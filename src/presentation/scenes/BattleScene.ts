@@ -13,6 +13,7 @@ export class BattleScene extends Phaser.Scene {
   // Visual components
   private arenaBackground!: ArenaBackground;
   private enemySprite: Phaser.GameObjects.Sprite | null = null;
+  private enemyShadow: Phaser.GameObjects.Ellipse | null = null;
   private crownSprite: Phaser.GameObjects.Image | null = null;
   private enemyNameText!: Phaser.GameObjects.Text;
   private enemyHPBar!: HPBar;
@@ -21,6 +22,8 @@ export class BattleScene extends Phaser.Scene {
   private playerHPBar!: HPBar;
   private goldChip!: Phaser.GameObjects.Container;
   private armorChip: Phaser.GameObjects.Container | null = null;
+  private topHUD: Phaser.GameObjects.Container | null = null;
+  private activeLabel: Phaser.GameObjects.Text | null = null;
 
   // Table elements
   private tableBackground!: Phaser.GameObjects.Graphics;
@@ -47,6 +50,9 @@ export class BattleScene extends Phaser.Scene {
     this.arenaBackground = new ArenaBackground(this);
     this.arenaBackground.setDepth(0);
 
+    // Top HUD bar
+    this.createTopHUD();
+
     // Table background (felt)
     this.createTableBackground();
 
@@ -71,6 +77,97 @@ export class BattleScene extends Phaser.Scene {
 
     // Listen for resize
     this.scale.on('resize', this.handleResize, this);
+  }
+
+  private createTopHUD(): void {
+    const width = this.scale.width;
+    const { safeTop, hudHeight } = this.layout;
+
+    this.topHUD = this.add.container(0, safeTop);
+    this.topHUD.setDepth(100);
+
+    // Background bar
+    const bg = this.add.graphics();
+    bg.fillStyle(colors.ink, 0.7);
+    bg.fillRect(0, 0, width, hudHeight);
+    this.topHUD.add(bg);
+
+    // Fight progress nodes (7 fights)
+    const manager = getGameManager();
+    const nodeStartX = 12;
+    const nodeSpacing = 24;
+
+    for (let i = 0; i < 7; i++) {
+      const nodeX = nodeStartX + i * nodeSpacing;
+      const nodeY = hudHeight / 2;
+      const currentFight = manager.getCurrentFightNumber() - 1;
+
+      const node = this.add.graphics();
+      
+      if (i < currentFight) {
+        // Completed fight
+        node.fillStyle(colors.green, 1);
+        node.fillCircle(nodeX, nodeY, 8);
+        node.lineStyle(2, colors.ink, 1);
+        node.strokeCircle(nodeX, nodeY, 8);
+      } else if (i === currentFight) {
+        // Current fight - gold with swords icon
+        node.fillStyle(colors.gold, 1);
+        node.fillCircle(nodeX, nodeY, 10);
+        node.lineStyle(2, colors.ink, 1);
+        node.strokeCircle(nodeX, nodeY, 10);
+      } else if (i === 3) {
+        // Elite (fight 4)
+        node.fillStyle(colors.violet, 0.5);
+        node.fillCircle(nodeX, nodeY, 8);
+        node.lineStyle(2, colors.ink, 0.5);
+        node.strokeCircle(nodeX, nodeY, 8);
+      } else if (i === 6) {
+        // Boss (fight 7)
+        node.fillStyle(colors.red, 0.5);
+        node.fillCircle(nodeX, nodeY, 8);
+        node.lineStyle(2, colors.ink, 0.5);
+        node.strokeCircle(nodeX, nodeY, 8);
+      } else {
+        // Future fight
+        node.fillStyle(colors.white, 0.3);
+        node.fillCircle(nodeX, nodeY, 6);
+        node.lineStyle(2, colors.ink, 0.3);
+        node.strokeCircle(nodeX, nodeY, 6);
+      }
+      this.topHUD.add(node);
+    }
+
+    // Gold display in center
+    const goldX = width / 2;
+    const state = manager.getState();
+    const goldAmount = state?.player.gold || 0;
+
+    const goldIcon = this.add.text(goldX - 30, hudHeight / 2, '💰', {
+      fontSize: '18px',
+    }).setOrigin(0.5);
+    this.topHUD.add(goldIcon);
+
+    const goldText = this.add.text(goldX + 5, hudHeight / 2, goldAmount.toString(), {
+      fontFamily: 'Lilita One',
+      fontSize: '18px',
+      color: '#FFD700',
+    }).setOrigin(0, 0.5).setStroke('#1B1030', 3);
+    this.topHUD.add(goldText);
+
+    // Settings button on right
+    const settingsX = width - 30;
+    const settingsBtn = this.add.graphics();
+    settingsBtn.fillStyle(colors.blue, 1);
+    settingsBtn.fillCircle(settingsX, hudHeight / 2, 14);
+    settingsBtn.lineStyle(2, colors.ink, 1);
+    settingsBtn.strokeCircle(settingsX, hudHeight / 2, 14);
+    this.topHUD.add(settingsBtn);
+
+    const settingsIcon = this.add.text(settingsX, hudHeight / 2, '⚙', {
+      fontSize: '16px',
+    }).setOrigin(0.5);
+    this.topHUD.add(settingsIcon);
   }
 
   private createTableBackground(): void {
@@ -212,11 +309,22 @@ export class BattleScene extends Phaser.Scene {
 
   private renderEnemy(battle: BattleState): void {
     const width = this.scale.width;
-    const { arenaTop, arenaHeight, enemyHeight } = this.layout;
+    const height = this.scale.height;
+    const { arenaTop, arenaHeight } = this.layout;
 
     const enemy = battle.enemy;
     const enemyX = width / 2;
-    const enemyY = arenaTop + arenaHeight - 84;
+    const enemyY = arenaTop + arenaHeight - 70;
+
+    // Target enemy height: ~26% of screen height per STYLE.md
+    const targetEnemyHeight = height * 0.26;
+
+    // Enemy shadow (dark oval under feet)
+    if (this.enemyShadow) {
+      this.enemyShadow.destroy();
+    }
+    this.enemyShadow = this.add.ellipse(enemyX, enemyY + 5, 120, 24, 0x1b1030, 0.4);
+    this.enemyShadow.setDepth(15);
 
     // Enemy sprite
     if (this.enemySprite) {
@@ -228,9 +336,18 @@ export class BattleScene extends Phaser.Scene {
       this.enemySprite = this.add.sprite(enemyX, enemyY, atlasKey);
       this.enemySprite.setOrigin(0.5, 1);
 
-      const scale = (enemy.scale || 1) * (enemyHeight / 180);
+      // Calculate scale to achieve target height
+      const frame = this.textures.getFrame(atlasKey);
+      const baseHeight = frame ? frame.height : 180;
+      const baseScale = targetEnemyHeight / baseHeight;
+      const scale = baseScale * (enemy.scale || 1);
+      
       this.enemySprite.setScale(scale);
       this.enemySprite.setDepth(20);
+
+      // Update shadow size based on sprite size
+      const shadowWidth = Math.min(this.enemySprite.displayWidth * 0.7, 150);
+      this.enemyShadow.setSize(shadowWidth, shadowWidth * 0.2);
 
       // Play idle animation
       const idleKey = `${enemy.sprite || 'goblin'}-idle`;
@@ -256,12 +373,18 @@ export class BattleScene extends Phaser.Scene {
       }
     }
 
-    // Enemy name
+    // Enemy name with rank badge
     if (this.enemyNameText) this.enemyNameText.destroy();
 
-    const rankBadge = enemy.tier === 'elite' ? 'ELITE ' : enemy.tier === 'boss' ? 'BOSS ' : '';
+    let rankBadge = '';
+    if (enemy.tier === 'elite') {
+      rankBadge = 'ELITE ';
+    } else if (enemy.tier === 'boss') {
+      rankBadge = 'BOSS ';
+    }
+
     this.enemyNameText = this.add
-      .text(width / 2, arenaTop + arenaHeight - 50, rankBadge + enemy.name, {
+      .text(width / 2, arenaTop + arenaHeight - 42, rankBadge + enemy.name, {
         fontFamily: 'Lilita One',
         fontSize: '19px',
         color: '#ffffff',
@@ -276,7 +399,7 @@ export class BattleScene extends Phaser.Scene {
     this.enemyHPBar = new HPBar(
       this,
       width / 2,
-      arenaTop + arenaHeight - 24,
+      arenaTop + arenaHeight - 16,
       230,
       22,
       enemy.maxHp
@@ -292,8 +415,8 @@ export class BattleScene extends Phaser.Scene {
     if (intent) {
       this.intentBubble = createIntentBubble(
         this,
-        width / 2 + 90,
-        arenaTop + arenaHeight * 0.25,
+        width / 2 + 80,
+        arenaTop + arenaHeight * 0.2,
         intent.type as 'attack' | 'defend' | 'buff' | 'debuff',
         intent.value
       );
@@ -371,6 +494,10 @@ export class BattleScene extends Phaser.Scene {
       this.activeCardVisual.destroy();
       this.activeCardVisual = null;
     }
+    if (this.activeLabel) {
+      this.activeLabel.destroy();
+      this.activeLabel = null;
+    }
 
     if (!battle.activeCard) return;
 
@@ -391,18 +518,16 @@ export class BattleScene extends Phaser.Scene {
     this.activeCardVisual.getContainer().setScale(activeScale);
     this.activeCardVisual.setDepth(55);
 
-    // "ACTIVE" label
+    // "ACTIVE" label - always show
     const labelY = activeY + activeH / 2 + 12;
-    if (!this.layout.isCompact) {
-      this.add
-        .text(activeX, labelY, 'ACTIVE', {
-          fontFamily: 'Fredoka',
-          fontSize: '11px',
-          color: '#9a8aba',
-        })
-        .setOrigin(0.5)
-        .setDepth(55);
-    }
+    this.activeLabel = this.add
+      .text(activeX, labelY, 'ACTIVE', {
+        fontFamily: 'Fredoka',
+        fontSize: '11px',
+        color: '#9a8aba',
+      })
+      .setOrigin(0.5)
+      .setDepth(55);
   }
 
   private updateComboBanner(battle: BattleState): void {
