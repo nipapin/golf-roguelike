@@ -1,0 +1,85 @@
+{
+  "normal": [
+    {
+      "id": "slime",
+      "name": "SLIME",
+      "hp": 26,
+      "intents": [
+        { "type": "attack", "value": 4 },
+        { "type": "attack", "value": 6 },
+        { "type": "defend", "value": 3 }
+      ],
+      "sprite": "enemy-slime"
+    },
+    {
+      "id": "bandit",
+      "name": "BANDIT",
+      "hp": 32,
+      "intents": [
+        { "type": "attack", "value": 5 },
+        { "type": "attack", "value": 7 },
+        { "type": "attack", "value": 4 }
+      ],
+      "sprite": "enemy-bandit"
+    },
+    {
+      "id": "knight",
+      "name": "BONE KNIGHT",
+      "hp": 38,
+      "intents": [
+        { "type": "attack", "value": 6 },
+        { "type": "defend", "value": 5 },
+        { "type": "attack", "value": 8 }
+      ],
+      "sprite": "enemy-knight"
+    }
+  ],
+  "elite": [
+    {
+      "id": "mimic",
+      "name": "MIMIC",
+      "hp": 55,
+      "intents": [
+        { "type": "attack", "value": 8 },
+        { "type": "attack", "value": 10 },
+        { "type": "buff", "value": 2 }
+      ],
+      "sprite": "enemy-mimic",
+      "powerCardCount": 5
+    },
+    {
+      "id": "witch",
+      "name": "WITCH",
+      "hp": 48,
+      "intents": [
+        { "type": "attack", "value": 7 },
+        { "type": "debuff", "value": 3 },
+        { "type": "attack", "value": 12 }
+      ],
+      "sprite": "enemy-witch",
+      "powerCardCount": 5
+    }
+  ],
+  "boss": [
+    {
+      "id": "king",
+      "name": "GOLF KING",
+      "hp": 85,
+      "intents": [
+        { "type": "attack", "value": 10 },
+        { "type": "attack", "value": 12 },
+        { "type": "attack", "value": 8 },
+        { "type": "buff", "value": 3 }
+      ],
+      "sprite": "enemy-king",
+      "powerCardCount": 4
+    }
+  ],
+  "defaults": {
+    "powerCardCount": {
+      "normal": 3,
+      "elite": 5,
+      "boss": 4
+    }
+  }
+}
