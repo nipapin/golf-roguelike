@@ -131,48 +131,55 @@ export function getCardMetrics(screenWidth: number) {
 
 /**
  * Get layout metrics for different screen sizes
- * Based on STYLE.md section 9 measurements
+ * Based on STYLE.md section 9 exact measurements:
+ * - 390×844: HUD 44, Arena 336, Banner 56, Tableau 200, Tray 133
+ * - 375×667: HUD 40, Arena 260, Banner 50, Tableau 188, Tray 109
+ * - 430×932: HUD 44, Arena 391, Banner 56, Tableau 221, Tray 145
  */
 export function getLayoutMetrics(width: number, height: number) {
   const isCompact = height <= 760;
   const metrics = getCardMetrics(width);
 
-  // Safe areas (approximate for now, real values from env())
+  // Safe areas (iPhone-style)
   const safeTop = height >= 800 ? 47 : 20;
   const safeBottom = height >= 800 ? 34 : 6;
 
+  // Fixed heights for HUD and banner
   const hudHeight = isCompact ? 40 : 44;
   const bannerHeight = isCompact ? 50 : 56;
+
+  // Calculate tableau height: 4 visible strips + 1 full card + padding
   const tableauHeight = 4 * metrics.strip + metrics.ch + 14;
 
-  // Active card in tray
+  // Active card sizing
   const activeScale = isCompact ? 1.3 : 1.42;
   const activeW = metrics.cw * activeScale;
   const activeH = metrics.ch * activeScale;
 
-  // Tray height (draw pile + active card + player HP)
-  const trayHeight = activeH + 50;
+  // Tray height: needs to fit active card + waste cards + HUD elements
+  const trayHeight = isCompact ? 109 : 133;
 
-  // Calculate from bottom up to ensure proper spacing
-  // Tray sits above safeBottom
-  const trayTop = height - safeBottom - trayHeight;
+  // Calculate from known fixed positions (top down)
+  const hudTop = safeTop;
+  const arenaTop = hudTop + hudHeight;
   
-  // Tableau sits above tray with padding
-  const tableauTop = trayTop - tableauHeight - 16;
+  // Table area = tableau + tray, positioned from bottom
+  const tableHeight = tableauHeight + trayHeight;
+  const tableTop = height - safeBottom - tableHeight;
   
-  // Table region (tableau + tray combined for background)
-  const tableTop = tableauTop - 30;
-  const tableHeight = height - tableTop - safeBottom;
+  // Tableau starts inside table area with top padding
+  const tableauTop = tableTop + 30;
   
-  // Banner sits at the seam between arena and table (overlaps both)
-  const bannerOverlap = 14;
-  const bannerTop = tableTop - bannerHeight + bannerOverlap + 22;
+  // Tray is below tableau
+  const trayTop = tableauTop + tableauHeight;
 
-  // Arena fills space between HUD and banner
-  const arenaTop = safeTop + hudHeight;
-  const arenaHeight = bannerTop + bannerOverlap - arenaTop;
+  // Banner overlaps the seam between arena and table
+  const bannerTop = tableTop - bannerHeight + 22;
 
-  // Enemy sprite
+  // Arena fills the space between HUD and banner
+  const arenaHeight = bannerTop - arenaTop + 14; // +14 for banner overlap
+
+  // Enemy sprite height
   const maxEnemyHeight = 250;
   const enemyHeight = Math.min(arenaHeight * 0.66, maxEnemyHeight);
 
@@ -180,6 +187,7 @@ export function getLayoutMetrics(width: number, height: number) {
     safeTop,
     safeBottom,
     hudHeight,
+    hudTop,
     arenaTop,
     arenaHeight,
     bannerTop,

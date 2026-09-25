@@ -358,14 +358,8 @@ export class CardVisual {
     this.container.setScale(1);
     this.container.setAngle(0);
 
-    // Apply filters
-    if (state === 'covered') {
-      this.cardBg.setAlpha(0.94);
-    } else if (state === 'disabled') {
-      this.cardBg.setAlpha(0.8);
-    } else {
-      this.cardBg.setAlpha(1);
-    }
+    // Cards are always fully opaque - no alpha changes
+    this.cardBg.setAlpha(1);
 
     this.updateOutline();
   }

@@ -122,15 +122,15 @@ export class BattleScene extends Phaser.Scene {
 
   private createTopHUD(): void {
     const width = this.scale.width;
-    const { safeTop, hudHeight } = this.layout;
+    const { hudTop, hudHeight } = this.layout;
 
-    this.topHUD = this.add.container(0, safeTop);
+    this.topHUD = this.add.container(0, hudTop);
     this.topHUD.setDepth(100);
 
-    // Background bar
+    // Dark rounded pill background (like mockup)
     const bg = this.add.graphics();
-    bg.fillStyle(colors.ink, 0.7);
-    bg.fillRect(0, 0, width, hudHeight);
+    bg.fillStyle(colors.ink, 0.85);
+    bg.fillRoundedRect(8, 4, width - 16, hudHeight - 8, 14);
     this.topHUD.add(bg);
 
     // Fight progress nodes (7 fights)
@@ -212,14 +212,14 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTableBackground(): void {
-    const { tableTop } = this.layout;
+    const { tableTop, tableHeight, safeBottom } = this.layout;
     const width = this.scale.width;
     const height = this.scale.height;
 
     this.tableBackground = this.add.graphics();
     this.tableBackground.setDepth(10);
 
-    // Felt gradient
+    // Felt gradient - extends to bottom of screen minus safe area
     this.tableBackground.fillGradientStyle(
       colors.feltHi,
       colors.feltHi,
@@ -231,7 +231,7 @@ export class BattleScene extends Phaser.Scene {
       0,
       tableTop,
       width,
-      height - tableTop,
+      height - tableTop - safeBottom + 10,
       { tl: 22, tr: 22, bl: 0, br: 0 }
     );
 
