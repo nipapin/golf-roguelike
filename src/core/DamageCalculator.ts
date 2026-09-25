@@ -27,7 +27,7 @@ export function calculateCardDamage(ctx: DamageContext): DamageResult {
   const { chainPosition, card, powerType, relics, config } = ctx;
 
   // Base damage = position in chain
-  let baseDamage = chainPosition;
+  const baseDamage = chainPosition;
 
   // Apply first chain bonus from relics
   const firstChainBonus = relics.find((r) => r.effect.type === 'firstChainBonus');

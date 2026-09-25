@@ -189,7 +189,7 @@ export function playCard(
     wildActive: powerType === 'WILD',
   };
 
-  let newState: RunState = {
+  const newState: RunState = {
     ...state,
     player: newPlayer,
     battle: newBattle,
@@ -427,7 +427,7 @@ function reshuffleDeck(state: RunState, config: GameConfig): ActionResult {
   const rng = RNG.fromState(state.rngState);
 
   // Combine discard and active card into new deck
-  let cardsToShuffle = [...state.battle.discard];
+  const cardsToShuffle = [...state.battle.discard];
   if (state.battle.activeCard) {
     cardsToShuffle.push(state.battle.activeCard);
   }

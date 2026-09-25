@@ -4,6 +4,7 @@ import { colors, getLayoutMetrics, getCardMetrics, getComboTier } from '../desig
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
 import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
 import { CardVisual, createCardBack } from '../design/CardVisual';
+import { isPlayable } from '../../core/GameRules';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
 
 export class BattleScene extends Phaser.Scene {
@@ -83,7 +84,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private setupTestHook(): void {
-    const { cw, ch } = this.layout;
+    const { ch } = this.layout;
     setTestHook({
       isActive: true,
       getPlayableCards: () => {
@@ -211,7 +212,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTableBackground(): void {
-    const { tableTop, tableHeight, safeBottom } = this.layout;
+    const { tableTop } = this.layout;
     const width = this.scale.width;
     const height = this.scale.height;
 
@@ -243,27 +244,26 @@ export class BattleScene extends Phaser.Scene {
 
   private createPlayerHUD(): void {
     const width = this.scale.width;
-    const height = this.scale.height;
-    const { trayTop, activeH, safeBottom } = this.layout;
+    const { trayTop, trayHeight } = this.layout;
 
-    const hudY = height - safeBottom - 40;
+    // Player HUD at bottom of tray area
+    const hudY = trayTop + trayHeight - 10;
 
     // Player HP bar (smaller, right side)
     this.playerHPBar = new HPBar(this, width - 70, hudY, 100, 18, 30, true);
     this.playerHPBar.setDepth(60);
 
-    // Gold chip
+    // Gold chip above HP bar
     this.goldChip = createChip(this, width - 140, hudY - 30, colors.diamond, '♦', 0);
     this.goldChip.setDepth(60);
   }
 
   private createDrawPile(): void {
-    const { trayTop, cw, ch, side, safeBottom } = this.layout;
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const { trayTop, trayHeight, cw, ch, side } = this.layout;
 
     const pileX = side + cw / 2 + 10;
-    const pileY = height - safeBottom - ch / 2 - 45;
+    // Position draw pile in the tray area, vertically centered with some offset for button
+    const pileY = trayTop + trayHeight / 2 - 10;
 
     this.drawPile = this.add.container(pileX, pileY);
     this.drawPile.setDepth(55);
@@ -470,8 +470,7 @@ export class BattleScene extends Phaser.Scene {
     this.cardVisuals.forEach((cv) => cv.destroy());
     this.cardVisuals = [];
 
-    const { tableauTop, cw, ch, strip, side, gap } = this.layout;
-    const width = this.scale.width;
+    const { tableauTop, cw, strip, side, gap } = this.layout;
 
     const tableauX = side;
     const tableauY = tableauTop + 20;
@@ -513,24 +512,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private canPlayCard(card: Card, battle: BattleState): boolean {
-    if (!battle.activeCard) return false;
-
-    const activeRank = battle.activeCard.rank;
-    const cardRank = card.rank;
-
-    // Wild active means any card can connect
-    if (battle.wildActive) return true;
-
-    // Normal connection: ±1
-    const diff = Math.abs(activeRank - cardRank);
-    if (diff === 1) return true;
-
-    // Ace-King wrap (check relics)
-    if ((activeRank === 1 && cardRank === 13) || (activeRank === 13 && cardRank === 1)) {
-      return true;
-    }
-
-    return false;
+    const manager = getGameManager();
+    const state = manager.getState();
+    if (!state) return false;
+    
+    return isPlayable(battle, card.id, state.player.relics);
   }
 
   private renderActiveCard(battle: BattleState): void {
@@ -545,13 +531,12 @@ export class BattleScene extends Phaser.Scene {
 
     if (!battle.activeCard) return;
 
-    const { trayTop, activeW, activeH, activeScale, safeBottom, cw, ch, side } = this.layout;
+    const { trayTop, trayHeight, activeW, activeH, activeScale, cw } = this.layout;
     const width = this.scale.width;
-    const height = this.scale.height;
 
-    // Position between draw pile and player HUD
-    const activeX = width / 2 - 20;
-    const activeY = height - safeBottom - activeH / 2 - 30;
+    // Position active card in center of tray, slightly right of center
+    const activeX = width / 2 + cw * 0.5;
+    const activeY = trayTop + trayHeight / 2;
 
     // Get power type if any
     const powerCard = battle.powerCards.find((pc) => pc.cardId === battle.activeCard!.id);
@@ -606,9 +591,8 @@ export class BattleScene extends Phaser.Scene {
     if (state.player.armor > 0) {
       if (!this.armorChip) {
         const width = this.scale.width;
-        const height = this.scale.height;
-        const { safeBottom } = this.layout;
-        this.armorChip = createChip(this, width - 140, height - safeBottom - 70, colors.club, '🛡', state.player.armor);
+        const { trayTop, trayHeight } = this.layout;
+        this.armorChip = createChip(this, width - 140, trayTop + trayHeight - 70, colors.club, '🛡', state.player.armor);
         this.armorChip.setDepth(60);
       } else {
         const armorText = this.armorChip.getAt(3) as Phaser.GameObjects.Text;

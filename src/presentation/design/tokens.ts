@@ -131,6 +131,7 @@ export function getCardMetrics(screenWidth: number) {
 
 /**
  * Get layout metrics for different screen sizes
+ * Based on STYLE.md section 9 measurements
  */
 export function getLayoutMetrics(width: number, height: number) {
   const isCompact = height <= 760;
@@ -150,14 +151,26 @@ export function getLayoutMetrics(width: number, height: number) {
   const activeH = metrics.ch * activeScale;
 
   // Tray height (draw pile + active card + player HP)
-  const trayHeight = activeH + 40;
+  const trayHeight = activeH + 50;
 
-  // Table = tableau + tray
-  const tableHeight = tableauHeight + trayHeight;
+  // Calculate from bottom up to ensure proper spacing
+  // Tray sits above safeBottom
+  const trayTop = height - safeBottom - trayHeight;
+  
+  // Tableau sits above tray with padding
+  const tableauTop = trayTop - tableauHeight - 16;
+  
+  // Table region (tableau + tray combined for background)
+  const tableTop = tableauTop - 30;
+  const tableHeight = height - tableTop - safeBottom;
+  
+  // Banner sits at the seam between arena and table (overlaps both)
+  const bannerOverlap = 14;
+  const bannerTop = tableTop - bannerHeight + bannerOverlap + 22;
 
-  // Arena fills remaining space
+  // Arena fills space between HUD and banner
   const arenaTop = safeTop + hudHeight;
-  const arenaHeight = height - safeTop - hudHeight - bannerHeight - tableHeight - safeBottom;
+  const arenaHeight = bannerTop + bannerOverlap - arenaTop;
 
   // Enemy sprite
   const maxEnemyHeight = 250;
@@ -169,13 +182,13 @@ export function getLayoutMetrics(width: number, height: number) {
     hudHeight,
     arenaTop,
     arenaHeight,
-    bannerTop: arenaTop + arenaHeight,
+    bannerTop,
     bannerHeight,
-    tableTop: arenaTop + arenaHeight + bannerHeight,
+    tableTop,
     tableHeight,
-    tableauTop: arenaTop + arenaHeight + bannerHeight + 30,
+    tableauTop,
     tableauHeight,
-    trayTop: arenaTop + arenaHeight + bannerHeight + 30 + tableauHeight,
+    trayTop,
     trayHeight,
     enemyHeight,
     activeScale,
