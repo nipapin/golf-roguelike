@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   playCard,
   drawCard,
@@ -11,9 +11,9 @@ import {
   setupRewards,
   startNextBattle,
 } from './GameActions';
-import { setupBattle, createInitialRunState, EnemiesData } from './GameState';
-import { RunState, BattleState, GameConfig, Relic, Card } from './types';
-import { RNG } from './RNG';
+import { EnemiesData } from './GameState';
+import { isPlayable } from './GameRules';
+import { RunState, GameConfig, Relic, Card } from './types';
 
 const mockConfig: GameConfig = {
   player: { startingHp: 30, maxHp: 30 },
@@ -81,12 +81,6 @@ const mockEnemiesData: EnemiesData = {
 
 const mockRelics: Relic[] = [
   {
-    id: 'ace_king_link',
-    name: 'SNAKE RING',
-    description: 'Ace connects to King',
-    effect: { type: 'aceKingWrap', value: true },
-  },
-  {
     id: 'spade_bonus',
     name: 'SHARP SPADE',
     description: '♠ deal +2',
@@ -97,6 +91,12 @@ const mockRelics: Relic[] = [
     name: 'RED HEART',
     description: '♥ heal +2',
     effect: { type: 'heartHealBonus', value: 2 },
+  },
+  {
+    id: 'diamond_bonus',
+    name: 'GOLD NUGGET',
+    description: '♦ give +2 gold',
+    effect: { type: 'diamondGoldBonus', value: 2 },
   },
 ];
 
@@ -294,7 +294,7 @@ describe('playCard', () => {
 
 describe('drawCard', () => {
   it('should resolve chain damage when drawing', () => {
-    let state = createTestBattleState('draw-test-1');
+    const state = createTestBattleState('draw-test-1');
 
     // Build a small chain first
     let currentState = state;
@@ -506,7 +506,7 @@ describe('shop actions', () => {
         maxHp: 30,
         armor: 0,
         gold: 30,
-        relics: [mockRelics[1]], // Already has spade_bonus
+        relics: [mockRelics[0]], // Already has spade_bonus (first relic)
       },
       battle: null,
     };
@@ -587,6 +587,110 @@ describe('run progression', () => {
 
     expect(result.events.some((e) => e.type === 'run_won')).toBe(true);
     expect(result.state.phase).toBe('victory');
+  });
+});
+
+describe('ace-king wrap (base rule)', () => {
+  it('should always accept A->K play (base rule)', () => {
+    let state = createTestBattleState('ak-base-rule');
+    const aceCard: Card = { rank: 1, suit: 'spades', id: 'test-ace' };
+    const kingCard: Card = { rank: 13, suit: 'hearts', id: 'test-king' };
+    
+    state = {
+      ...state,
+      player: { ...state.player, relics: [] },
+      battle: {
+        ...state.battle!,
+        activeCard: aceCard,
+        tableau: [
+          { cards: [kingCard] },
+          ...state.battle!.tableau.slice(1),
+        ],
+      },
+    };
+
+    const result = playCard(state, kingCard.id, mockConfig);
+    
+    // A-K wrap is now always legal (base rule)
+    expect(result.state.battle?.chain.length).toBe(1);
+    expect(result.state.battle?.activeCard?.id).toBe('test-king');
+  });
+
+  it('should always accept K->A play (base rule)', () => {
+    let state = createTestBattleState('ka-base-rule');
+    const kingCard: Card = { rank: 13, suit: 'spades', id: 'test-king' };
+    const aceCard: Card = { rank: 1, suit: 'hearts', id: 'test-ace' };
+    
+    state = {
+      ...state,
+      player: { ...state.player, relics: [] },
+      battle: {
+        ...state.battle!,
+        activeCard: kingCard,
+        tableau: [
+          { cards: [aceCard] },
+          ...state.battle!.tableau.slice(1),
+        ],
+      },
+    };
+
+    const result = playCard(state, aceCard.id, mockConfig);
+    
+    // K-A wrap is now always legal (base rule)
+    expect(result.state.battle?.chain.length).toBe(1);
+    expect(result.state.battle?.activeCard?.id).toBe('test-ace');
+  });
+});
+
+describe('UI playability matches engine validation', () => {
+  it('every card isPlayable reports should be accepted by playCard', () => {
+    const seeds = ['ui-engine-sync-1', 'ui-engine-sync-2', 'ui-engine-sync-3'];
+    
+    for (const seed of seeds) {
+      const state = createTestBattleState(seed);
+      const battle = state.battle!;
+      
+      // Get all exposed cards
+      for (const col of battle.tableau) {
+        if (col.cards.length === 0) continue;
+        const topCard = col.cards[col.cards.length - 1];
+        
+        const uiSaysPlayable = isPlayable(battle, topCard.id);
+        
+        if (uiSaysPlayable) {
+          // If UI says playable, engine must accept the play
+          const result = playCard(state, topCard.id, mockConfig);
+          expect(result.state.battle?.chain.length).toBeGreaterThan(0);
+          expect(result.state.battle?.activeCard?.id).toBe(topCard.id);
+        }
+      }
+    }
+  });
+
+  it('non-playable cards should be rejected by both UI and engine', () => {
+    let state = createTestBattleState('non-playable-test');
+    const activeCard: Card = { rank: 5, suit: 'spades', id: 'active-5' };
+    const farCard: Card = { rank: 10, suit: 'hearts', id: 'far-10' };
+    
+    state = {
+      ...state,
+      player: { ...state.player, relics: [] },
+      battle: {
+        ...state.battle!,
+        activeCard,
+        tableau: [
+          { cards: [farCard] },
+          ...state.battle!.tableau.slice(1),
+        ],
+      },
+    };
+
+    const uiSaysPlayable = isPlayable(state.battle!, farCard.id);
+    expect(uiSaysPlayable).toBe(false);
+    
+    const result = playCard(state, farCard.id, mockConfig);
+    expect(result.state.battle?.chain.length).toBe(0);
+    expect(result.state.battle?.activeCard?.id).toBe('active-5');
   });
 });
 

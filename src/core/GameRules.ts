@@ -1,13 +1,13 @@
-import { BattleState, Card, RunState, Relic, TableauColumn } from './types';
+import { BattleState, Card, RunState, Relic } from './types';
 import { canConnect, isCardExposed, hasLegalMoves as checkLegalMoves, isTableauEmpty } from './GameState';
 
 /**
  * Check if a card can be played from the tableau
+ * A-K wrap is always legal (base rule)
  */
 export function isPlayable(
   battle: BattleState,
-  cardId: string,
-  relics: Relic[]
+  cardId: string
 ): boolean {
   if (!battle.activeCard) return false;
 
@@ -26,25 +26,22 @@ export function isPlayable(
   // Check if exposed
   if (!isCardExposed(battle.tableau, cardId)) return false;
 
-  // Check if can connect
-  const aceKingWrap = relics.some((r) => r.effect.type === 'aceKingWrap');
-  return canConnect(card, battle.activeCard, aceKingWrap, battle.wildActive);
+  // Check if can connect (A-K wrap is always legal)
+  return canConnect(card, battle.activeCard, battle.wildActive);
 }
 
 /**
  * Get all playable cards from the tableau
  */
-export function getPlayableCards(battle: BattleState, relics: Relic[]): Card[] {
+export function getPlayableCards(battle: BattleState): Card[] {
   const playable: Card[] = [];
 
   if (!battle.activeCard) return playable;
 
-  const aceKingWrap = relics.some((r) => r.effect.type === 'aceKingWrap');
-
   for (const col of battle.tableau) {
     if (col.cards.length === 0) continue;
     const topCard = col.cards[col.cards.length - 1];
-    if (canConnect(topCard, battle.activeCard, aceKingWrap, battle.wildActive)) {
+    if (canConnect(topCard, battle.activeCard, battle.wildActive)) {
       playable.push(topCard);
     }
   }
@@ -55,9 +52,8 @@ export function getPlayableCards(battle: BattleState, relics: Relic[]): Card[] {
 /**
  * Check if the player has any legal moves
  */
-export function hasLegalMoves(battle: BattleState, relics: Relic[]): boolean {
-  const aceKingWrap = relics.some((r) => r.effect.type === 'aceKingWrap');
-  return checkLegalMoves(battle, aceKingWrap);
+export function hasLegalMovesForUI(battle: BattleState): boolean {
+  return checkLegalMoves(battle);
 }
 
 /**

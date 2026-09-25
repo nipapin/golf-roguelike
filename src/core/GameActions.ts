@@ -25,10 +25,6 @@ import {
 } from './GameState';
 import { calculateCardDamage } from './DamageCalculator';
 
-function hasAceKingWrap(relics: Relic[]): boolean {
-  return relics.some((r) => r.effect.type === 'aceKingWrap');
-}
-
 function getFirstChainBonus(relics: Relic[]): number {
   const relic = relics.find((r) => r.effect.type === 'firstChainBonus');
   return relic && typeof relic.effect.value === 'number' ? relic.effect.value : 0;
@@ -49,7 +45,6 @@ export function playCard(
   }
 
   const battle = state.battle;
-  const aceKingWrap = hasAceKingWrap(state.player.relics);
 
   // Find the card in tableau
   const colIndex = findCardColumn(battle.tableau, cardId);
@@ -66,7 +61,7 @@ export function playCard(
   const card = column.cards[column.cards.length - 1];
 
   // Check if card can connect
-  if (!battle.activeCard || !canConnect(card, battle.activeCard, aceKingWrap, battle.wildActive)) {
+  if (!battle.activeCard || !canConnect(card, battle.activeCard, battle.wildActive)) {
     return { state, events };
   }
 
@@ -189,7 +184,7 @@ export function playCard(
     wildActive: powerType === 'WILD',
   };
 
-  let newState: RunState = {
+  const newState: RunState = {
     ...state,
     player: newPlayer,
     battle: newBattle,
@@ -245,10 +240,9 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
   }
 
   const updatedBattle = newState.battle;
-  const aceKingWrap = hasAceKingWrap(newState.player.relics);
 
   // Check if deck is empty and no legal moves
-  if (updatedBattle.deck.length === 0 && !hasLegalMoves(updatedBattle, aceKingWrap)) {
+  if (updatedBattle.deck.length === 0 && !hasLegalMoves(updatedBattle)) {
     const reshuffleResult = reshuffleDeck(newState, config);
     newState = reshuffleResult.state;
     events.push(...reshuffleResult.events);
@@ -256,7 +250,7 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
 
   if (!newState.battle || newState.battle.deck.length === 0) {
     // Still no cards, check again for moves
-    if (newState.battle && !hasLegalMoves(newState.battle, aceKingWrap)) {
+    if (newState.battle && !hasLegalMoves(newState.battle)) {
       // Enemy attacks again, then reshuffle
       const attackResult2 = enemyAttack(newState, config);
       newState = attackResult2.state;
@@ -427,7 +421,7 @@ function reshuffleDeck(state: RunState, config: GameConfig): ActionResult {
   const rng = RNG.fromState(state.rngState);
 
   // Combine discard and active card into new deck
-  let cardsToShuffle = [...state.battle.discard];
+  const cardsToShuffle = [...state.battle.discard];
   if (state.battle.activeCard) {
     cardsToShuffle.push(state.battle.activeCard);
   }

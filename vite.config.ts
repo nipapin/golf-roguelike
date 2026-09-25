@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'Golf Rogue',
         short_name: 'Golf Rogue',
@@ -24,12 +24,8 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Activate new SW immediately without waiting
-        skipWaiting: true,
-        clientsClaim: true,
-
-        // Pre-cache static assets for offline play
-        globPatterns: ['**/*.{js,css,svg,png,woff2}'],
+        // Pre-cache static assets for offline play (including audio)
+        globPatterns: ['**/*.{js,css,svg,png,woff2,ogg,mp3}'],
 
         // Don't pre-cache HTML - fetch from network first
         navigateFallback: null,
@@ -95,6 +91,18 @@ export default defineConfig({
               expiration: {
                 maxEntries: 20,
                 maxAgeSeconds: 60 * 60 * 24 * 365, // 1 year
+              },
+            },
+          },
+          {
+            // Audio files: Cache First
+            urlPattern: /\.(?:ogg|mp3|m4a|wav)$/,
+            handler: 'CacheFirst',
+            options: {
+              cacheName: 'audio-cache',
+              expiration: {
+                maxEntries: 30,
+                maxAgeSeconds: 60 * 60 * 24 * 30, // 30 days
               },
             },
           },

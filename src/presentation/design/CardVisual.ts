@@ -166,32 +166,40 @@ export class CardVisual {
 
     this.powerFrame = this.scene.add.graphics();
 
-    // Conic gradient simulation with segments
     const frameWidth = cw * 0.1;
-    const segments = 12;
-    const gradColors = [pc.pw1, pc.pw2, pc.pw3, pc.pw2, pc.pw1];
 
-    for (let i = 0; i < segments; i++) {
-      const colorIndex = Math.floor((i / segments) * gradColors.length) % gradColors.length;
-      this.powerFrame.fillStyle(gradColors[colorIndex], 1);
+    // Draw frame as concentric rounded rects with gradient colors
+    // Outer edge (pw1 - darkest)
+    this.powerFrame.lineStyle(frameWidth * 0.4, pc.pw1, 1);
+    this.powerFrame.strokeRoundedRect(
+      frameWidth * 0.2,
+      frameWidth * 0.2,
+      cw - frameWidth * 0.4,
+      ch - frameWidth * 0.4,
+      radius
+    );
 
-      const angle1 = (i / segments) * Math.PI * 2;
-      const angle2 = ((i + 1) / segments) * Math.PI * 2;
+    // Middle band (pw2 - main color)
+    this.powerFrame.lineStyle(frameWidth * 0.4, pc.pw2, 1);
+    this.powerFrame.strokeRoundedRect(
+      frameWidth * 0.5,
+      frameWidth * 0.5,
+      cw - frameWidth,
+      ch - frameWidth,
+      radius - frameWidth * 0.3
+    );
 
-      this.powerFrame.beginPath();
-      this.powerFrame.arc(cw / 2, ch / 2, Math.max(cw, ch) * 0.7, angle1, angle2, false);
-      this.powerFrame.arc(cw / 2, ch / 2, Math.max(cw, ch) * 0.5, angle2, angle1, true);
-      this.powerFrame.closePath();
-      this.powerFrame.fill();
-    }
-
-    // Mask to card shape
-    const mask = this.scene.add.graphics();
-    mask.fillStyle(0xffffff);
-    mask.fillRoundedRect(frameWidth, frameWidth, cw - frameWidth * 2, ch - frameWidth * 2, radius - frameWidth);
+    // Inner highlight (pw3 - brightest)
+    this.powerFrame.lineStyle(frameWidth * 0.3, pc.pw3, 0.7);
+    this.powerFrame.strokeRoundedRect(
+      frameWidth * 0.8,
+      frameWidth * 0.8,
+      cw - frameWidth * 1.6,
+      ch - frameWidth * 1.6,
+      radius - frameWidth * 0.5
+    );
 
     this.container.add(this.powerFrame);
-    this.powerFrame.setMask(mask.createGeometryMask().setInvertAlpha(true));
   }
 
   private createPowerMedal(powerType: PowerType): void {
@@ -312,12 +320,17 @@ export class CardVisual {
         break;
 
       case 'disabled':
+        // Per mockup: exposed but not playable card gets grey-blue tint
+        // CSS: filter:saturate(.75) brightness(.86) + overlay gradient
         this.outlineGfx.lineStyle(outline, colors.ink, 1);
         this.outlineGfx.strokeRoundedRect(0, 0, cw, ch, radius);
 
-        // Dim overlay
-        this.outlineGfx.fillStyle(0x4632aa, 0.2);
-        this.outlineGfx.fillRoundedRect(0, 0, cw, ch, radius);
+        // Grey-blue veil overlay (matching mockup's disabled state)
+        // Top: rgba(70,50,170,.16), bottom: rgba(40,20,120,.30)
+        this.glowGfx.fillStyle(0x4632aa, 0.18);
+        this.glowGfx.fillRoundedRect(0, 0, cw, ch * 0.5, { tl: radius, tr: radius, bl: 0, br: 0 });
+        this.glowGfx.fillStyle(0x281478, 0.28);
+        this.glowGfx.fillRoundedRect(0, ch * 0.5, cw, ch * 0.5, { tl: 0, tr: 0, bl: radius, br: radius });
         break;
 
       case 'covered':
@@ -350,14 +363,8 @@ export class CardVisual {
     this.container.setScale(1);
     this.container.setAngle(0);
 
-    // Apply filters
-    if (state === 'covered') {
-      this.cardBg.setAlpha(0.94);
-    } else if (state === 'disabled') {
-      this.cardBg.setAlpha(0.8);
-    } else {
-      this.cardBg.setAlpha(1);
-    }
+    // Cards are always fully opaque - no alpha changes
+    this.cardBg.setAlpha(1);
 
     this.updateOutline();
   }

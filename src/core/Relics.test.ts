@@ -29,18 +29,6 @@ function makeCard(rank: number, suit: 'spades' | 'hearts' | 'diamonds' | 'clubs'
 }
 
 describe('Relic Effects on Damage', () => {
-  it('aceKingWrap relic enables A-K connection', () => {
-    // This is tested in the canConnect logic, not damage
-    // Just verify the relic structure is correct
-    const relic: Relic = {
-      id: 'ace_king_link',
-      name: 'SNAKE RING',
-      description: 'Ace connects to King',
-      effect: { type: 'aceKingWrap', value: true },
-    };
-    expect(relic.effect.type).toBe('aceKingWrap');
-  });
-
   it('spadeDamageBonus relic adds extra spade damage', () => {
     const card = makeCard(5, 'spades');
     const relics: Relic[] = [

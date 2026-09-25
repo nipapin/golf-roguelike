@@ -4,6 +4,9 @@ import { colors, getLayoutMetrics, getCardMetrics, getComboTier } from '../desig
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
 import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
 import { CardVisual, createCardBack } from '../design/CardVisual';
+import { SettingsModal } from '../design/SettingsModal';
+import { isPlayable } from '../../core/GameRules';
+import { AudioSystem } from '../audio/AudioSystem';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
 
 export class BattleScene extends Phaser.Scene {
@@ -34,6 +37,10 @@ export class BattleScene extends Phaser.Scene {
 
   // State
   private currentState: RunState | null = null;
+  
+  // UI
+  private settingsModal: SettingsModal | null = null;
+  private inputPaused: boolean = false;
 
   constructor() {
     super('BattleScene');
@@ -75,6 +82,24 @@ export class BattleScene extends Phaser.Scene {
     // Initial render
     this.refreshState();
 
+    // Create settings modal
+    this.settingsModal = new SettingsModal(this, {
+      onResume: () => {
+        this.inputPaused = false;
+      },
+      onRestart: () => {
+        this.inputPaused = false;
+        const manager = getGameManager();
+        manager.abandonRun();
+        manager.startNewRun();
+        this.scene.restart();
+      },
+      onMainMenu: () => {
+        this.inputPaused = false;
+        this.scene.start('StartScene');
+      },
+    });
+
     // Listen for resize
     this.scale.on('resize', this.handleResize, this);
 
@@ -83,7 +108,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private setupTestHook(): void {
-    const { cw, ch } = this.layout;
+    const { ch } = this.layout;
     setTestHook({
       isActive: true,
       getPlayableCards: () => {
@@ -121,15 +146,15 @@ export class BattleScene extends Phaser.Scene {
 
   private createTopHUD(): void {
     const width = this.scale.width;
-    const { safeTop, hudHeight } = this.layout;
+    const { hudTop, hudHeight } = this.layout;
 
-    this.topHUD = this.add.container(0, safeTop);
+    this.topHUD = this.add.container(0, hudTop);
     this.topHUD.setDepth(100);
 
-    // Background bar
+    // Dark rounded pill background (like mockup)
     const bg = this.add.graphics();
-    bg.fillStyle(colors.ink, 0.7);
-    bg.fillRect(0, 0, width, hudHeight);
+    bg.fillStyle(colors.ink, 0.85);
+    bg.fillRoundedRect(8, 4, width - 16, hudHeight - 8, 14);
     this.topHUD.add(bg);
 
     // Fight progress nodes (7 fights)
@@ -195,19 +220,59 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0, 0.5).setStroke('#1B1030', 3);
     this.topHUD.add(goldText);
 
-    // Settings button on right
+    // Settings button on right (3D Supercell-style)
     const settingsX = width - 30;
+    const settingsBtnContainer = this.add.container(settingsX, hudHeight / 2);
+    
     const settingsBtn = this.add.graphics();
-    settingsBtn.fillStyle(colors.blue, 1);
-    settingsBtn.fillCircle(settingsX, hudHeight / 2, 14);
-    settingsBtn.lineStyle(2, colors.ink, 1);
-    settingsBtn.strokeCircle(settingsX, hudHeight / 2, 14);
-    this.topHUD.add(settingsBtn);
+    // Shadow
+    settingsBtn.fillStyle(colors.ink, 1);
+    settingsBtn.fillRoundedRect(-16, -14 + 3, 32, 28, 10);
+    // Button body
+    settingsBtn.fillGradientStyle(0x6cc2ff, 0x6cc2ff, colors.blue, colors.blue, 1);
+    settingsBtn.fillRoundedRect(-16, -14, 32, 28, 10);
+    // Bottom lip
+    settingsBtn.fillStyle(colors.blueLo, 1);
+    settingsBtn.fillRect(-14, 8, 28, 5);
+    // Outline
+    settingsBtn.lineStyle(2.5, colors.ink, 1);
+    settingsBtn.strokeRoundedRect(-16, -14, 32, 28, 10);
+    settingsBtnContainer.add(settingsBtn);
 
-    const settingsIcon = this.add.text(settingsX, hudHeight / 2, '⚙', {
-      fontSize: '16px',
+    const settingsIcon = this.add.text(0, -1, '⚙', {
+      fontSize: '18px',
+      color: '#ffffff',
     }).setOrigin(0.5);
-    this.topHUD.add(settingsIcon);
+    settingsBtnContainer.add(settingsIcon);
+    
+    // Make interactive
+    settingsBtnContainer.setInteractive(
+      new Phaser.Geom.Rectangle(-18, -16, 36, 32),
+      Phaser.Geom.Rectangle.Contains
+    );
+    
+    settingsBtnContainer.on('pointerdown', () => {
+      settingsBtnContainer.setScale(0.92);
+    });
+    
+    settingsBtnContainer.on('pointerup', () => {
+      settingsBtnContainer.setScale(1);
+      AudioSystem.play('button_tap');
+      this.openSettings();
+    });
+    
+    settingsBtnContainer.on('pointerout', () => {
+      settingsBtnContainer.setScale(1);
+    });
+    
+    this.topHUD.add(settingsBtnContainer);
+  }
+  
+  private openSettings(): void {
+    if (this.settingsModal) {
+      this.inputPaused = true;
+      this.settingsModal.show();
+    }
   }
 
   private createTableBackground(): void {
@@ -218,7 +283,7 @@ export class BattleScene extends Phaser.Scene {
     this.tableBackground = this.add.graphics();
     this.tableBackground.setDepth(10);
 
-    // Felt gradient
+    // Felt gradient - extends to bottom of screen minus safe area
     this.tableBackground.fillGradientStyle(
       colors.feltHi,
       colors.feltHi,
@@ -230,7 +295,7 @@ export class BattleScene extends Phaser.Scene {
       0,
       tableTop,
       width,
-      height - tableTop,
+      height - tableTop - safeBottom + 10,
       { tl: 22, tr: 22, bl: 0, br: 0 }
     );
 
@@ -243,27 +308,26 @@ export class BattleScene extends Phaser.Scene {
 
   private createPlayerHUD(): void {
     const width = this.scale.width;
-    const height = this.scale.height;
-    const { trayTop, activeH, safeBottom } = this.layout;
+    const { trayTop, trayHeight } = this.layout;
 
-    const hudY = height - safeBottom - 40;
+    // Player HUD at bottom of tray area
+    const hudY = trayTop + trayHeight - 10;
 
     // Player HP bar (smaller, right side)
     this.playerHPBar = new HPBar(this, width - 70, hudY, 100, 18, 30, true);
     this.playerHPBar.setDepth(60);
 
-    // Gold chip
+    // Gold chip above HP bar
     this.goldChip = createChip(this, width - 140, hudY - 30, colors.diamond, '♦', 0);
     this.goldChip.setDepth(60);
   }
 
   private createDrawPile(): void {
-    const { trayTop, cw, ch, side, safeBottom } = this.layout;
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const { trayTop, trayHeight, cw, ch, side } = this.layout;
 
     const pileX = side + cw / 2 + 10;
-    const pileY = height - safeBottom - ch / 2 - 45;
+    // Position draw pile in the tray area, vertically centered with some offset for button
+    const pileY = trayTop + trayHeight / 2 - 10;
 
     this.drawPile = this.add.container(pileX, pileY);
     this.drawPile.setDepth(55);
@@ -470,8 +534,7 @@ export class BattleScene extends Phaser.Scene {
     this.cardVisuals.forEach((cv) => cv.destroy());
     this.cardVisuals = [];
 
-    const { tableauTop, cw, ch, strip, side, gap } = this.layout;
-    const width = this.scale.width;
+    const { tableauTop, cw, strip, side, gap } = this.layout;
 
     const tableauX = side;
     const tableauY = tableauTop + 20;
@@ -513,24 +576,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private canPlayCard(card: Card, battle: BattleState): boolean {
-    if (!battle.activeCard) return false;
-
-    const activeRank = battle.activeCard.rank;
-    const cardRank = card.rank;
-
-    // Wild active means any card can connect
-    if (battle.wildActive) return true;
-
-    // Normal connection: ±1
-    const diff = Math.abs(activeRank - cardRank);
-    if (diff === 1) return true;
-
-    // Ace-King wrap (check relics)
-    if ((activeRank === 1 && cardRank === 13) || (activeRank === 13 && cardRank === 1)) {
-      return true;
-    }
-
-    return false;
+    return isPlayable(battle, card.id);
   }
 
   private renderActiveCard(battle: BattleState): void {
@@ -545,13 +591,12 @@ export class BattleScene extends Phaser.Scene {
 
     if (!battle.activeCard) return;
 
-    const { trayTop, activeW, activeH, activeScale, safeBottom, cw, ch, side } = this.layout;
+    const { trayTop, trayHeight, activeW, activeH, activeScale, cw } = this.layout;
     const width = this.scale.width;
-    const height = this.scale.height;
 
-    // Position between draw pile and player HUD
-    const activeX = width / 2 - 20;
-    const activeY = height - safeBottom - activeH / 2 - 30;
+    // Position active card in center of tray, slightly right of center
+    const activeX = width / 2 + cw * 0.5;
+    const activeY = trayTop + trayHeight / 2;
 
     // Get power type if any
     const powerCard = battle.powerCards.find((pc) => pc.cardId === battle.activeCard!.id);
@@ -606,9 +651,8 @@ export class BattleScene extends Phaser.Scene {
     if (state.player.armor > 0) {
       if (!this.armorChip) {
         const width = this.scale.width;
-        const height = this.scale.height;
-        const { safeBottom } = this.layout;
-        this.armorChip = createChip(this, width - 140, height - safeBottom - 70, colors.club, '🛡', state.player.armor);
+        const { trayTop, trayHeight } = this.layout;
+        this.armorChip = createChip(this, width - 140, trayTop + trayHeight - 70, colors.club, '🛡', state.player.armor);
         this.armorChip.setDepth(60);
       } else {
         const armorText = this.armorChip.getAt(3) as Phaser.GameObjects.Text;
@@ -623,6 +667,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onCardClick(cardId: string): void {
+    if (this.inputPaused) return;
+    
+    // Unlock audio on first interaction
+    AudioSystem.unlock();
+    
     const manager = getGameManager();
     const result = manager.playCard(cardId);
 
@@ -635,6 +684,13 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onDrawClick(): void {
+    if (this.inputPaused) return;
+    
+    // Unlock audio on first interaction
+    AudioSystem.unlock();
+    
+    AudioSystem.play('card_draw');
+    
     const manager = getGameManager();
     const result = manager.draw();
 
@@ -649,14 +705,29 @@ export class BattleScene extends Phaser.Scene {
   private handleEvents(events: Array<{ type: string; [key: string]: unknown }>): void {
     for (const event of events) {
       switch (event.type) {
+        case 'card_played':
+          AudioSystem.playCardSound((event.chainPosition as number) || 1);
+          break;
         case 'enemy_attacked':
           this.playEnemyAttackAnimation();
+          AudioSystem.play('player_hit');
           break;
         case 'enemy_died':
           this.playEnemyDeathAnimation();
+          AudioSystem.play('enemy_death');
           break;
         case 'chain_resolved':
           this.playDamageAnimation(event.totalDamage as number);
+          AudioSystem.play('enemy_hit');
+          break;
+        case 'armor_gained':
+          AudioSystem.play('shield');
+          break;
+        case 'battle_won':
+          AudioSystem.play('victory');
+          break;
+        case 'battle_lost':
+          AudioSystem.play('defeat');
           break;
       }
     }
@@ -762,5 +833,9 @@ export class BattleScene extends Phaser.Scene {
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this);
     setTestHook(null);
+    if (this.settingsModal) {
+      this.settingsModal.destroy();
+      this.settingsModal = null;
+    }
   }
 }

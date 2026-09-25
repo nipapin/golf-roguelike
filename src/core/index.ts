@@ -4,7 +4,7 @@ export * from './GameState';
 export { 
   isPlayable, 
   getPlayableCards, 
-  hasLegalMoves, 
+  hasLegalMovesForUI, 
   isDeckEmpty, 
   isTableauCleared, 
   getChainLength,
