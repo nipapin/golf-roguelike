@@ -1,0 +1,118 @@
+<!doctype html><html><head><meta charset="utf-8"><title>Golf Rogue — card states sheet</title>
+<link rel="stylesheet" href="style.css">
+<style>
+html,body{overflow:visible;height:auto}
+body{width:1280px;padding:36px 40px 50px;background:
+ radial-gradient(80% 50% at 50% 0%,rgba(120,100,255,.35),transparent 70%),linear-gradient(180deg,#3A2A96,#22176A)}
+h1{font:normal 44px/1 "Lilita One";color:#fff;-webkit-text-stroke:5px var(--ink);paint-order:stroke fill;text-shadow:0 4px 0 var(--ink);margin-bottom:6px}
+h1 span{color:#FFD34A}
+.sub{font:500 15px/1.4 Fredoka;color:#CFC6FF;margin-bottom:26px}
+h2{font:normal 22px/1 "Lilita One";letter-spacing:.04em;color:#FFE35A;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;margin:26px 0 14px;display:flex;align-items:center;gap:10px}
+h2 small{font:500 13px Fredoka;color:#B9AEF5;-webkit-text-stroke:0;letter-spacing:0}
+.row{display:flex;gap:26px;align-items:flex-end;flex-wrap:wrap}
+.cell{position:relative;display:flex;flex-direction:column;align-items:center;gap:14px}
+.stage{position:relative}
+.cap{font:normal 15px/1 "Lilita One";letter-spacing:.05em;color:#fff;-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill}
+.cap i{display:block;font:500 11.5px/1.3 Fredoka;font-style:normal;color:#B9AEF5;-webkit-text-stroke:0;text-align:center;margin-top:3px;max-width:150px}
+.panel{background:rgba(15,5,50,.35);border-radius:22px;padding:18px 22px 20px;box-shadow:0 0 0 3px var(--ink),inset 0 2px 0 rgba(255,255,255,.08)}
+.x1{--cw:50px}.x2{--cw:100px;--ol:4px}.x3{--cw:150px;--ol:5px}
+.trail{position:absolute;height:34%;border-radius:40px;filter:blur(3px)}
+.anno{position:absolute;font:600 12px/1.2 Fredoka;color:#fff;white-space:nowrap}
+.anno::before{content:"";position:absolute;background:#FFE35A}
+.anno.l::before{right:calc(100% + 6px);top:50%;height:2px;width:var(--len,40px)}
+.anno.r{padding-left:0}
+.anno.r::before{right:calc(100% + 6px);top:50%;height:2px;width:var(--len,40px)}
+.dot{position:absolute;width:8px;height:8px;border-radius:50%;background:#FFE35A;box-shadow:0 0 0 2px var(--ink)}
+.legend{display:grid;grid-template-columns:repeat(4,1fr);gap:18px;margin-top:4px}
+.lg{display:flex;align-items:center;gap:10px;padding:10px 12px;border-radius:14px;background:rgba(15,5,50,.45);box-shadow:0 0 0 2.5px var(--ink)}
+.lg svg{width:46px;height:46px;flex:none;padding:6px;border-radius:50%;background:#FFF6E2;box-shadow:0 0 0 2.5px var(--ink),inset 0 -3px 0 #D9BF8E}
+.lg b{display:block;font:normal 20px/1 "Lilita One";color:#fff;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill}
+.lg span{font:500 12.5px/1.25 Fredoka;color:#D8D0FF}
+</style></head><body>
+<script src="sprite.js"></script><script src="cards.js"></script>
+<h1>GOLF ROGUE <span>· CARDS</span></h1>
+<div class="sub">Card system reference. Tableau card on 390-wide screen = 50×70 px (cw = (W − 16 − 6·4)/7, h = 1.4·cw, visible strip = 0.58·cw). All numbers scale with cw.</div>
+
+<div class="panel">
+<h2>SUIT = EFFECT <small>color + silhouette + embossed glyph; readable at a glance and in the covered strip</small></h2>
+<div class="legend" id="legend"></div>
+<div class="row" id="suits" style="margin-top:22px;gap:34px"></div>
+</div>
+
+<div class="panel" style="margin-top:22px">
+<h2>STATES · 1:1 GAME SIZE <small>390×844 reference</small></h2>
+<div class="row x1" id="s1" style="gap:42px"></div>
+<h2>STATES · 2× ZOOM</h2>
+<div class="row x2" id="s2" style="gap:38px"></div>
+</div>
+
+<div class="panel" style="margin-top:22px">
+<h2>POWER CARDS <small>foil frame + tinted holo face + medallion (visible in the strip) + ribbon + glow & sparkles</small></h2>
+<div class="row x2" id="pw" style="gap:40px;padding-top:10px"></div>
+<div class="row x1" id="pwstrip" style="gap:26px;margin-top:26px"></div>
+</div>
+
+
+<div class="panel" style="margin-top:22px">
+<h2>UI KIT <small>buttons (normal / pressed), HP bar with pending-damage preview, chips, intent, combo tiers</small></h2>
+<div class="row" style="gap:34px;align-items:center">
+  <div class="cell"><div class="btn yellow" style="width:220px;height:64px;font-size:30px">START RUN</div><div class="cap">PRIMARY<i>face #FFC21A, lip #E08600 6px, outline 3px, drop 6px</i></div></div>
+  <div class="cell"><div class="btn yellow pressed" style="width:220px;height:64px;font-size:30px">START RUN</div><div class="cap">PRESSED<i>translateY(5px), lip 2px, drop 1px, 60 ms</i></div></div>
+  <div class="cell"><div class="btn blue" style="height:44px;font-size:21px;padding:0 18px">DRAW</div><div class="cap">SECONDARY</div></div>
+  <div class="cell"><div class="btn blue pressed" style="height:44px;font-size:21px;padding:0 18px">DRAW</div><div class="cap">PRESSED</div></div>
+  <div class="cell"><div class="btn green" style="height:44px;font-size:21px;padding:0 18px">CLAIM</div><div class="cap">REWARD/CONFIRM</div></div>
+</div>
+<div class="row" style="gap:40px;align-items:center;margin-top:28px">
+  <div class="cell"><div style="position:relative;width:260px;padding-left:22px"><div class="shieldbadge" id="sb1" style="left:-2px;top:-10px"></div>
+    <div class="hpbar"><div class="fill" style="width:73%"></div><div class="preview" style="left:21%;width:52%"></div><div class="txt">38 / 52</div></div></div><div class="cap">ENEMY HP + ARMOR<i>22 px bar, striped = damage the current combo will deal</i></div></div>
+  <div class="cell"><div class="chip"><svg class="ic" viewBox="0 0 30 30"><circle cx="15" cy="15" r="12" fill="#FFB800" stroke="#1B1030" stroke-width="3"/><circle cx="15" cy="15" r="7.5" fill="none" stroke="#FFE88A" stroke-width="2.5"/></svg>128</div><div class="cap">GOLD CHIP</div></div>
+  <div class="cell"><div class="chip" style="padding-left:2px"><span class="shieldbadge" id="sb2" style="position:relative;width:26px;height:29px;margin-left:-4px"></span>6</div><div class="cap">ARMOR CHIP</div></div>
+  <div class="cell"><div class="chip"><svg class="ic" viewBox="-8 -8 116 116" style="color:#FF3B4E"><use href="#s-heart"/></svg>24/30</div><div class="cap">HP CHIP</div></div>
+  <div class="cell"><div style="position:relative;display:flex;align-items:center;gap:2px;height:50px;padding:0 10px 0 6px;border-radius:18px;background:linear-gradient(180deg,#fff,#FFE9EC);box-shadow:0 0 0 3px var(--ink),inset 0 -4px 0 #F5C2CB">
+    <svg viewBox="0 0 512 512" style="width:36px;height:36px;fill:#FF3B4E;stroke:var(--ink);stroke-width:44;paint-order:stroke;transform:rotate(-10deg)"><use href="#i-sword"/></svg><b style="font:normal 32px/1 'Lilita One';color:#FF3B4E;-webkit-text-stroke:3.5px var(--ink);paint-order:stroke fill">9</b></div><div class="cap">INTENT<i>attack red · block blue · buff violet · special gold</i></div></div>
+</div>
+<div class="row" style="gap:22px;align-items:center;margin-top:28px" id="tiers"></div>
+</div>
+<div class="panel" style="margin-top:22px;display:flex;gap:60px;align-items:flex-start">
+<div><h2>ANATOMY <small>150 px render of a 50 px card (×3)</small></h2><div class="stage x3" id="anat" style="width:520px;height:250px"></div></div>
+<div><h2>BACK · ACTIVE · SLOT</h2><div class="row" id="misc" style="gap:30px"></div></div>
+</div>
+<script>
+const $=id=>document.getElementById(id);
+const LG=[['sp','spade','ATTACK','♠ adds damage to the combo hit','#2C2160'],['he','heart','HEAL','♥ restores player HP','#F2324E'],['cl','club','ARMOR','♣ blocks the next enemy hit','#1683F0'],['di','diamond','GOLD','♦ gives run currency','#F29A00']];
+$('legend').innerHTML=LG.map(l=>`<div class="lg"><svg viewBox="-8 -8 116 116" style="color:${l[4]}"><use href="#s-${l[1]}"/></svg><div><b>${l[2]}</b><span>${l[3]}</span></div></div>`).join('');
+$('suits').innerHTML=[['A','sp'],['7','he'],['10','cl'],['Q','di'],['K','sp'],['2','he'],['J','cl'],['5','di']].map(([r,s],i)=>`<div class="cell x2"><div class="stage" style="width:100px;height:140px">${card({r,s})}</div></div>`).join('');
+function states(scale){const cw=scale*50,ch=cw*1.4,st=cw*.58;
+ const out=[];
+ out.push(['NORMAL','exposed top card, idle',`<div class="stage" style="width:${cw}px;height:${ch}px">${card({r:'8',s:'he'})}</div>`]);
+ out.push(['COVERED','overlapped; strip = 0.58·cw shows rank + pip',`<div class="stage" style="width:${cw}px;height:${st*3+ch}px">${card({r:'K',s:'cl',state:'covered',y:0})}${card({r:'4',s:'di',state:'covered',y:st})}${card({r:'J',s:'sp',state:'covered',y:st*2})}${card({r:'9',s:'he',y:st*3})}</div>`]);
+ out.push(['PLAYABLE','rank ±1 of active: gold rim, warm under-glow, ▲ tick',`<div class="stage" style="width:${cw}px;height:${ch}px">${card({r:'7',s:'di',state:'playable'})}</div>`]);
+ out.push(['SELECTED','finger down: lift 12, scale 1.1, tilt −3°',`<div class="stage" style="width:${cw}px;height:${ch}px">${card({r:'9',s:'sp',state:'selected'})}</div>`]);
+ out.push(['DISABLED','exposed but not legal: −14% value, violet veil',`<div class="stage" style="width:${cw}px;height:${ch}px">${card({r:'Q',s:'cl',state:'disabled'})}</div>`]);
+ out.push(['BEING PLAYED','in flight to active slot: scale 1.15, rot 8°, suit-color trail',`<div class="stage" style="width:${cw*1.9}px;height:${ch*1.2}px"><div class="trail" style="left:0;top:40%;width:${cw*1.4}px;background:linear-gradient(90deg,transparent,rgba(255,77,106,.9))"></div><div class="trail" style="left:${cw*.2}px;top:62%;height:12%;width:${cw}px;background:linear-gradient(90deg,transparent,#fff)"></div>${card({r:'6',s:'he',x:cw*.8,y:ch*.05,style:`transform:scale(1.15) rotate(8deg);z-index:3;box-shadow:0 0 0 var(--ol) var(--ink),inset 0 calc(var(--cw)*-.07) 0 var(--bevel),0 ${cw*.25}px ${cw*.3}px rgba(20,8,40,.5),0 0 ${cw*.4}px ${cw*.1}px rgba(255,77,106,.7)`})}</div>`]);
+ out.push(['POWER','see power system below',`<div class="stage" style="width:${cw}px;height:${ch}px">${card({r:'9',s:'sp',power:'crit'})}</div>`]);
+ return out.map(o=>`<div class="cell">${o[2]}<div class="cap">${o[0]}<i>${o[1]}</i></div></div>`).join('');}
+$('s1').innerHTML=states(1);$('s2').innerHTML=states(2);
+const P=[['crit','9','sp','CRIT','×2 damage of this hit'],['heal','7','he','HEAL','big heal'],['guard','J','cl','GUARD','big armor'],['gold','K','di','GOLD','bonus gold'],['bomb','Q','sp','BOMB','direct burst dmg'],['wild','5','di','WILD','connects to any rank'],['echo','3','cl','ECHO','repeats combo effect']];
+$('pw').innerHTML=P.map(p=>`<div class="cell"><div class="stage" style="width:100px;height:140px">${card({r:p[1],s:p[2],power:p[0],sparks:[[10,34],[70,62],[30,80]]})}</div><div class="cap">${p[3]}<i>${p[4]}</i></div></div>`).join('');
+$('pwstrip').innerHTML=P.map(p=>`<div class="cell"><div class="stage" style="width:50px;height:${29*2+70}px">${card({r:'4',s:'cl',state:'covered',y:0})}${card({r:p[1],s:p[2],power:p[0],state:'covered',y:29})}${card({r:'10',s:'he',y:58})}</div><div class="cap" style="font-size:12px">${p[3]} IN STRIP</div></div>`).join('');
+$('anat').innerHTML=card({r:'10',s:'he',x:170,y:20})+
+ `<div class="anno" style="left:0;top:22px;width:150px;text-align:right">RANK · Lilita One 0.47·cw</div>
+  <div class="anno" style="left:0;top:92px;width:150px;text-align:right">OUTLINE 2.5 px #1B1030</div>
+  <div class="anno" style="left:0;top:152px;width:150px;text-align:right">BIG SUIT 0.70·cw + glyph</div>
+  <div class="anno" style="left:0;top:218px;width:150px;text-align:right">BEVEL 0.07·cw #D9BF8E</div>
+  <div class="anno" style="left:338px;top:28px">PIP 0.30·cw (top-right)</div>
+  <div class="anno" style="left:338px;top:66px">STRIP 0.58·cw ← visible when covered</div>
+  <div class="anno" style="left:338px;top:106px">RADIUS 0.16·cw</div>
+  <div class="anno" style="left:338px;top:146px">FACE #FFFDF6 → #FFF6E2 → #F3E4C4</div>
+  <div class="anno" style="left:338px;top:186px">SHADOW 0 (ol+3) 0 rgba(20,8,40,.55)</div>
+  <div style="position:absolute;left:170px;top:${20+150*.58}px;width:150px;border-top:2px dashed #FFE35A"></div>`;
+$('misc').innerHTML=`<div class="cell x2"><div class="stage" style="width:100px;height:140px">${back(0,0)}</div><div class="cap">CARD BACK</div></div>
+<div class="cell x2"><div class="stage" style="width:100px;height:140px">${card({r:'8',s:'sp',style:'box-shadow:0 0 0 4px var(--ink),0 0 0 9px #FFB02E,0 0 0 11px var(--ink),inset 0 -7px 0 var(--bevel),0 9px 0 rgba(20,8,40,.5),0 0 34px 10px rgba(255,150,40,.6)'})}</div><div class="cap">ACTIVE<i>1.42× tableau size, combo-colored rim</i></div></div>
+<div class="cell x2"><div class="stage" style="width:100px;height:140px"><div style="position:absolute;inset:0;border-radius:16px;border:4px dashed rgba(255,255,255,.25);background:rgba(10,0,40,.2)"></div></div><div class="cap">EMPTY SLOT<i>column keeps its place</i></div></div>`;
+
+document.getElementById('sb1').innerHTML=SHIELD_SVG('#C9D6E8','#7E8FB0')+'<b>4</b>';
+document.getElementById('sb2').innerHTML=SHIELD_SVG();
+const T=[['x2','NICE','#FFE45C','#E0A800','small impact'],['x4','GREAT!','#FF9A1F','#D0520A','card trail + shake 2px'],['x6','BRUTAL!!','#FF3D2E','#A8101E','screen edges glow, shake 4px'],['x8+','MONSTER CHAIN','#D23BFF','#6A12B8','full-screen event, slow-mo 120ms']];
+document.getElementById('tiers').innerHTML=T.map(t=>`<div class="cell"><div style="display:flex;align-items:center;gap:8px;height:54px;padding:0 16px;border-radius:16px;background:linear-gradient(180deg,${t[2]} 0 45%,${t[3]});box-shadow:0 0 0 3px var(--ink),inset 0 2px 0 rgba(255,255,255,.6),inset 0 -5px 0 rgba(0,0,0,.25),0 0 ${t[0]==='x2'?6:t[0]==='x4'?14:t[0]==='x6'?22:30}px ${t[0]==='x8+'?10:4}px ${t[2]}"><span style="font:normal 32px/1 'Lilita One';color:#fff;-webkit-text-stroke:4px var(--ink);paint-order:stroke fill;text-shadow:0 3px 0 var(--ink)">${t[0]}</span><span style="font:normal 16px/1 'Lilita One';color:#fff;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;letter-spacing:.05em">${t[1]}</span></div><div class="cap">COMBO TIER<i>${t[4]}</i></div></div>`).join('');
+</script></body></html>

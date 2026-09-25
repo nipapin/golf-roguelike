@@ -1,648 +1,565 @@
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
-import { Card, BattleState, GameEvent, PowerCard, RunState, Relic } from '../../core/types';
-import { getPlayableCards, getRankDisplay, getSuitSymbol } from '../../core/GameRules';
-
-interface EnemyData {
-  sprite: string;
-  scale?: number;
-  tint?: string;
-  crown?: boolean;
-}
+import { colors, getLayoutMetrics, getCardMetrics, getComboTier } from '../design/tokens';
+import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
+import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
+import { CardVisual, createCardBack } from '../design/CardVisual';
+import type { RunState, Card, BattleState, PowerType } from '../../core/types';
 
 export class BattleScene extends Phaser.Scene {
-  private cardObjects: Map<string, Phaser.GameObjects.Container> = new Map();
-  private isAnimating = false;
+  private layout!: ReturnType<typeof getLayoutMetrics>;
+  private cardMetrics!: ReturnType<typeof getCardMetrics>;
+
+  // Visual components
+  private arenaBackground!: ArenaBackground;
   private enemySprite: Phaser.GameObjects.Sprite | null = null;
   private crownSprite: Phaser.GameObjects.Image | null = null;
-  private currentEnemyState: 'idle' | 'attack' | 'hurt' | 'dead' = 'idle';
+  private enemyNameText!: Phaser.GameObjects.Text;
+  private enemyHPBar!: HPBar;
+  private intentBubble: Phaser.GameObjects.Container | null = null;
+  private comboBanner!: ComboBanner;
+  private playerHPBar!: HPBar;
+  private goldChip!: Phaser.GameObjects.Container;
+  private armorChip: Phaser.GameObjects.Container | null = null;
+
+  // Table elements
+  private tableBackground!: Phaser.GameObjects.Graphics;
+  private cardVisuals: CardVisual[] = [];
+  private activeCardVisual: CardVisual | null = null;
+  private drawPile: Phaser.GameObjects.Container | null = null;
+  private drawCountBadge!: Phaser.GameObjects.Container;
+
+  // State
+  private currentState: RunState | null = null;
 
   constructor() {
     super('BattleScene');
   }
 
   create(): void {
-    const manager = getGameManager();
-    const state = manager.getState();
-
-    if (!state || !state.battle) {
-      this.scene.start('StartScene');
-      return;
-    }
-
-    // Subscribe to events
-    manager.onEvents((events) => this.handleEvents(events));
-
-    this.cameras.main.setBackgroundColor('#0a0e17');
-    this.render();
-  }
-
-  private render(): void {
-    const manager = getGameManager();
-    const state = manager.getState();
-
-    if (!state || !state.battle) {
-      return;
-    }
-
-    // Clear previous objects but keep the map for animation reference
-    this.children.removeAll();
-    this.cardObjects.clear();
-
     const width = this.scale.width;
     const height = this.scale.height;
-    const battle = state.battle;
 
-    this.drawBackground(width, height);
-    this.drawHUD(width);
-    this.drawEnemy(width, battle);
-    this.drawPlayerStats(width, height, state);
-    this.drawTableau(width, height, battle, state.player.relics);
-    this.drawActiveCard(width, height, battle);
-    this.drawDeck(width, height, battle);
-    this.drawChainIndicator(width, height, battle);
+    this.layout = getLayoutMetrics(width, height);
+    this.cardMetrics = getCardMetrics(width);
+
+    // Arena background
+    this.arenaBackground = new ArenaBackground(this);
+    this.arenaBackground.setDepth(0);
+
+    // Table background (felt)
+    this.createTableBackground();
+
+    // Combo banner
+    this.comboBanner = new ComboBanner(
+      this,
+      width / 2,
+      this.layout.bannerTop,
+      width - 32,
+      this.layout.bannerHeight
+    );
+    this.comboBanner.setDepth(50);
+
+    // Player HUD at bottom
+    this.createPlayerHUD();
+
+    // Draw pile
+    this.createDrawPile();
+
+    // Initial render
+    this.refreshState();
+
+    // Listen for resize
+    this.scale.on('resize', this.handleResize, this);
   }
 
-  private drawBackground(width: number, height: number): void {
-    const g = this.add.graphics();
+  private createTableBackground(): void {
+    const { tableTop, tableHeight, safeBottom } = this.layout;
+    const width = this.scale.width;
+    const height = this.scale.height;
 
-    // Dark blue gradient background
-    g.fillStyle(0x0c1220, 1);
-    g.fillRect(0, 0, width, height);
+    this.tableBackground = this.add.graphics();
+    this.tableBackground.setDepth(10);
 
-    // Table area
-    const tableTop = height * 0.38;
-    g.fillStyle(0x0a1018, 0.9);
-    g.fillRoundedRect(8, tableTop, width - 16, height - tableTop - 8, 16);
-    g.lineStyle(1, 0x2a4a6a, 0.3);
-    g.strokeRoundedRect(8, tableTop, width - 16, height - tableTop - 8, 16);
+    // Felt gradient
+    this.tableBackground.fillGradientStyle(
+      colors.feltHi,
+      colors.feltHi,
+      colors.feltLo,
+      colors.feltLo,
+      1
+    );
+    this.tableBackground.fillRoundedRect(
+      0,
+      tableTop,
+      width,
+      height - tableTop,
+      { tl: 22, tr: 22, bl: 0, br: 0 }
+    );
+
+    // Wood rim at top
+    this.tableBackground.fillStyle(colors.rim, 1);
+    this.tableBackground.fillRect(0, tableTop, width, 6);
+    this.tableBackground.fillStyle(colors.rimHi, 1);
+    this.tableBackground.fillRect(0, tableTop, width, 2);
   }
 
-  private drawHUD(width: number): void {
-    const manager = getGameManager();
-    const safeTop = 12;
+  private createPlayerHUD(): void {
+    const width = this.scale.width;
+    const height = this.scale.height;
+    const { trayTop, activeH, safeBottom } = this.layout;
 
-    // Title and fight number
-    this.add
-      .text(14, safeTop, '♣ GOLF ROGUE', {
-        fontFamily: 'Georgia, serif',
-        fontSize: '14px',
-        fontStyle: 'bold',
-        color: '#f0cf68',
-      });
+    const hudY = height - safeBottom - 40;
 
-    this.add
-      .text(width - 14, safeTop + 2, `FIGHT ${manager.getCurrentFightNumber()}/${manager.getTotalFights()}`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '10px',
-        fontStyle: 'bold',
-        color: '#6a7a8a',
-      })
-      .setOrigin(1, 0);
+    // Player HP bar (smaller, right side)
+    this.playerHPBar = new HPBar(this, width - 70, hudY, 100, 18, 30, true);
+    this.playerHPBar.setDepth(60);
 
-    // Fight type indicator
-    if (manager.isEliteFight()) {
-      this.add
-        .text(width - 14, safeTop + 16, 'ELITE', {
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontStyle: 'bold',
-          color: '#c080ff',
-        })
-        .setOrigin(1, 0);
-    } else if (manager.isBossFight()) {
-      this.add
-        .text(width - 14, safeTop + 16, 'BOSS', {
-          fontFamily: 'Arial, sans-serif',
-          fontSize: '9px',
-          fontStyle: 'bold',
-          color: '#ff6060',
-        })
-        .setOrigin(1, 0);
+    // Gold chip
+    this.goldChip = createChip(this, width - 140, hudY - 30, colors.diamond, '♦', 0);
+    this.goldChip.setDepth(60);
+  }
+
+  private createDrawPile(): void {
+    const { trayTop, cw, ch, side, safeBottom } = this.layout;
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    const pileX = side + cw / 2 + 10;
+    const pileY = height - safeBottom - ch / 2 - 45;
+
+    this.drawPile = this.add.container(pileX, pileY);
+    this.drawPile.setDepth(55);
+
+    // Stack of card backs
+    for (let i = 2; i >= 0; i--) {
+      const back = createCardBack(this, -cw / 2 + i * 3, -ch / 2 - i * 3);
+      this.drawPile.add(back);
     }
+
+    // DRAW button overlay
+    const drawBtn = this.add.graphics();
+    drawBtn.fillGradientStyle(colors.blue, colors.blue, colors.blueLo, colors.blueLo, 1);
+    drawBtn.fillRoundedRect(-35, ch / 2 - 20, 70, 28, 8);
+    drawBtn.lineStyle(2.5, colors.ink, 1);
+    drawBtn.strokeRoundedRect(-35, ch / 2 - 20, 70, 28, 8);
+    this.drawPile.add(drawBtn);
+
+    const drawText = this.add
+      .text(0, ch / 2 - 6, 'DRAW', {
+        fontFamily: 'Lilita One',
+        fontSize: '14px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setStroke('#1B1030', 3);
+    this.drawPile.add(drawText);
+
+    // Count badge
+    this.drawCountBadge = this.add.container(cw / 2 - 5, -ch / 2 + 5);
+    const badgeBg = this.add.graphics();
+    badgeBg.fillStyle(colors.red, 1);
+    badgeBg.fillCircle(0, 0, 14);
+    badgeBg.lineStyle(2, colors.ink, 1);
+    badgeBg.strokeCircle(0, 0, 14);
+    this.drawCountBadge.add(badgeBg);
+
+    const countText = this.add
+      .text(0, 0, '0', {
+        fontFamily: 'Lilita One',
+        fontSize: '14px',
+        color: '#ffffff',
+      })
+      .setOrigin(0.5)
+      .setStroke('#1B1030', 2);
+    this.drawCountBadge.add(countText);
+    this.drawPile.add(this.drawCountBadge);
+
+    // Make entire pile clickable
+    this.drawPile.setInteractive(
+      new Phaser.Geom.Rectangle(-cw / 2, -ch / 2, cw, ch + 20),
+      Phaser.Geom.Rectangle.Contains
+    );
+    this.drawPile.on('pointerdown', () => this.onDrawClick());
   }
 
-  private drawEnemy(width: number, battle: BattleState): void {
+  private refreshState(): void {
+    const manager = getGameManager();
+    const state = manager.getState();
+    if (!state) return;
+
+    this.currentState = state;
+
+    // Update arena background based on enemy
+    if (state.battle) {
+      const encounter = getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
+      this.arenaBackground.draw(
+        this.scale.width,
+        this.layout.arenaTop,
+        this.layout.arenaHeight,
+        encounter
+      );
+
+      this.renderEnemy(state.battle);
+      this.renderTableau(state.battle);
+      this.renderActiveCard(state.battle);
+      this.updateComboBanner(state.battle);
+      this.updateDrawPile(state.battle);
+    }
+
+    this.updatePlayerHUD(state);
+  }
+
+  private renderEnemy(battle: BattleState): void {
+    const width = this.scale.width;
+    const { arenaTop, arenaHeight, enemyHeight } = this.layout;
+
     const enemy = battle.enemy;
-    const cx = width / 2;
-    const panelY = 42;
-    const panelH = 110;
-
-    // Get enemy config for scale/tint
-    const manager = getGameManager();
-    const enemyConfig = this.getEnemyConfig(enemy.id);
-    const scale = enemyConfig?.scale || 1;
-    const isBoss = enemyConfig?.crown || false;
-    const hasGoldTint = enemyConfig?.tint === 'gold';
-
-    // Enemy panel background
-    this.add
-      .rectangle(cx, panelY + panelH / 2, width - 20, panelH, 0x141a28)
-      .setStrokeStyle(1, isBoss ? 0xffd700 : 0x2a3a4a);
-
-    // Enemy name
-    const nameColor = isBoss ? '#ffd700' : '#e8e0d0';
-    this.add
-      .text(24, panelY + 10, enemy.name, {
-        fontFamily: 'Georgia, serif',
-        fontSize: isBoss ? '18px' : '16px',
-        fontStyle: 'bold',
-        color: nameColor,
-      });
-
-    // Intent
-    const intent = enemy.intents[enemy.currentIntentIndex];
-    const intentIcon = intent.type === 'attack' ? '⚔' : intent.type === 'defend' ? '🛡' : '✦';
-    this.add
-      .text(24, panelY + 35, `${intentIcon} ${intent.value}`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: intent.type === 'attack' ? '#ff8080' : '#80c0ff',
-      });
-
-    // HP display
-    const hpText = `${Math.max(0, enemy.hp)}/${enemy.maxHp}`;
-    this.add
-      .text(width - 24, panelY + 10, hpText, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '14px',
-        fontStyle: 'bold',
-        color: '#e8e0d0',
-      })
-      .setOrigin(1, 0);
-
-    // HP bar
-    const barWidth = Math.min(120, width * 0.3);
-    const barX = width - 24 - barWidth;
-    const barY = panelY + 38;
-
-    this.add.rectangle(barX + barWidth / 2, barY, barWidth, 8, 0x3a1a2a).setOrigin(0.5);
-
-    const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
-    if (hpRatio > 0) {
-      this.add
-        .rectangle(barX, barY, barWidth * hpRatio, 8, isBoss ? 0xffd700 : 0xd84b65)
-        .setOrigin(0, 0.5);
-    }
+    const enemyX = width / 2;
+    const enemyY = arenaTop + arenaHeight - 84;
 
     // Enemy sprite
-    const spriteKey = enemy.sprite;
-    const atlasKey = `enemy-${spriteKey}`;
-    const spriteY = panelY + panelH / 2 + 15;
-    const baseSize = 80 * scale;
+    if (this.enemySprite) {
+      this.enemySprite.destroy();
+    }
 
+    const atlasKey = `enemy-${enemy.sprite || 'goblin'}`;
     if (this.textures.exists(atlasKey)) {
-      // Animated sprite
-      const sprite = this.add.sprite(cx, spriteY, atlasKey);
-      sprite.setDisplaySize(baseSize, baseSize);
+      this.enemySprite = this.add.sprite(enemyX, enemyY, atlasKey);
+      this.enemySprite.setOrigin(0.5, 1);
 
-      // Apply gold tint for boss
-      if (hasGoldTint) {
-        sprite.setTint(0xffd700);
-      }
+      const scale = (enemy.scale || 1) * (enemyHeight / 180);
+      this.enemySprite.setScale(scale);
+      this.enemySprite.setDepth(20);
 
       // Play idle animation
-      const idleAnim = `${spriteKey}-idle`;
-      if (this.anims.exists(idleAnim)) {
-        sprite.play(idleAnim);
+      const idleKey = `${enemy.sprite || 'goblin'}-idle`;
+      if (this.anims.exists(idleKey)) {
+        this.enemySprite.play(idleKey);
       }
 
-      this.enemySprite = sprite;
-      this.currentEnemyState = 'idle';
-
-      // Add crown for boss
-      if (isBoss && this.textures.exists('crown')) {
-        const crown = this.add.image(cx, spriteY - baseSize / 2 - 10, 'crown');
-        crown.setDisplaySize(40, 30);
-        this.crownSprite = crown;
+      // Boss gold tint
+      if (enemy.tint === 'gold') {
+        this.enemySprite.setTint(0xffd700);
       }
-    } else {
-      // Fallback to old SVG if atlas not loaded
-      const oldSpriteKey = `enemy-${spriteKey}`;
-      if (this.textures.exists(oldSpriteKey)) {
-        const sprite = this.add.image(cx, spriteY, oldSpriteKey);
-        sprite.setDisplaySize(baseSize, baseSize);
 
-        // Idle bounce animation
-        this.tweens.add({
-          targets: sprite,
-          y: sprite.y - 4,
-          duration: 900,
-          yoyo: true,
-          repeat: -1,
-          ease: 'Sine.inOut',
-        });
+      // Crown for boss
+      if (enemy.crown) {
+        if (this.crownSprite) this.crownSprite.destroy();
+        this.crownSprite = this.add.image(
+          enemyX,
+          enemyY - this.enemySprite.displayHeight - 10,
+          'crown'
+        );
+        this.crownSprite.setScale(0.5);
+        this.crownSprite.setDepth(21);
       }
     }
-  }
 
-  private getEnemyConfig(enemyId: string): EnemyData | null {
-    // This would ideally come from the data file
-    const configs: Record<string, EnemyData> = {
-      slime: { sprite: 'slime' },
-      mushroom: { sprite: 'mushroom' },
-      bat: { sprite: 'bat' },
-      wolf: { sprite: 'wolf' },
-      zombie: { sprite: 'zombie' },
-      goblin: { sprite: 'goblin' },
-      bandit: { sprite: 'bandit' },
-      knight: { sprite: 'knight', scale: 1.3 },
-      golfking: { sprite: 'samurai', scale: 1.5, tint: 'gold', crown: true },
-    };
-    return configs[enemyId] || null;
-  }
+    // Enemy name
+    if (this.enemyNameText) this.enemyNameText.destroy();
 
-  playEnemyAnimation(anim: 'attack' | 'hurt' | 'dead'): void {
-    if (!this.enemySprite) return;
-
-    const manager = getGameManager();
-    const state = manager.getState();
-    if (!state?.battle) return;
-
-    const spriteKey = state.battle.enemy.sprite;
-    const animKey = `${spriteKey}-${anim}`;
-
-    if (this.anims.exists(animKey)) {
-      this.enemySprite.play(animKey);
-      this.currentEnemyState = anim;
-
-      // Return to idle after attack/hurt (not dead)
-      if (anim !== 'dead') {
-        this.enemySprite.once('animationcomplete', () => {
-          const idleAnim = `${spriteKey}-idle`;
-          if (this.anims.exists(idleAnim) && this.enemySprite) {
-            this.enemySprite.play(idleAnim);
-            this.currentEnemyState = 'idle';
-          }
-        });
-      }
-    }
-  }
-
-  private drawPlayerStats(width: number, height: number, state: RunState): void {
-    const statsY = 138;
-
-    // HP
-    this.add
-      .text(16, statsY, `♥ ${state.player.hp}/${state.player.maxHp}`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: '#ff6677',
-      });
-
-    // Armor
-    this.add
-      .text(width / 2, statsY, `♣ ${state.player.armor}`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: '#70a0e0',
+    const rankBadge = enemy.tier === 'elite' ? 'ELITE ' : enemy.tier === 'boss' ? 'BOSS ' : '';
+    this.enemyNameText = this.add
+      .text(width / 2, arenaTop + arenaHeight - 50, rankBadge + enemy.name, {
+        fontFamily: 'Lilita One',
+        fontSize: '19px',
+        color: '#ffffff',
       })
-      .setOrigin(0.5, 0);
+      .setOrigin(0.5)
+      .setStroke('#1B1030', 4)
+      .setShadow(0, 2, '#1B1030', 0, true, true)
+      .setDepth(30);
 
-    // Gold
-    this.add
-      .text(width - 16, statsY, `♦ ${state.player.gold}`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '13px',
-        fontStyle: 'bold',
-        color: '#f0cf68',
-      })
-      .setOrigin(1, 0);
+    // Enemy HP bar
+    if (this.enemyHPBar) this.enemyHPBar.destroy();
+    this.enemyHPBar = new HPBar(
+      this,
+      width / 2,
+      arenaTop + arenaHeight - 24,
+      230,
+      22,
+      enemy.maxHp
+    );
+    this.enemyHPBar.setHp(enemy.hp);
+    this.enemyHPBar.setPendingDamage(battle.accumulatedDamage);
+    this.enemyHPBar.setDepth(30);
 
-    // Relics row
-    if (state.player.relics.length > 0) {
-      const relicsY = statsY + 22;
-      state.player.relics.forEach((relic, i) => {
-        this.add
-          .text(16 + i * 24, relicsY, '◆', {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '12px',
-            color: '#a080c0',
-          })
-          .setInteractive()
-          .on('pointerover', () => {
-            // Could show tooltip
-          });
-      });
+    // Intent bubble
+    if (this.intentBubble) this.intentBubble.destroy();
+
+    const intent = enemy.intents[enemy.currentIntentIndex];
+    if (intent) {
+      this.intentBubble = createIntentBubble(
+        this,
+        width / 2 + 90,
+        arenaTop + arenaHeight * 0.25,
+        intent.type as 'attack' | 'defend' | 'buff' | 'debuff',
+        intent.value
+      );
+      this.intentBubble.setDepth(25);
     }
   }
 
-  private drawTableau(
-    width: number,
-    height: number,
-    battle: BattleState,
-    relics: Relic[]
-  ): void {
-    const manager = getGameManager();
-    const playableCards = getPlayableCards(battle, relics);
-    const playableIds = new Set(playableCards.map((c) => c.id));
+  private renderTableau(battle: BattleState): void {
+    // Clear existing cards
+    this.cardVisuals.forEach((cv) => cv.destroy());
+    this.cardVisuals = [];
 
-    const tableTop = height * 0.40;
-    const tableBottom = height - 115;
-    const cols = battle.tableau.length;
-    const gap = 4;
-    const cardWidth = Math.floor((width - 20 - gap * (cols - 1)) / cols);
-    const cardHeight = Math.min(72, cardWidth * 1.4);
-    const overlap = Math.min(42, (tableBottom - tableTop - cardHeight) / 4);
-    const startX = (width - (cardWidth * cols + gap * (cols - 1))) / 2;
+    const { tableauTop, cw, ch, strip, side, gap } = this.layout;
+    const width = this.scale.width;
 
-    battle.tableau.forEach((column, colIdx) => {
-      column.cards.forEach((card, rowIdx) => {
-        const x = startX + colIdx * (cardWidth + gap);
-        const y = tableTop + rowIdx * overlap;
-        const isExposed = rowIdx === column.cards.length - 1;
-        const isPlayable = isExposed && playableIds.has(card.id);
-        const powerType = this.getPowerType(card.id, battle.powerCards);
+    const tableauX = side;
+    const tableauY = tableauTop + 20;
 
-        this.drawCard(x, y, cardWidth, cardHeight, card, isExposed, isPlayable, powerType);
+    // Get power cards mapping
+    const powerCards = new Map<string, PowerType>();
+    battle.powerCards.forEach((pc) => powerCards.set(pc.cardId, pc.type));
+
+    // Render each column
+    battle.tableau.forEach((column, colIndex) => {
+      const x = tableauX + colIndex * (cw + gap);
+
+      column.cards.forEach((card, cardIndex) => {
+        const isTop = cardIndex === column.cards.length - 1;
+        const y = tableauY + cardIndex * strip;
+
+        const powerType = powerCards.get(card.id) || null;
+        const cardVisual = new CardVisual(this, x, y, card, powerType);
+
+        // Determine state
+        let state: 'normal' | 'covered' | 'playable' | 'disabled' = 'normal';
+        if (!isTop) {
+          state = 'covered';
+        } else if (this.canPlayCard(card, battle)) {
+          state = 'playable';
+          cardVisual.setInteractive(() => this.onCardClick(card.id));
+        } else {
+          state = 'disabled';
+        }
+
+        cardVisual.setState(state);
+        cardVisual.setDepth(15 + cardIndex);
+        this.cardVisuals.push(cardVisual);
       });
     });
   }
 
-  private drawCard(
-    x: number,
-    y: number,
-    width: number,
-    height: number,
-    card: Card,
-    isExposed: boolean,
-    isPlayable: boolean,
-    powerType: string | null
-  ): void {
-    const container = this.add.container(x + width / 2, y + height / 2);
+  private canPlayCard(card: Card, battle: BattleState): boolean {
+    if (!battle.activeCard) return false;
 
-    // Card shadow
-    const shadow = this.add.rectangle(2, 3, width, height, 0x000000, 0.3);
-    container.add(shadow);
+    const activeRank = battle.activeCard.rank;
+    const cardRank = card.rank;
 
-    // Card background
-    const cardKey = this.getCardKey(card);
-    if (this.textures.exists(cardKey)) {
-      const cardImg = this.add.image(0, 0, cardKey);
-      cardImg.setDisplaySize(width, height);
-      if (!isExposed) {
-        cardImg.setTint(0xb0b0b0);
-        cardImg.setAlpha(0.85);
-      }
-      container.add(cardImg);
-    } else {
-      // Fallback: draw card manually
-      const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
-      const bg = this.add.rectangle(0, 0, width, height, 0xffffff);
-      container.add(bg);
+    // Wild active means any card can connect
+    if (battle.wildActive) return true;
 
-      const label = getRankDisplay(card.rank) + getSuitSymbol(card.suit);
-      const text = this.add
-        .text(0, 0, label, {
-          fontFamily: 'Georgia, serif',
-          fontSize: `${Math.floor(width * 0.35)}px`,
-          fontStyle: 'bold',
-          color: isRed ? '#c84050' : '#1a2540',
-        })
-        .setOrigin(0.5);
-      container.add(text);
+    // Normal connection: ±1
+    const diff = Math.abs(activeRank - cardRank);
+    if (diff === 1) return true;
 
-      if (!isExposed) {
-        bg.setFillStyle(0xd0d0d0);
-      }
+    // Ace-King wrap (check relics)
+    if ((activeRank === 1 && cardRank === 13) || (activeRank === 13 && cardRank === 1)) {
+      return true;
     }
 
-    // Playable glow
-    if (isPlayable) {
-      const glow = this.add
-        .rectangle(0, 0, width + 6, height + 6)
-        .setStrokeStyle(3, 0xffd85b, 0.8);
-      container.addAt(glow, 0);
-
-      this.tweens.add({
-        targets: glow,
-        alpha: 0.4,
-        duration: 500,
-        yoyo: true,
-        repeat: -1,
-      });
-
-      // Make interactive
-      const hitArea = this.add
-        .rectangle(0, 0, width, height)
-        .setInteractive({ useHandCursor: true });
-      container.add(hitArea);
-
-      hitArea.on('pointerdown', () => {
-        if (!this.isAnimating) {
-          this.playCard(card.id);
-        }
-      });
-
-      hitArea.on('pointerover', () => {
-        container.setScale(1.05);
-      });
-
-      hitArea.on('pointerout', () => {
-        container.setScale(1);
-      });
-    }
-
-    // Power card indicator
-    if (powerType) {
-      const badge = this.add.circle(width / 2 - 8, -height / 2 + 8, 10, 0x7050c0);
-      badge.setStrokeStyle(2, 0xf0d080);
-      container.add(badge);
-
-      const star = this.add
-        .text(width / 2 - 8, -height / 2 + 8, '✦', {
-          fontFamily: 'Arial',
-          fontSize: '10px',
-          color: '#fff0c0',
-        })
-        .setOrigin(0.5);
-      container.add(star);
-
-      if (isExposed) {
-        const label = this.add
-          .text(0, height / 2 - 8, powerType, {
-            fontFamily: 'Arial, sans-serif',
-            fontSize: '8px',
-            fontStyle: 'bold',
-            color: '#ffffff',
-            backgroundColor: '#6040a0',
-            padding: { x: 3, y: 1 },
-          })
-          .setOrigin(0.5);
-        container.add(label);
-      }
-    }
-
-    this.cardObjects.set(card.id, container);
+    return false;
   }
 
-  private drawActiveCard(width: number, height: number, battle: BattleState): void {
+  private renderActiveCard(battle: BattleState): void {
+    if (this.activeCardVisual) {
+      this.activeCardVisual.destroy();
+      this.activeCardVisual = null;
+    }
+
     if (!battle.activeCard) return;
 
-    const card = battle.activeCard;
-    const cardW = Math.min(70, width * 0.18);
-    const cardH = cardW * 1.4;
-    const x = width / 2 + cardW * 0.4;
-    const y = height - 65;
+    const { trayTop, activeW, activeH, activeScale, safeBottom, cw, ch, side } = this.layout;
+    const width = this.scale.width;
+    const height = this.scale.height;
 
-    const cardKey = this.getCardKey(card);
-    if (this.textures.exists(cardKey)) {
-      const img = this.add.image(x, y, cardKey);
-      img.setDisplaySize(cardW, cardH);
-    } else {
-      const isRed = card.suit === 'hearts' || card.suit === 'diamonds';
-      this.add.rectangle(x, y, cardW, cardH, 0xffffff).setStrokeStyle(1, 0x888888);
+    // Position between draw pile and player HUD
+    const activeX = width / 2 - 20;
+    const activeY = height - safeBottom - activeH / 2 - 30;
+
+    // Get power type if any
+    const powerCard = battle.powerCards.find((pc) => pc.cardId === battle.activeCard!.id);
+    const powerType = powerCard?.type || null;
+
+    this.activeCardVisual = new CardVisual(this, activeX - activeW / 2, activeY - activeH / 2, battle.activeCard, powerType);
+    this.activeCardVisual.setState('active');
+    this.activeCardVisual.getContainer().setScale(activeScale);
+    this.activeCardVisual.setDepth(55);
+
+    // "ACTIVE" label
+    const labelY = activeY + activeH / 2 + 12;
+    if (!this.layout.isCompact) {
       this.add
-        .text(x, y, getRankDisplay(card.rank) + getSuitSymbol(card.suit), {
-          fontFamily: 'Georgia, serif',
-          fontSize: '18px',
-          fontStyle: 'bold',
-          color: isRed ? '#c84050' : '#1a2540',
+        .text(activeX, labelY, 'ACTIVE', {
+          fontFamily: 'Fredoka',
+          fontSize: '11px',
+          color: '#9a8aba',
         })
-        .setOrigin(0.5);
+        .setOrigin(0.5)
+        .setDepth(55);
+    }
+  }
+
+  private updateComboBanner(battle: BattleState): void {
+    const chainLength = battle.chain.length;
+    const damage = battle.accumulatedDamage;
+
+    if (chainLength > 0) {
+      this.comboBanner.update(chainLength, damage);
+    } else {
+      this.comboBanner.setVisible(false);
+    }
+  }
+
+  private updateDrawPile(battle: BattleState): void {
+    // Update count badge
+    const countText = this.drawCountBadge.getAt(1) as Phaser.GameObjects.Text;
+    if (countText) {
+      countText.setText(battle.deck.length.toString());
+    }
+  }
+
+  private updatePlayerHUD(state: RunState): void {
+    this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
+
+    // Update gold chip
+    const goldText = this.goldChip.getAt(3) as Phaser.GameObjects.Text;
+    if (goldText) {
+      goldText.setText(state.player.gold.toString());
     }
 
-    // Label
-    this.add
-      .text(x, y + cardH / 2 + 12, 'ACTIVE', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '8px',
-        fontStyle: 'bold',
-        color: '#6a7a8a',
-      })
-      .setOrigin(0.5);
-  }
-
-  private drawDeck(width: number, height: number, battle: BattleState): void {
-    const cardW = Math.min(70, width * 0.18);
-    const cardH = cardW * 1.4;
-    const x = width / 2 - cardW * 0.4;
-    const y = height - 65;
-
-    // Draw button
-    const drawBtn = this.add
-      .rectangle(x, y, cardW, cardH, 0x1a2a40)
-      .setStrokeStyle(1, 0x3a5a7a)
-      .setInteractive({ useHandCursor: true });
-
-    this.add
-      .text(x, y - 10, 'DRAW', {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '11px',
-        fontStyle: 'bold',
-        color: '#c0d0e0',
-      })
-      .setOrigin(0.5);
-
-    this.add
-      .text(x, y + 12, `${battle.deck.length}`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: '#e0e8f0',
-      })
-      .setOrigin(0.5);
-
-    drawBtn.on('pointerdown', () => {
-      if (!this.isAnimating) {
-        this.drawFromDeck();
+    // Armor chip (create/update if armor > 0)
+    if (state.player.armor > 0) {
+      if (!this.armorChip) {
+        const width = this.scale.width;
+        const height = this.scale.height;
+        const { safeBottom } = this.layout;
+        this.armorChip = createChip(this, width - 140, height - safeBottom - 70, colors.club, '🛡', state.player.armor);
+        this.armorChip.setDepth(60);
+      } else {
+        const armorText = this.armorChip.getAt(3) as Phaser.GameObjects.Text;
+        if (armorText) {
+          armorText.setText(state.player.armor.toString());
+        }
       }
-    });
-
-    drawBtn.on('pointerover', () => drawBtn.setFillStyle(0x2a3a50));
-    drawBtn.on('pointerout', () => drawBtn.setFillStyle(0x1a2a40));
-
-    // Help text
-    const manager = getGameManager();
-    const state = manager.getState();
-    const playable = state?.battle ? getPlayableCards(state.battle, state.player.relics) : [];
-
-    const helpText = playable.length > 0 ? 'PLAY ±1  •  DRAW = ENEMY TURN' : 'NO MOVES  •  DRAW';
-
-    this.add
-      .text(width / 2, height - 16, helpText, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '9px',
-        fontStyle: 'bold',
-        color: '#5a6a7a',
-      })
-      .setOrigin(0.5);
+    } else if (this.armorChip) {
+      this.armorChip.destroy();
+      this.armorChip = null;
+    }
   }
 
-  private drawChainIndicator(width: number, height: number, battle: BattleState): void {
-    if (battle.chain.length === 0) return;
-
-    const y = height * 0.36;
-
-    // Chain length indicator
-    this.add
-      .text(width / 2, y, `CHAIN ×${battle.chain.length}`, {
-        fontFamily: 'Georgia, serif',
-        fontSize: '16px',
-        fontStyle: 'bold',
-        color: '#f0cf68',
-      })
-      .setOrigin(0.5);
-
-    // Accumulated damage
-    this.add
-      .text(width / 2, y + 20, `${battle.accumulatedDamage} DMG`, {
-        fontFamily: 'Arial, sans-serif',
-        fontSize: '12px',
-        fontStyle: 'bold',
-        color: '#ff9080',
-      })
-      .setOrigin(0.5);
-  }
-
-  private getCardKey(card: Card): string {
-    const rankChar = card.rank === 10 ? 'T' : getRankDisplay(card.rank);
-    const suitChar = card.suit[0].toUpperCase();
-    return `card-${rankChar}${suitChar}`;
-  }
-
-  private getPowerType(cardId: string, powerCards: PowerCard[]): string | null {
-    const pc = powerCards.find((p) => p.cardId === cardId);
-    return pc ? pc.type : null;
-  }
-
-  private playCard(cardId: string): void {
+  private onCardClick(cardId: string): void {
     const manager = getGameManager();
     const result = manager.playCard(cardId);
 
     if (result && result.events.length > 0) {
-      // Simple visual feedback
-      this.cameras.main.shake(50, 0.003);
+      this.handleEvents(result.events);
     }
 
+    this.refreshState();
     this.checkPhaseTransition();
-    this.render();
   }
 
-  private drawFromDeck(): void {
+  private onDrawClick(): void {
     const manager = getGameManager();
     const result = manager.draw();
 
-    if (result) {
-      // Check for enemy attack event
-      const attacked = result.events.find((e) => e.type === 'enemy_attacked');
-      if (attacked && attacked.type === 'enemy_attacked') {
-        this.cameras.main.shake(100, 0.01);
-        this.cameras.main.flash(80, 150, 40, 40);
-      }
+    if (result && result.events.length > 0) {
+      this.handleEvents(result.events);
     }
 
+    this.refreshState();
     this.checkPhaseTransition();
-    this.render();
+  }
+
+  private handleEvents(events: Array<{ type: string; [key: string]: unknown }>): void {
+    for (const event of events) {
+      switch (event.type) {
+        case 'enemy_attacked':
+          this.playEnemyAttackAnimation();
+          break;
+        case 'enemy_died':
+          this.playEnemyDeathAnimation();
+          break;
+        case 'chain_resolved':
+          this.playDamageAnimation(event.totalDamage as number);
+          break;
+      }
+    }
+  }
+
+  private playEnemyAttackAnimation(): void {
+    if (!this.enemySprite) return;
+
+    const attackKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-attack`;
+    if (this.anims.exists(attackKey)) {
+      this.enemySprite.play(attackKey);
+      this.enemySprite.once('animationcomplete', () => {
+        const idleKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-idle`;
+        if (this.anims.exists(idleKey)) {
+          this.enemySprite?.play(idleKey);
+        }
+      });
+    }
+
+    // Screen shake
+    this.cameras.main.shake(100, 0.01);
+  }
+
+  private playEnemyDeathAnimation(): void {
+    if (!this.enemySprite) return;
+
+    const deadKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-dead`;
+    if (this.anims.exists(deadKey)) {
+      this.enemySprite.play(deadKey);
+    }
+  }
+
+  private playDamageAnimation(damage: number): void {
+    if (!this.enemySprite) return;
+
+    const hurtKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-hurt`;
+    if (this.anims.exists(hurtKey)) {
+      this.enemySprite.play(hurtKey);
+      this.enemySprite.once('animationcomplete', () => {
+        const idleKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-idle`;
+        if (this.anims.exists(idleKey)) {
+          this.enemySprite?.play(idleKey);
+        }
+      });
+    }
+
+    // Damage number popup
+    const dmgText = this.add
+      .text(this.scale.width / 2, this.layout.arenaTop + this.layout.arenaHeight * 0.4, damage.toString(), {
+        fontFamily: 'Lilita One',
+        fontSize: '40px',
+        color: '#FFD070',
+      })
+      .setOrigin(0.5)
+      .setStroke('#1B1030', 8)
+      .setShadow(0, 4, '#1B1030', 0, true, true)
+      .setDepth(100);
+
+    this.tweens.add({
+      targets: dmgText,
+      y: dmgText.y - 60,
+      alpha: 0,
+      scale: 1.3,
+      duration: 800,
+      ease: 'Power2',
+      onComplete: () => dmgText.destroy(),
+    });
   }
 
   private checkPhaseTransition(): void {
     const manager = getGameManager();
     const state = manager.getState();
-
     if (!state) return;
 
     switch (state.phase) {
@@ -656,97 +573,24 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private handleEvents(events: GameEvent[]): void {
-    for (const event of events) {
-      switch (event.type) {
-        case 'chain_resolved':
-          if (event.chainLength >= 5) {
-            this.showChainText(event.chainLength);
-          }
-          // Play hurt animation when damage lands
-          if (event.totalDamage > 0) {
-            this.playEnemyAnimation('hurt');
-          }
-          break;
-        case 'power_activated':
-          this.showPowerText(event.powerType);
-          break;
-        case 'enemy_attacked':
-          // Play attack animation when enemy attacks
-          this.playEnemyAnimation('attack');
-          break;
-        case 'enemy_died':
-          // Play death animation
-          this.playEnemyAnimation('dead');
-          break;
-      }
+  private handleResize(): void {
+    const width = this.scale.width;
+    const height = this.scale.height;
+
+    this.layout = getLayoutMetrics(width, height);
+    this.cardMetrics = getCardMetrics(width);
+
+    // Recreate table background
+    if (this.tableBackground) {
+      this.tableBackground.destroy();
     }
+    this.createTableBackground();
+
+    // Refresh everything
+    this.refreshState();
   }
 
-  private showChainText(length: number): void {
-    const width = this.scale.width;
-    const height = this.scale.height;
-
-    const text = length >= 8 ? 'MONSTER CHAIN!' : 'HOT STREAK!';
-    const color = length >= 8 ? '#ff8040' : '#f0d060';
-
-    const label = this.add
-      .text(width / 2, height * 0.3, text, {
-        fontFamily: 'Georgia, serif',
-        fontSize: length >= 8 ? '24px' : '20px',
-        fontStyle: 'bold',
-        color,
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: label,
-      alpha: 1,
-      scale: 1.2,
-      y: label.y - 30,
-      duration: 400,
-      ease: 'Back.out',
-      onComplete: () => {
-        this.tweens.add({
-          targets: label,
-          alpha: 0,
-          duration: 300,
-          delay: 200,
-          onComplete: () => label.destroy(),
-        });
-      },
-    });
-  }
-
-  private showPowerText(powerType: string): void {
-    const width = this.scale.width;
-    const height = this.scale.height;
-
-    const label = this.add
-      .text(width / 2, height * 0.32, `${powerType}!`, {
-        fontFamily: 'Georgia, serif',
-        fontSize: '18px',
-        fontStyle: 'bold',
-        color: '#c090ff',
-      })
-      .setOrigin(0.5)
-      .setAlpha(0);
-
-    this.tweens.add({
-      targets: label,
-      alpha: 1,
-      y: label.y - 20,
-      duration: 300,
-      onComplete: () => {
-        this.tweens.add({
-          targets: label,
-          alpha: 0,
-          duration: 400,
-          delay: 300,
-          onComplete: () => label.destroy(),
-        });
-      },
-    });
+  shutdown(): void {
+    this.scale.off('resize', this.handleResize, this);
   }
 }

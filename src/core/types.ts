@@ -20,6 +20,10 @@ export interface Enemy {
   readonly intents: Intent[];
   readonly currentIntentIndex: number;
   readonly sprite: string;
+  readonly scale?: number;
+  readonly tint?: string;
+  readonly crown?: boolean;
+  readonly tier?: 'normal' | 'elite' | 'boss';
 }
 
 export interface Intent {
