@@ -4,7 +4,7 @@ import { VitePWA } from 'vite-plugin-pwa';
 export default defineConfig({
   plugins: [
     VitePWA({
-      registerType: 'autoUpdate',
+      registerType: 'prompt',
       manifest: {
         name: 'Golf Rogue',
         short_name: 'Golf Rogue',
@@ -24,10 +24,6 @@ export default defineConfig({
         ],
       },
       workbox: {
-        // Activate new SW immediately without waiting
-        skipWaiting: true,
-        clientsClaim: true,
-
         // Pre-cache static assets for offline play (including audio)
         globPatterns: ['**/*.{js,css,svg,png,woff2,ogg,mp3}'],
 

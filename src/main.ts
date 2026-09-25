@@ -3,6 +3,7 @@ import './style.css';
 
 import { loadFonts } from './presentation/design/fontLoader';
 import { AudioSystem } from './presentation/audio/AudioSystem';
+import { initPWAUpdateHandler } from './pwa/updateHandler';
 import { BootScene } from './presentation/scenes/BootScene';
 import { StartScene } from './presentation/scenes/StartScene';
 import { BattleScene } from './presentation/scenes/BattleScene';
@@ -14,6 +15,9 @@ import { CreditsScene } from './presentation/scenes/CreditsScene';
 async function initGame() {
   // Load fonts before Phaser starts (per STYLE.md section 13)
   await loadFonts();
+
+  // Initialize PWA update handler (prompt mode with in-app update toast)
+  initPWAUpdateHandler();
 
   // Initialize audio system (loads sounds in background)
   AudioSystem.init().catch(() => {
