@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { getGameManager } from '../GameManager';
+import { getGameManager, setTestHook } from '../GameManager';
 import { colors, getLayoutMetrics, getCardMetrics, getComboTier } from '../design/tokens';
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
 import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
@@ -77,6 +77,46 @@ export class BattleScene extends Phaser.Scene {
 
     // Listen for resize
     this.scale.on('resize', this.handleResize, this);
+
+    // Set up test hook for automated testing
+    this.setupTestHook();
+  }
+
+  private setupTestHook(): void {
+    const { cw, ch } = this.layout;
+    setTestHook({
+      isActive: true,
+      getPlayableCards: () => {
+        return this.cardVisuals
+          .filter((cv) => cv.isInteractive())
+          .map((cv) => ({
+            cardId: cv.getCard().id,
+            bounds: cv.getWorldBounds(),
+          }));
+      },
+      getDrawPileBounds: () => {
+        if (!this.drawPile) return { x: 0, y: 0, width: 0, height: 0 };
+        return {
+          x: this.drawPile.x - 40,
+          y: this.drawPile.y + ch / 2 - 24,
+          width: 80,
+          height: 36,
+        };
+      },
+      getTableauCount: () => {
+        const state = getGameManager().getState();
+        if (!state?.battle) return 0;
+        return state.battle.tableau.reduce((sum, col) => sum + col.cards.length, 0);
+      },
+      getDeckCount: () => {
+        const state = getGameManager().getState();
+        return state?.battle?.deck.length || 0;
+      },
+      getActiveCardId: () => {
+        const state = getGameManager().getState();
+        return state?.battle?.activeCard?.id || null;
+      },
+    });
   }
 
   private createTopHUD(): void {
@@ -721,5 +761,6 @@ export class BattleScene extends Phaser.Scene {
 
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this);
+    setTestHook(null);
   }
 }

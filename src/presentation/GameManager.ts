@@ -204,10 +204,26 @@ let gameManagerInstance: GameManager | null = null;
 export function getGameManager(): GameManager {
   if (!gameManagerInstance) {
     gameManagerInstance = new GameManager();
-    // Dev hook for testing (tree-shaken in production if unused)
+    // Dev hook for testing
     if (typeof window !== 'undefined') {
       (window as any).$game = gameManagerInstance;
     }
   }
   return gameManagerInstance;
+}
+
+// Test hook interface - set by BattleScene when active
+export interface TestHook {
+  isActive: boolean;
+  getPlayableCards: () => Array<{ cardId: string; bounds: { x: number; y: number; width: number; height: number } }>;
+  getDrawPileBounds: () => { x: number; y: number; width: number; height: number };
+  getTableauCount: () => number;
+  getDeckCount: () => number;
+  getActiveCardId: () => string | null;
+}
+
+export function setTestHook(hook: TestHook | null): void {
+  if (typeof window !== 'undefined') {
+    (window as any).__GOLF_TEST__ = hook;
+  }
 }

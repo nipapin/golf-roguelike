@@ -36,6 +36,7 @@ export class CardVisual {
   private powerFrame: Phaser.GameObjects.Graphics | null = null;
   private powerMedal: Phaser.GameObjects.Container | null = null;
   private powerRibbon: Phaser.GameObjects.Container | null = null;
+  private hitZone: Phaser.GameObjects.Zone | null = null;
   private played: boolean = false;
 
   private card: Card;
@@ -376,27 +377,26 @@ export class CardVisual {
   setInteractive(callback: () => void): void {
     const { cw, ch } = this.metrics;
     
-    // Correct Container hit area setup:
-    // 1. Set container size first
-    // 2. Then setInteractive with Rectangle at (0,0) - NOT offset by -w/2,-h/2
-    this.container.setSize(cw, ch);
-    this.container.setInteractive(
-      new Phaser.Geom.Rectangle(0, 0, cw, ch),
-      Phaser.Geom.Rectangle.Contains
-    );
+    // Use a Zone child for hit detection - Zones have origin 0.5 by default
+    // Position at card center (cw/2, ch/2), size cw x ch
+    this.hitZone = this.scene.add.zone(cw / 2, ch / 2, cw, ch);
+    this.hitZone.setInteractive();
+    this.container.add(this.hitZone);
     
     // Use pointerup with played guard to prevent double-tap issues
-    this.container.on('pointerup', () => {
+    this.hitZone.on('pointerup', () => {
       if (this.played) return;
       this.played = true;
-      this.container.disableInteractive();
+      this.hitZone?.disableInteractive();
       callback();
     });
   }
 
   disableInteractive(): void {
-    this.container.disableInteractive();
-    this.container.removeAllListeners('pointerup');
+    if (this.hitZone) {
+      this.hitZone.disableInteractive();
+      this.hitZone.removeAllListeners();
+    }
   }
 
   getContainer(): Phaser.GameObjects.Container {
@@ -407,7 +407,26 @@ export class CardVisual {
     return this.card;
   }
 
+  getWorldBounds(): { x: number; y: number; width: number; height: number } {
+    const { cw, ch } = this.metrics;
+    return {
+      x: this.container.x,
+      y: this.container.y,
+      width: cw,
+      height: ch,
+    };
+  }
+
+  isInteractive(): boolean {
+    return this.hitZone !== null && !this.played;
+  }
+
   destroy(): void {
+    if (this.hitZone) {
+      this.hitZone.removeAllListeners();
+      this.hitZone.destroy();
+      this.hitZone = null;
+    }
     this.container.removeAllListeners();
     this.container.destroy();
   }
