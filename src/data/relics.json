@@ -1,0 +1,76 @@
+{
+  "relics": [
+    {
+      "id": "ace_king_link",
+      "name": "SNAKE RING",
+      "description": "Ace connects to King",
+      "effect": { "type": "aceKingWrap", "value": true }
+    },
+    {
+      "id": "spade_bonus",
+      "name": "SHARP SPADE",
+      "description": "♠ deal +2 extra damage",
+      "effect": { "type": "spadeDamageBonus", "value": 2 }
+    },
+    {
+      "id": "heart_bonus",
+      "name": "RED HEART",
+      "description": "♥ heal +2 extra",
+      "effect": { "type": "heartHealBonus", "value": 2 }
+    },
+    {
+      "id": "diamond_bonus",
+      "name": "DIAMOND VEIN",
+      "description": "♦ give +2 extra gold",
+      "effect": { "type": "diamondGoldBonus", "value": 2 }
+    },
+    {
+      "id": "club_bonus",
+      "name": "OAK SHIELD",
+      "description": "♣ give +2 extra armor",
+      "effect": { "type": "clubArmorBonus", "value": 2 }
+    },
+    {
+      "id": "third_card_multiplier",
+      "name": "TRIPLE THREAT",
+      "description": "Every 3rd card in chain deals 2x damage",
+      "effect": { "type": "thirdCardMultiplier", "value": 2 }
+    },
+    {
+      "id": "first_chain_bonus",
+      "name": "QUICK START",
+      "description": "First chain of each battle starts at position 3",
+      "effect": { "type": "firstChainBonus", "value": 3 }
+    },
+    {
+      "id": "boosted_sevens",
+      "name": "LUCKY SEVEN",
+      "description": "All 7s deal +5 damage",
+      "effect": { "type": "boostedRank", "rank": 7, "bonus": 5 }
+    },
+    {
+      "id": "more_power_cards",
+      "name": "POWER SURGE",
+      "description": "+2 power cards in each battle",
+      "effect": { "type": "extraPowerCards", "value": 2 }
+    },
+    {
+      "id": "double_crit",
+      "name": "DOUBLE CRIT",
+      "description": "CRIT power triggers twice",
+      "effect": { "type": "doublePower", "powerType": "CRIT" }
+    },
+    {
+      "id": "double_heal",
+      "name": "DOUBLE HEAL",
+      "description": "HEAL power triggers twice",
+      "effect": { "type": "doublePower", "powerType": "HEAL" }
+    },
+    {
+      "id": "vampiric",
+      "name": "VAMPIRIC EDGE",
+      "description": "Heal 1 HP for every 10 damage dealt",
+      "effect": { "type": "vampiric", "ratio": 10 }
+    }
+  ]
+}

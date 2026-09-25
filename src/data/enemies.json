@@ -1,0 +1,136 @@
+{
+  "normal": [
+    {
+      "id": "slime",
+      "name": "GREEN SLIME",
+      "hp": 22,
+      "intents": [
+        { "type": "attack", "value": 3 },
+        { "type": "attack", "value": 4 },
+        { "type": "defend", "value": 2 }
+      ],
+      "sprite": "slime",
+      "tier": 1
+    },
+    {
+      "id": "mushroom",
+      "name": "SPORE SHROOM",
+      "hp": 26,
+      "intents": [
+        { "type": "attack", "value": 4 },
+        { "type": "attack", "value": 5 },
+        { "type": "debuff", "value": 2 }
+      ],
+      "sprite": "mushroom",
+      "tier": 1
+    },
+    {
+      "id": "bat",
+      "name": "CAVE BAT",
+      "hp": 20,
+      "intents": [
+        { "type": "attack", "value": 5 },
+        { "type": "attack", "value": 3 },
+        { "type": "attack", "value": 4 }
+      ],
+      "sprite": "bat",
+      "tier": 1
+    },
+    {
+      "id": "wolf",
+      "name": "DIRE WOLF",
+      "hp": 32,
+      "intents": [
+        { "type": "attack", "value": 5 },
+        { "type": "attack", "value": 7 },
+        { "type": "attack", "value": 4 }
+      ],
+      "sprite": "wolf",
+      "tier": 2
+    },
+    {
+      "id": "zombie",
+      "name": "UNDEAD",
+      "hp": 36,
+      "intents": [
+        { "type": "attack", "value": 6 },
+        { "type": "attack", "value": 5 },
+        { "type": "buff", "value": 3 }
+      ],
+      "sprite": "zombie",
+      "tier": 2
+    },
+    {
+      "id": "goblin",
+      "name": "GOBLIN THIEF",
+      "hp": 30,
+      "intents": [
+        { "type": "attack", "value": 5 },
+        { "type": "attack", "value": 6 },
+        { "type": "attack", "value": 4 }
+      ],
+      "sprite": "goblin",
+      "tier": 2
+    },
+    {
+      "id": "bandit",
+      "name": "HIGHWAY BANDIT",
+      "hp": 38,
+      "intents": [
+        { "type": "attack", "value": 6 },
+        { "type": "attack", "value": 8 },
+        { "type": "defend", "value": 4 }
+      ],
+      "sprite": "bandit",
+      "tier": 3
+    }
+  ],
+  "elite": [
+    {
+      "id": "knight",
+      "name": "DARK KNIGHT",
+      "hp": 55,
+      "intents": [
+        { "type": "attack", "value": 8 },
+        { "type": "defend", "value": 6 },
+        { "type": "attack", "value": 10 },
+        { "type": "buff", "value": 3 }
+      ],
+      "sprite": "knight",
+      "scale": 1.3,
+      "powerCardCount": 5
+    }
+  ],
+  "boss": [
+    {
+      "id": "golfking",
+      "name": "THE GOLF KING",
+      "hp": 90,
+      "intents": [
+        { "type": "attack", "value": 10 },
+        { "type": "attack", "value": 12 },
+        { "type": "buff", "value": 4 },
+        { "type": "attack", "value": 8 }
+      ],
+      "sprite": "samurai",
+      "scale": 1.5,
+      "tint": "gold",
+      "crown": true,
+      "powerCardCount": 4
+    }
+  ],
+  "defaults": {
+    "powerCardCount": {
+      "normal": 3,
+      "elite": 5,
+      "boss": 4
+    }
+  },
+  "tierWeights": {
+    "fight1": { "1": 100 },
+    "fight2": { "1": 70, "2": 30 },
+    "fight3": { "1": 30, "2": 70 },
+    "fight5": { "2": 50, "3": 50 },
+    "fight6": { "2": 30, "3": 70 }
+  }
+}

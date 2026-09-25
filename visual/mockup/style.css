@@ -1,0 +1,189 @@
+/* ==========================================================================
+   GOLF ROGUE — UI style system (mockup reference implementation)
+   All values mirror visual/STYLE.md. 1 CSS px = 1 game px at DPR 1.
+   ========================================================================== */
+@font-face{font-family:"Lilita One";src:url(fonts/LilitaOne-Regular.ttf) format("truetype");font-display:block}
+@font-face{font-family:"Fredoka";src:url(fonts/Fredoka-Variable.ttf) format("truetype");font-weight:300 700;font-display:block}
+@font-face{font-family:"Rubik";src:url(fonts/Rubik-Variable.ttf) format("truetype");font-weight:300 900;font-display:block}
+
+:root{
+  /* ink & neutrals */
+  --ink:#1B1030; --ink-2:#2E1F52; --white:#FFFFFF;
+  /* card face */
+  --face-hi:#FFFDF6; --face:#FFF6E2; --face-lo:#F3E4C4; --bevel:#D9BF8E; --face-dim:#CFC3B4;
+  /* suits = effects */
+  --sp:#2C2160;  --sp-fx:#FF5A36;   /* ♠ ATTACK: ink-violet suit, flame-red effect */
+  --he:#F2324E;  --he-fx:#FF4D6A;   /* ♥ HEAL */
+  --cl:#1683F0;  --cl-fx:#3FB0FF;   /* ♣ ARMOR */
+  --di:#F29A00;  --di-txt:#E67E00; --di-fx:#FFC629; /* ♦ GOLD */
+  /* UI accents */
+  --gold:#FFCC1F; --gold-lo:#E88A00; --gold-hi:#FFF08A;
+  --blue:#3AA0FF; --blue-lo:#1C5FD1;
+  --red:#FF3B4E;  --red-lo:#B8163A;
+  --green:#3ED66B; --green-lo:#1A9444;
+  --violet:#7B4DFF;
+  /* table */
+  --felt:#3A2A96; --felt-hi:#5140C0; --felt-lo:#22176A; --rim:#8C4A22; --rim-hi:#D2803C;
+  /* combo tiers */
+  --t1:#FFE45C; --t2:#FF9A1F; --t3:#FF3D2E; --t4:#D23BFF;
+  /* layout (390x844 reference; scales with width) */
+  --safe-top: env(safe-area-inset-top, 0px);
+  --safe-bot: env(safe-area-inset-bottom, 0px);
+  --gap:4px; --side:8px;
+  --cw: min(calc((100vw - 2*var(--side) - 6*var(--gap)) / 7), 56px);
+  --ch: calc(var(--cw) * 1.4);
+  --strip: calc(var(--cw) * 0.58);
+  --r: calc(var(--cw) * 0.16);
+  --ol: 2.5px;               /* card outline on tableau */
+}
+*{box-sizing:border-box;margin:0;padding:0}
+html,body{width:100%;height:100%;overflow:hidden;background:#140A2A}
+body{font-family:"Fredoka",system-ui,sans-serif;color:#fff;-webkit-font-smoothing:antialiased}
+svg.i{width:1em;height:1em;display:inline-block;vertical-align:middle;fill:currentColor;overflow:visible}
+svg.i.o{stroke:var(--ink);stroke-width:48;paint-order:stroke;stroke-linejoin:round}
+
+/* ---------- Supercell-style outlined text ---------- */
+.t-disp{font-family:"Lilita One","Rubik",sans-serif;font-weight:400;letter-spacing:.01em;line-height:1}
+.ol{color:#fff;-webkit-text-stroke:var(--sw,3px) var(--ink);paint-order:stroke fill;text-shadow:0 var(--sh,2px) 0 var(--ink)}
+
+/* ==========================================================================
+   CARD
+   ========================================================================== */
+.card{
+  position:absolute;width:var(--cw);height:calc(var(--cw)*1.4);border-radius:calc(var(--cw)*.16);
+  background:linear-gradient(180deg,var(--face-hi) 0%,var(--face) 55%,var(--face-lo) 100%);
+  box-shadow:
+    0 0 0 var(--ol) var(--ink),                 /* outline */
+    inset 0 calc(var(--cw)*-.07) 0 var(--bevel), /* bottom bevel */
+    inset 0 2px 0 #fff,                          /* top inner highlight */
+    0 calc(var(--ol) + 3px) 0 rgba(20,8,40,.55); /* hard drop shadow */
+  color:var(--suit);
+  transition:transform .12s;
+}
+.card.sp{--suit:var(--sp);--fx:var(--sp-fx)}
+.card.he{--suit:var(--he);--fx:var(--he-fx)}
+.card.cl{--suit:var(--cl);--fx:var(--cl-fx)}
+.card.di{--suit:var(--di);--fx:var(--di-fx)}
+.card .rank{position:absolute;left:calc(var(--cw)*.09);top:calc(var(--cw)*.04);
+  font-family:"Lilita One",sans-serif;font-size:calc(var(--cw)*.47);line-height:1;letter-spacing:-.03em;color:var(--suit)}
+.card.di .rank{color:var(--di-txt)}
+.card .rank.ten{letter-spacing:-.09em;font-size:calc(var(--cw)*.43)}
+.card .pip{position:absolute;right:calc(var(--cw)*.07);top:calc(var(--cw)*.08);width:calc(var(--cw)*.30);height:calc(var(--cw)*.30)}
+.card .bigw{position:absolute;left:50%;bottom:calc(var(--cw)*.13);width:calc(var(--cw)*.7);height:calc(var(--cw)*.7);transform:translateX(-50%)}
+.card .big{position:absolute;inset:0;width:100%;height:100%}
+/* effect glyph embossed in the big suit: white w/ ink outline */
+.card .fxg{position:absolute;left:50%;top:54%;width:44%;height:44%;transform:translate(-50%,-50%);fill:#fff;stroke:var(--ink);stroke-width:56;paint-order:stroke;stroke-linejoin:round}
+.card.sp .fxg{fill:#FFB09A}
+.card.cl .fxg{top:52%}
+.card.he .fxg{top:47%}
+/* effect badge: small round chip bottom-left of the big suit */
+.card .fxb{position:absolute;right:calc(var(--cw)*.06);bottom:calc(var(--cw)*.1);width:calc(var(--cw)*.30);height:calc(var(--cw)*.30);
+  border-radius:50%;background:var(--fx);box-shadow:0 0 0 2px var(--ink);display:grid;place-items:center;color:#fff;font-size:calc(var(--cw)*.2)}
+.card .fxb svg{width:72%;height:72%;fill:#fff}
+
+/* covered = overlapped in a column: only the top strip is visible, still full info in the strip */
+.card.covered{filter:saturate(.92) brightness(.97)}
+/* disabled = exposed top card that can't be played now (rank not ±1) */
+.card.disabled{filter:saturate(.75) brightness(.86)}
+.card.disabled::after{content:"";position:absolute;inset:0;border-radius:inherit;background:linear-gradient(180deg,rgba(70,50,170,.16),rgba(40,20,120,.30))}
+/* playable = exposed and legal: lift + warm gold rim + soft under-glow (no acid glow) */
+.card.playable{transform:none;
+  box-shadow:
+    0 0 0 var(--ol) var(--ink),
+    0 0 0 calc(var(--ol) + 2.5px) #FFE35A,
+    0 0 0 calc(var(--ol) + 4px) var(--ink),
+    inset 0 0 0 2px #FFE35A,
+    inset 0 calc(var(--cw)*-.07) 0 var(--bevel), inset 0 2px 0 #fff,
+    0 calc(var(--ol) + 7px) 0 rgba(20,8,40,.45),
+    0 6px 18px 4px rgba(255,214,70,.55)}
+.card.playable .tick{position:absolute;left:50%;bottom:calc(var(--ol)*-1 - 17px);transform:translateX(-50%);
+  width:0;height:0;border-left:6px solid transparent;border-right:6px solid transparent;border-bottom:7px solid #FFE35A;filter:drop-shadow(0 0 0 var(--ink)) drop-shadow(0 1.5px 0 var(--ink))}
+/* selected / pressed */
+.card.selected{transform:translateY(-12px) scale(1.1) rotate(-3deg);z-index:50;
+  box-shadow:0 0 0 var(--ol) var(--ink),0 0 0 calc(var(--ol) + 3.5px) #fff,0 0 0 calc(var(--ol) + 5px) var(--ink),
+    inset 0 calc(var(--cw)*-.07) 0 var(--bevel),inset 0 2px 0 #fff,0 16px 14px rgba(20,8,40,.45),0 0 26px 8px rgba(255,240,170,.75)}
+
+/* ---------- POWER CARDS ---------- */
+.card.power{--pw1:#FF4A1C;--pw2:#FFB800;--pw3:#FFF1A0;
+  background:linear-gradient(180deg,color-mix(in srgb,var(--pw2) 38%,#fff) 0%,color-mix(in srgb,var(--pw2) 22%,var(--face)) 55%,color-mix(in srgb,var(--pw1) 30%,var(--face-lo)) 100%)}
+.card.power .rank{color:var(--ink)!important}
+.card.power .pip{display:none}
+.card.power::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:calc(var(--cw)*.1);z-index:1;box-shadow:inset 0 0 0 1px rgba(255,255,255,.6);
+  background:conic-gradient(from 210deg,var(--pw1),var(--pw2),var(--pw3),var(--pw2),var(--pw1),var(--pw2),var(--pw3),var(--pw1));
+  -webkit-mask:linear-gradient(#000 0 0) content-box,linear-gradient(#000 0 0);-webkit-mask-composite:xor;mask-composite:exclude}
+.card.power .holo{position:absolute;inset:calc(var(--cw)*.1);border-radius:calc(var(--cw)*.11);overflow:hidden;
+  background:
+    radial-gradient(120% 70% at 50% 110%,color-mix(in srgb,var(--pw1) 30%,transparent),transparent 70%),
+    repeating-linear-gradient(115deg,transparent 0 9px,rgba(255,255,255,.55) 9px 11px,transparent 11px 20px),
+    linear-gradient(115deg,transparent 30%,color-mix(in srgb,var(--pw3) 55%,transparent) 45%,transparent 60%);
+  mix-blend-mode:soft-light;opacity:.9}
+.card.power .medal{position:absolute;right:calc(var(--cw)*-.1);top:calc(var(--cw)*-.1);width:calc(var(--cw)*.44);height:calc(var(--cw)*.44);z-index:3;
+  border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--pw3),var(--pw2) 45%,var(--pw1));
+  box-shadow:0 0 0 2px var(--ink),inset 0 -3px 0 rgba(0,0,0,.25),inset 0 2px 0 rgba(255,255,255,.6),0 0 10px 2px color-mix(in srgb,var(--pw2) 80%,transparent);
+  display:grid;place-items:center}
+.card.power .medal svg{width:calc(var(--cw)*.3);height:calc(var(--cw)*.3);fill:#fff;stroke:var(--ink);stroke-width:40;paint-order:stroke;stroke-linejoin:round}
+.card.power .ribbon{position:absolute;left:50%;bottom:calc(var(--cw)*-.1);transform:translateX(-50%);z-index:3;
+  padding:1px 5px 2px;border-radius:5px;background:linear-gradient(180deg,var(--pw2),var(--pw1));box-shadow:0 0 0 2px var(--ink),inset 0 1.5px 0 rgba(255,255,255,.5);
+  font-family:"Lilita One";font-size:calc(var(--cw)*.2);color:#fff;-webkit-text-stroke:2px var(--ink);paint-order:stroke fill;letter-spacing:.04em;line-height:1.1;white-space:nowrap}
+.card.power{box-shadow:0 0 0 var(--ol) var(--ink),inset 0 calc(var(--cw)*-.07) 0 var(--bevel),0 calc(var(--ol) + 3px) 0 rgba(20,8,40,.55),0 0 14px 3px color-mix(in srgb,var(--pw2) 70%,transparent)}
+.card.power.playable{box-shadow:0 0 0 var(--ol) var(--ink),0 0 0 calc(var(--ol) + 2.5px) #FFE35A,0 0 0 calc(var(--ol) + 4px) var(--ink),
+  inset 0 calc(var(--cw)*-.07) 0 var(--bevel),0 calc(var(--ol) + 8px) 0 rgba(20,8,40,.45),0 0 22px 7px color-mix(in srgb,var(--pw2) 85%,transparent)}
+.card.power .spark{position:absolute;width:10px;height:10px;z-index:4;background:
+  radial-gradient(closest-side,#fff,transparent),conic-gradient(from 45deg,transparent 0 10%,#fff 12%,transparent 14% 35%,#fff 37%,transparent 39% 60%,#fff 62%,transparent 64% 85%,#fff 87%,transparent 89%);
+  filter:drop-shadow(0 0 3px var(--pw2))}
+.card.pw-crit{--pw1:#FF3A1A;--pw2:#FF9A00;--pw3:#FFF07A}
+.card.pw-heal{--pw1:#12B76A;--pw2:#3DF5A0;--pw3:#E0FFF0}
+.card.pw-guard{--pw1:#1D5BFF;--pw2:#45C8FF;--pw3:#E6FAFF}
+.card.pw-gold{--pw1:#D98A00;--pw2:#FFD23F;--pw3:#FFFBD0}
+.card.pw-bomb{--pw1:#1B1030;--pw2:#FF3B30;--pw3:#FF9F6B}
+.card.pw-wild{--pw1:#FF3DB8;--pw2:#39D9FF;--pw3:#FFF15C}
+.card.pw-wild::before{background:conic-gradient(#FF3D6E,#FFB32E,#FFF15C,#4BE38A,#39D9FF,#7B6BFF,#FF3DB8,#FF3D6E)!important}
+.card.pw-echo{--pw1:#8A2BFF;--pw2:#E05CFF;--pw3:#FFD6FF}
+
+/* card back */
+.back{position:absolute;width:var(--cw);height:calc(var(--cw)*1.4);border-radius:calc(var(--cw)*.16);
+  background:
+    radial-gradient(circle at 50% 50%,rgba(255,210,90,.0) 0 32%,transparent 33%),
+    repeating-linear-gradient(45deg,rgba(255,255,255,.07) 0 6px,transparent 6px 12px),
+    repeating-linear-gradient(-45deg,rgba(255,255,255,.07) 0 6px,transparent 6px 12px),
+    linear-gradient(180deg,#8A4DFF,#5A2BD6 60%,#4420A8);
+  box-shadow:0 0 0 var(--ol) var(--ink),inset 0 0 0 calc(var(--cw)*.07) #FFD34A,inset 0 0 0 calc(var(--cw)*.07 + 1.5px) var(--ink),inset 0 -5px 0 rgba(0,0,0,.25),0 calc(var(--ol) + 3px) 0 rgba(20,8,40,.55)}
+.back .emb{position:absolute;left:50%;top:50%;width:48%;aspect-ratio:1;transform:translate(-50%,-50%) rotate(45deg);border-radius:18%;
+  background:linear-gradient(135deg,#FFE680,#FFB300);box-shadow:0 0 0 2px var(--ink),inset 0 -3px 0 #D07A00}
+.back .emb svg{position:absolute;left:18%;top:18%;width:64%;height:64%;transform:rotate(-45deg);fill:var(--ink)}
+
+/* ==========================================================================
+   BUTTONS (3D Supercell style: face + bottom lip + ink outline)
+   ========================================================================== */
+.btn{position:relative;display:inline-grid;place-items:center;border-radius:14px;padding:0 22px;height:56px;
+  font-family:"Lilita One";font-size:26px;color:#fff;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;text-shadow:0 2px 0 var(--ink);
+  background:linear-gradient(180deg,var(--b-hi) 0 48%,var(--b) 52% 100%);
+  box-shadow:0 0 0 3px var(--ink),inset 0 -6px 0 var(--b-lo),inset 0 3px 0 rgba(255,255,255,.55),0 6px 0 3px var(--ink)}
+.btn.yellow{--b-hi:#FFE55C;--b:#FFC21A;--b-lo:#E08600}
+.btn.blue{--b-hi:#6CC2FF;--b:#3A9CFF;--b-lo:#1C5FD1}
+.btn.green{--b-hi:#7BF09A;--b:#3ED66B;--b-lo:#1A9444}
+.btn.pressed{transform:translateY(5px);box-shadow:0 0 0 3px var(--ink),inset 0 -2px 0 var(--b-lo),inset 0 3px 0 rgba(0,0,0,.12),0 1px 0 3px var(--ink)}
+.btn::after{content:"";position:absolute;left:10px;right:10px;top:5px;height:8px;border-radius:8px;background:rgba(255,255,255,.35)}
+
+/* ==========================================================================
+   HUD chips
+   ========================================================================== */
+.chip{display:inline-flex;align-items:center;gap:5px;height:30px;padding:0 10px 0 4px;border-radius:15px;
+  background:linear-gradient(180deg,rgba(40,20,80,.78),rgba(27,16,48,.86));box-shadow:0 0 0 2.5px var(--ink),inset 0 1.5px 0 rgba(255,255,255,.18);
+  font-family:"Lilita One";font-size:18px;color:#fff;-webkit-text-stroke:2.5px var(--ink);paint-order:stroke fill;text-shadow:0 1.5px 0 var(--ink)}
+.chip .ic{width:26px;height:26px;margin-left:-6px;filter:drop-shadow(0 1.5px 0 var(--ink))}
+
+/* HP bar */
+.hpbar{position:relative;height:22px;border-radius:11px;background:linear-gradient(180deg,#3A0E26,#57163A);
+  box-shadow:0 0 0 3px var(--ink),0 3px 0 3px rgba(20,8,40,.5);overflow:hidden}
+.hpbar .fill{position:absolute;left:0;top:0;bottom:0;border-radius:11px 0 0 11px;
+  background:linear-gradient(180deg,#FF8A97 0 22%,#FF3B4E 24% 70%,#D61F3C 72%)}
+.hpbar .preview{position:absolute;top:0;bottom:0;background:repeating-linear-gradient(-45deg,#FFF3B0 0 5px,#FFD24A 5px 10px);box-shadow:inset 3px 0 0 var(--ink)}
+.hpbar .txt{position:absolute;inset:0;display:grid;place-items:center;font-family:"Lilita One";font-size:17px;color:#fff;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;padding-top:1px}
+.shieldbadge{position:absolute;width:36px;height:40px;display:grid;place-items:center;z-index:2}
+.shieldbadge svg{position:absolute;inset:0;width:100%;height:100%}
+.shieldbadge b{position:relative;font-family:"Lilita One";font-weight:400;font-size:18px;color:#fff;-webkit-text-stroke:3px var(--ink);paint-order:stroke fill;margin-top:-2px}
+
+/* heal glyph = chunky plus (custom) */
+.card.he .fxg{top:44%;width:40%;height:40%}
+.card.power .rank{z-index:2}

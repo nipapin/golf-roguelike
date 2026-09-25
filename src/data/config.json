@@ -1,0 +1,39 @@
+{
+  "player": {
+    "startingHp": 30,
+    "maxHp": 30
+  },
+  "combat": {
+    "baseSpadeDamageBonus": 1,
+    "baseHeartHeal": 1,
+    "baseClubArmor": 1,
+    "baseDiamondGold": 1
+  },
+  "powerCards": {
+    "CRIT": { "damageMultiplier": 3 },
+    "HEAL": { "healAmount": 8 },
+    "GUARD": { "armorAmount": 8 },
+    "GOLD": { "goldAmount": 8 },
+    "BOMB": { "flatDamage": 12 },
+    "WILD": { "description": "Next play connects to any rank" },
+    "ECHO": { "comboBonus": 2 }
+  },
+  "tableau": {
+    "columns": 7,
+    "rows": 5
+  },
+  "shop": {
+    "healCost": 10,
+    "healAmount": 8,
+    "relicBaseCost": 15
+  },
+  "runStructure": [
+    { "type": "battle", "enemyTier": "normal" },
+    { "type": "battle", "enemyTier": "normal" },
+    { "type": "battle", "enemyTier": "normal" },
+    { "type": "battle", "enemyTier": "elite" },
+    { "type": "battle", "enemyTier": "normal" },
+    { "type": "battle", "enemyTier": "normal" },
+    { "type": "battle", "enemyTier": "boss" }
+  ]
+}

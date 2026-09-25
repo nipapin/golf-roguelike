@@ -1,50 +1,43 @@
-import Phaser from 'phaser';import './style.css';
-type Card={rank:number;suit:number}; type Relic={name:string;desc:string;apply:()=>void};
-const R=['A','2','3','4','5','6','7','8','9','10','J','Q','K'],S=['♠','♥','♦','♣'];
-class Game extends Phaser.Scene{
- cols:Card[][]=[]; deck:Card[]=[]; waste!:Card; hp=30; maxHp=30; shield=0; gold=0; floor=0; combo=0; enemyHp=0; enemyMax=0; enemyAtk=0; wrap=false; spade=0; heal=0; coin=0; armor=0; boost=false; locked=true; powerCards=new Set<string>(); powerTypes=new Map<string,string>(); started=false; musicTimer?:number;
- enemies=[['SLIME',26,4],['BANDIT',38,5],['BONE KNIGHT',52,6],['MIMIC',66,7],['WITCH',82,8],['GOLF KING',110,10]] as [string,number,number][];
- constructor(){super('game')}
- preload(){let rs=['A','2','3','4','5','6','7','8','9','T','J','Q','K'],ss=['S','H','D','C'];for(let r of rs)for(let q of ss)this.load.svg('card-'+r+q,'/assets/cards/'+r+q+'.svg');['slime','bandit','knight','mimic','witch','king'].forEach(n=>this.load.svg('enemy-'+n,'/assets/enemies/'+n+'.svg'))}
- create(){this.input.addPointer(2);this.showStart()}
- bg(){let w=this.scale.width,h=this.scale.height;this.cameras.main.setBackgroundColor('#060911');let g=this.add.graphics();
-g.fillGradientStyle(0x28456b,0x20385c,0x12243e,0x0c1729,1);g.fillRect(0,0,w,h);
-g.fillStyle(0x1b2740,.55);g.fillEllipse(w*.18,h*.24,w*.72,h*.42);g.fillStyle(0x38233a,.28);g.fillEllipse(w*.88,h*.34,w*.8,h*.52);
-for(let i=0;i<42;i++){let x=Phaser.Math.Between(0,w),y=Phaser.Math.Between(0,h);g.fillStyle(i%4===0?0xe6c86b:0x829ac4,Phaser.Math.FloatBetween(.025,.12));g.fillCircle(x,y,Phaser.Math.Between(1,2))}
-g.fillStyle(0x080b12,.74);g.fillRoundedRect(10,h*.39,w-20,h*.58,22);g.lineStyle(1,0xcaa957,.16);g.strokeRoundedRect(10,h*.39,w-20,h*.58,22);
-for(let y=h*.43;y<h;y+=36){g.lineStyle(1,0xffffff,.018);g.lineBetween(18,y,w-18,y)}
-let vign=this.add.graphics();vign.fillStyle(0x000000,.18);vign.fillRect(0,0,w,20);vign.fillRect(0,h-28,w,28)}
- txt(x:number,y:number,s:string,size=14,color='#e9e2d2'){return this.add.text(x,y,s,{fontFamily:'Alfa Slab One, Georgia, serif',fontSize:size+'px',fontStyle:'bold',color,stroke:'#05070b',strokeThickness:size>18?2:0})}
- showStart(){this.children.removeAll();this.bg();let w=this.scale.width,h=this.scale.height,cx=w/2;let top=Math.max(70,h*.08);
-let rays=this.add.graphics();for(let i=0;i<12;i++){rays.fillStyle(i%2?0xf0cf68:0x7fa8e8,.035);rays.fillTriangle(cx,top+170,cx-260+i*44,h*.62,cx-220+i*44,h*.62)}
-this.add.circle(cx,top+145,96,0xf0cf68,.07).setStrokeStyle(2,0xf0cf68,.22);this.txt(cx,top+70,'GOLF',50,'#f5d56a').setOrigin(.5);this.txt(cx,top+122,'ROGUE',31,'#ffffff').setOrigin(.5);
-this.add.text(cx,top+174,'ROGUELIKE SOLITAIRE',{fontFamily:'Nunito,Arial',fontSize:'12px',fontStyle:'bold',letterSpacing:3,color:'#b9c9e8'}).setOrigin(.5);
-let cards=[['A♠',-52,-7],['K♥',0,0],['Q♦',52,7]];cards.forEach(([v,ox,ang]:any,i)=>{let r=this.add.rectangle(cx+ox,top+275,72,104,i===1?0xfff7e8:0xe8edf7).setStrokeStyle(3,i===1?0xf0cf68:0x7e91b5).setAngle(ang);this.txt(cx+ox,top+275,v,22,v.includes('♥')||v.includes('♦')?'#d74458':'#172038').setOrigin(.5).setAngle(ang)});
-this.txt(cx,top+368,'BUILD CHAINS.  HIT HARD.',16,'#f2e6bd').setOrigin(.5);
-let b=this.add.rectangle(cx,Math.min(h-180,top+455),w-54,64,0xe3bd4f).setStrokeStyle(3,0xffe798).setInteractive();this.txt(cx,b.y,'START RUN',19,'#101725').setOrigin(.5);this.tweens.add({targets:b,scaleX:1.02,duration:850,yoyo:true,repeat:-1,ease:'Sine.inOut'});b.on('pointerdown',()=>{this.soundClick(220,.05);this.hp=30;this.gold=0;this.wrap=false;this.spade=this.heal=this.coin=this.armor=0;this.boost=false;this.started=true;this.startMusic();this.cameras.main.fadeOut(160,8,12,22);this.time.delayedCall(170,()=>this.startFight(0))});
-this.add.text(cx,Math.min(h-95,top+515),'7 POWER CARDS • 6 ENEMIES • RELICS',{fontFamily:'Nunito,Arial',fontSize:'10px',fontStyle:'bold',letterSpacing:1,color:'#94a8c8'}).setOrigin(.5)}
- makeDeck(){let d:Card[]=[];for(let s=0;s<4;s++)for(let r=1;r<=13;r++)d.push({rank:r,suit:s});Phaser.Utils.Array.Shuffle(d);return d}
- startFight(f:number){this.floor=f;this.combo=0;this.shield=0;let d=this.makeDeck();this.cols=Array.from({length:7},()=>[]);for(let y=0;y<5;y++)for(let x=0;x<7;x++)this.cols[x].push(d.pop()!);this.deck=d;this.waste=this.deck.pop()!;this.powerCards.clear();this.powerTypes.clear();let candidates:Card[]=[];this.cols.forEach(c=>c.forEach(x=>candidates.push(x)));Phaser.Utils.Array.Shuffle(candidates);candidates.slice(0,7).forEach((c,i)=>{let k=c.rank+':'+c.suit;this.powerCards.add(k);this.powerTypes.set(k,['CRIT','HEAL','GUARD','GOLD','WILD','BOMB','ECHO'][i])});let e=this.enemies[f];this.enemyHp=this.enemyMax=e[1];this.enemyAtk=e[2];this.locked=false;this.render();this.cameras.main.fadeIn(320,5,7,12)}
- near(a:number,b:number){let x=Math.abs(a-b);return x===1||(this.wrap&&x===12)}
- isPlayable(i:number){let c=this.cols[i];return !!c.length&&this.near(c[c.length-1].rank,this.waste.rank)}
- cardLabel(c:Card){return R[c.rank-1]+S[c.suit]} cardKey(c:Card){let r=c.rank===10?'T':R[c.rank-1],q=['S','H','D','C'][c.suit];return 'card-'+r+q}
- startMusic(){if(this.musicTimer)return;let step=0,notes=[110,0,147,131,0,98,123,0];this.musicTimer=window.setInterval(()=>{let n=notes[step++%notes.length];if(n)this.soundClick(n,.18)},320)}
- soundClick(freq=330,dur=.04){try{let A=window.AudioContext||(window as any).webkitAudioContext,a=new A(),o=a.createOscillator(),g=a.createGain();o.type='triangle';o.frequency.value=freq;g.gain.setValueAtTime(.045,a.currentTime);g.gain.exponentialRampToValueAtTime(.001,a.currentTime+dur);o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+dur)}catch{}}
- flash(x:number,y:number,color:number){let p=this.add.circle(x,y,8,color,.9);this.tweens.add({targets:p,scale:4,alpha:0,duration:300,onComplete:()=>p.destroy()})}
- enemyArt(cx:number,y:number){let keys=['slime','bandit','knight','mimic','witch','king'];let shadow=this.add.ellipse(cx,y+42,130,22,0x000000,.4);let im=this.add.image(cx,y,'enemy-'+keys[this.floor]).setDisplaySize(118,118);this.tweens.add({targets:im,y:y-6,duration:850,yoyo:true,repeat:-1,ease:'Sine.inOut'});return im}
-particles(x:number,y:number,color:number,n=12){for(let i=0;i<n;i++){let p=this.add.circle(x,y,Phaser.Math.Between(2,5),color,1);let a=Phaser.Math.FloatBetween(0,Math.PI*2),d=Phaser.Math.Between(25,75);this.tweens.add({targets:p,x:x+Math.cos(a)*d,y:y+Math.sin(a)*d,alpha:0,scale:.2,duration:Phaser.Math.Between(260,520),ease:'Quad.out',onComplete:()=>p.destroy()})}}
-damageNumber(amount:number,color='#fff0bd'){let w=this.scale.width;let t=this.txt(w/2,126,'-'+amount,22,color).setOrigin(.5);t.setScale(.7);this.tweens.add({targets:t,y:91,scale:1.25,alpha:0,duration:650,ease:'Back.out',onComplete:()=>t.destroy()})}
-render(){this.children.removeAll();this.bg();let w=this.scale.width,h=this.scale.height,cx=w/2;let safeTop=Math.max(58,h*.055);this.txt(18,safeTop,'♣ GOLF ROGUE',17,'#f0cf68');this.add.text(w-18,safeTop+4,`FIGHT ${this.floor+1}/6`,{fontFamily:'Arial,sans-serif',fontSize:'10px',fontStyle:'bold',color:'#78849a'}).setOrigin(1,0);
- let panelY=safeTop+38,panelH=76;this.add.rectangle(cx,panelY+panelH/2,w-28,panelH,0x141a25,.96).setStrokeStyle(1,0x344058);let e=this.enemies[this.floor];this.txt(27,panelY+16,e[0],17);this.add.text(27,panelY+45,`⚔ ${this.enemyAtk}`,{fontFamily:'Arial,sans-serif',fontSize:'11px',fontStyle:'bold',color:'#9aa5b8'});this.txt(w-27,panelY+14,`${Math.max(0,this.enemyHp)}/${this.enemyMax}`,13).setOrigin(1,0);let bw=Math.min(105,w*.28);this.add.rectangle(w-27-bw,panelY+49,bw,7,0x3a1b26).setOrigin(0,.5);this.add.rectangle(w-27-bw,panelY+49,bw*Math.max(0,this.enemyHp/this.enemyMax),7,0xd84b65).setOrigin(0,.5);
- let statY=panelY+94;this.txt(20,statY,`♥ ${this.hp}/${this.maxHp}`,13,'#ff6677');this.txt(cx,statY,`♣ ${this.shield}`,13,'#83b6ff').setOrigin(.5,0);this.txt(w-20,statY,`♦ ${this.gold}`,13,'#f0cf68').setOrigin(1,0);if(this.combo)this.txt(cx,statY+28,`COMBO ×${this.combo}`,14,'#f0cf68').setOrigin(.5,0);
- // Fixed five-row tableau: removing cards never shifts the column.
- let controlsH=124,boardTop=statY+56,boardBottom=h-controlsH;let gap=4,cw=Math.floor((w-24-gap*6)/7),ch=Math.min(76,Math.floor((boardBottom-boardTop)/2.65));let overlap=Math.min(45,Math.max(27,(boardBottom-boardTop-ch)/4));let start=(w-(cw*7+gap*6))/2;
- this.cols.forEach((col,i)=>col.forEach((c,j)=>{let x=start+i*(cw+gap),y=boardTop+j*overlap;let active=j===col.length-1,play=active&&this.isPlayable(i),powered=this.powerCards.has(c.rank+':'+c.suit),ptype=this.powerTypes.get(c.rank+':'+c.suit);this.add.rectangle(x+cw/2+3,y+5,cw,ch,0x000000,.34).setOrigin(.5,0);let box=this.add.image(x+cw/2,y,this.cardKey(c)).setOrigin(.5,0).setDisplaySize(cw,ch).setAlpha(active?1:.78);if(!active)box.setTint(0xc9c9c9);if(play){let glow=this.add.rectangle(x+cw/2,y+ch/2,cw+5,ch+5,0xffd85b,.12).setStrokeStyle(3,0xffd85b);this.tweens.add({targets:glow,alpha:.5,duration:420,yoyo:true,repeat:-1})}if(powered){this.add.circle(x+cw-8,y+11,9,0x7656df,1).setStrokeStyle(2,0xffe990);this.txt(x+cw-8,y+11,'✦',10,'#fff4ad').setOrigin(.5);if(active&&ptype)this.add.text(x+cw/2,y+ch-10,ptype,{fontFamily:'Nunito,Arial',fontSize:'7px',fontStyle:'bold',color:'#fff',backgroundColor:'#6848c7',padding:{x:4,y:2}}).setOrigin(.5)}if(active){box.setInteractive().on('pointerdown',()=>this.play(i));if(!this.locked&&this.combo===0){box.setScale(.95);this.tweens.add({targets:box,scale:1,duration:190+i*15,ease:'Back.out'})}}}));
- let by=h-77,cardW=Math.min(64,w*.17),cardH=82;let dx=cx-cardW*.72,wx=cx+cardW*.72;let draw=this.add.rectangle(dx,by,cardW,cardH,0x20283a).setStrokeStyle(1,0x58657d).setInteractive();this.add.text(dx,by,`DRAW\n${this.deck.length}`,{fontFamily:'Arial,sans-serif',align:'center',fontSize:'11px',fontStyle:'bold',color:'#d8dfed'}).setOrigin(.5);draw.on('pointerdown',()=>this.draw());let red=this.waste.suit===1||this.waste.suit===2;this.add.image(wx,by,this.cardKey(this.waste)).setDisplaySize(cardW,cardH);this.add.text(cx,h-22,this.cols.some((_,i)=>this.isPlayable(i))?'PLAY ±1  •  DRAW = ENEMY TURN':'NO MOVE  •  DRAW',{fontFamily:'Arial,sans-serif',fontSize:'9px',fontStyle:'bold',letterSpacing:1,color:'#778297'}).setOrigin(.5)}
- play(i:number){if(this.locked||!this.isPlayable(i))return;let c=this.cols[i].pop()!;this.waste=c;this.combo++;let key=c.rank+':'+c.suit,powered=this.powerCards.has(key),ptype=this.powerTypes.get(key);this.powerCards.delete(key);let mult=1+Math.floor(this.combo/3)*(this.boost?2:1);let dmg=mult+(c.suit===0?this.spade:0)+(ptype==='CRIT'?mult*2:0)+(ptype==='BOMB'?6:powered?2:0);this.enemyHp-=dmg;if(c.suit===1)this.hp=Math.min(this.maxHp,this.hp+1+this.heal);if(c.suit===2)this.gold+=1+this.coin;if(c.suit===3)this.shield+=1+this.armor;if(ptype==='HEAL')this.hp=Math.min(this.maxHp,this.hp+5);if(ptype==='GUARD')this.shield+=6;if(ptype==='GOLD')this.gold+=5;if(ptype==='WILD')this.wrap=true;if(ptype==='ECHO')this.combo+=2;if(powered&&ptype!=='HEAL'&&ptype!=='GUARD'&&ptype!=='GOLD'){this.shield+=1;}this.soundClick(300+this.combo*45,.06);let fly=this.txt(this.scale.width/2,this.scale.height*.67,this.cardLabel(c),26,(c.suit===1||c.suit===2)?'#d83b51':'#f4edda').setOrigin(.5);fly.setScale(.65);this.tweens.add({targets:fly,y:150,scale:1.3,angle:Phaser.Math.Between(-10,10),alpha:0,duration:280,ease:'Cubic.in',onComplete:()=>fly.destroy()});this.render();let col=c.suit===1?0xe55268:c.suit===2?0xe7c85e:c.suit===3?0x70a9ff:0xffffff;this.flash(this.scale.width/2,145,col);let slash=this.add.rectangle(this.scale.width/2,145,88,5,col,.9).setAngle(-18);this.tweens.add({targets:slash,scaleX:1.8,alpha:0,duration:180,onComplete:()=>slash.destroy()});this.particles(this.scale.width/2,145,col,8+Math.min(this.combo,12));this.damageNumber(dmg,powered?'#c99cff':this.combo>=5?'#ffd75f':'#fff0bd');if(powered){let pt=this.txt(this.scale.width/2,this.scale.height*.31,(ptype||'POWER')+'!',19,'#c99cff').setOrigin(.5);this.particles(this.scale.width/2,this.scale.height*.31,0xa66cff,22);this.tweens.add({targets:pt,y:'-=42',alpha:0,scale:1.2,duration:800,onComplete:()=>pt.destroy()})}this.cameras.main.shake(this.combo>=5?100:45,.002+Math.min(this.combo,10)*.0007);if(this.combo>=5){let ct=this.txt(this.scale.width/2,this.scale.height*.34,this.combo>=10?'MONSTER CHAIN!':'HOT STREAK!',this.combo>=10?27:21,'#ffd75f').setOrigin(.5);ct.setScale(.5);this.tweens.add({targets:ct,scale:1.15,alpha:0,y:'-=38',duration:720,ease:'Back.out',onComplete:()=>ct.destroy()})}if(this.enemyHp<=0){this.locked=true;this.time.delayedCall(450,()=>this.victory())}}
- draw(){if(this.locked)return;if(!this.deck.length){if(!this.cols.some((_,i)=>this.isPlayable(i)))this.end(false);return}if(this.combo){let hit=Math.max(0,this.enemyAtk-this.shield);this.shield=Math.max(0,this.shield-this.enemyAtk);this.hp-=hit;this.combo=0;this.soundClick(95,.12);this.cameras.main.flash(100,150,20,35,false);this.cameras.main.shake(150,.012);let hitTxt=this.txt(this.scale.width/2,this.scale.height*.22,'ENEMY STRIKES  -'+hit,18,'#ff6677').setOrigin(.5);this.tweens.add({targets:hitTxt,y:'-=30',alpha:0,duration:650,onComplete:()=>hitTxt.destroy()});if(this.hp<=0){this.end(false);return}}this.waste=this.deck.pop()!;this.soundClick(180,.04);this.render()}
- victory(){if(this.floor===5){this.end(true);return}this.reward()}
- reward(){this.children.removeAll();this.bg();let w=this.scale.width,h=this.scale.height;this.txt(w/2,h*.12,'ENEMY DEFEATED',27,'#f0cf68').setOrigin(.5);this.add.text(w/2,h*.17,'CHOOSE ONE RELIC',{fontFamily:'Arial,sans-serif',fontSize:'11px',letterSpacing:2,color:'#8995aa'}).setOrigin(.5);let all:Relic[]=[{name:'SHARP SPADE',desc:'♠ +2 damage',apply:()=>this.spade+=2},{name:'RED HEART',desc:'♥ +2 healing',apply:()=>this.heal+=2},{name:'DIAMOND VEIN',desc:'♦ +2 gold',apply:()=>this.coin+=2},{name:'OAK ARMOR',desc:'♣ +2 armor',apply:()=>this.armor+=2},{name:'LONG STREAK',desc:'Combos scale faster',apply:()=>this.boost=true},{name:'WILD ACE',desc:'A connects to K',apply:()=>this.wrap=true}];Phaser.Utils.Array.Shuffle(all);all.slice(0,3).forEach((r,i)=>{let y=h*.30+i*105;let b=this.add.rectangle(w/2,y,w-40,84,0x172031).setStrokeStyle(1,0x53617b).setInteractive();this.txt(32,y-20,r.name,16,'#f1e6c6').setOrigin(0,.5);this.add.text(32,y+13,r.desc,{fontFamily:'Arial,sans-serif',fontSize:'12px',color:'#a4aec0'}).setOrigin(0,.5);b.on('pointerdown',()=>{this.soundClick(420,.07);r.apply();this.hp=Math.min(this.maxHp,this.hp+6);this.startFight(this.floor+1)})})}
- end(win:boolean){this.locked=true;this.children.removeAll();this.bg();let w=this.scale.width,h=this.scale.height;this.txt(w/2,h*.32,win?'RUN COMPLETE':'YOU DIED',30,win?'#f0cf68':'#e85d70').setOrigin(.5);this.add.text(w/2,h*.4,`Fight ${this.floor+1} • ♦ ${this.gold}`,{fontFamily:'Arial,sans-serif',fontSize:'13px',color:'#aeb6c8'}).setOrigin(.5);let b=this.add.rectangle(w/2,h*.56,w-64,58,0xd6b85a).setInteractive();this.txt(w/2,h*.56,'NEW RUN',16,'#0b0e14').setOrigin(.5);b.on('pointerdown',()=>this.showStart())}
+import Phaser from 'phaser';
+import './style.css';
+
+import { loadFonts } from './presentation/design/fontLoader';
+import { BootScene } from './presentation/scenes/BootScene';
+import { StartScene } from './presentation/scenes/StartScene';
+import { BattleScene } from './presentation/scenes/BattleScene';
+import { RewardScene } from './presentation/scenes/RewardScene';
+import { ShopScene } from './presentation/scenes/ShopScene';
+import { EndScene } from './presentation/scenes/EndScene';
+import { CreditsScene } from './presentation/scenes/CreditsScene';
+
+async function initGame() {
+  // Load fonts before Phaser starts (per STYLE.md section 13)
+  await loadFonts();
+
+  // Get device pixel ratio for crisp text at DPR 3
+  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+
+  const config: Phaser.Types.Core.GameConfig = {
+    type: Phaser.AUTO,
+    parent: 'game',
+    backgroundColor: '#140A2A',
+    scale: {
+      mode: Phaser.Scale.RESIZE,
+      width: '100%',
+      height: '100%',
+    },
+    scene: [BootScene, StartScene, BattleScene, RewardScene, ShopScene, EndScene, CreditsScene],
+    render: {
+      antialias: true,
+      pixelArt: false,
+      roundPixels: true,
+    },
+    input: {
+      activePointers: 3,
+    },
+  };
+
+  new Phaser.Game(config);
 }
-new Phaser.Game({type:Phaser.AUTO,parent:'game',backgroundColor:'#080b12',scale:{mode:Phaser.Scale.RESIZE,width:'100%',height:'100%'},scene:Game,render:{antialias:true,pixelArt:false,roundPixels:true}});
+
+initGame();
