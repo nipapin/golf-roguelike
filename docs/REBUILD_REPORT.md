@@ -182,7 +182,63 @@ it('should continue from restored state deterministically', () => {
 
 ---
 
-## 6. Build и запуск
+## 6. PWA Auto-Update
+
+### Конфигурация
+
+Настроен `vite-plugin-pwa` для автоматического обновления:
+
+```typescript
+VitePWA({
+  registerType: 'autoUpdate',
+  workbox: {
+    skipWaiting: true,      // Новый SW активируется сразу
+    clientsClaim: true,     // Контролирует все вкладки сразу
+    runtimeCaching: [
+      // Navigation: NetworkFirst с timeout 3s
+      { urlPattern: /navigate/, handler: 'NetworkFirst' },
+      // Static assets: CacheFirst (immutable)
+      { urlPattern: /\.(js|css)$/, handler: 'CacheFirst' },
+    ],
+  },
+})
+```
+
+### Vercel Headers
+
+`vercel.json` настроен с cache-control:
+- `/`, `/*.html`, `/sw.js` — `no-cache, must-revalidate`
+- `/manifest.webmanifest` — `no-cache, must-revalidate`  
+- `/assets/*` — `immutable, max-age=31536000`
+
+### Поток обновления
+
+1. Vercel деплоит новую версию → новый `sw.js` с новыми хэшами
+2. Браузер проверяет SW при каждом запуске/focus
+3. Если SW изменился, скачивается и активируется (`skipWaiting`)
+4. `clientsClaim` захватывает все вкладки
+5. При следующем navigation запрашивается свежий HTML (NetworkFirst)
+
+### Верификация
+
+Проверено в build output:
+```
+✓ self.skipWaiting() в dist/sw.js
+✓ s.clientsClaim() в dist/sw.js
+✓ registerRoute с NetworkFirst для navigate
+✓ manifest.webmanifest генерируется с revision hash
+```
+
+### Offline Play
+
+Работает благодаря:
+- Pre-cache всех game assets (cards, enemies, JS, CSS)
+- CacheFirst для статических ресурсов
+- NetworkFirst с fallback для навигации
+
+---
+
+## 7. Build и запуск
 
 ### Development
 ```bash
