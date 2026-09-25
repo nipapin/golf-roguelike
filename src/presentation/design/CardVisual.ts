@@ -374,10 +374,29 @@ export class CardVisual {
 
   setInteractive(callback: () => void): void {
     const { cw, ch } = this.metrics;
-    const hitArea = new Phaser.Geom.Rectangle(0, 0, cw, ch);
+    // Expand hit area to cover glow (-8 on sides) and tick mark (+24 on bottom)
+    // This ensures the entire visible clickable area responds to taps
+    const hitArea = new Phaser.Geom.Rectangle(-8, -8, cw + 16, ch + 32);
 
     this.container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
-    this.container.on('pointerdown', callback);
+    this.container.removeAllListeners();
+    
+    // Hover feedback
+    this.container.on('pointerover', () => {
+      this.container.setScale(1.05);
+    });
+    this.container.on('pointerout', () => {
+      this.container.setScale(1);
+    });
+    
+    // Click/tap feedback with visual pulse
+    this.container.on('pointerdown', () => {
+      this.container.setScale(0.95);
+      callback();
+    });
+    this.container.on('pointerup', () => {
+      this.container.setScale(1.05);
+    });
   }
 
   disableInteractive(): void {

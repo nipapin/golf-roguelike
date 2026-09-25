@@ -32,6 +32,9 @@ async function initGame() {
       pixelArt: false,
       roundPixels: true,
     },
+    input: {
+      activePointers: 3,
+    },
   };
 
   new Phaser.Game(config);
