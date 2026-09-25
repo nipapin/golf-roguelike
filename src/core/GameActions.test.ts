@@ -81,12 +81,6 @@ const mockEnemiesData: EnemiesData = {
 
 const mockRelics: Relic[] = [
   {
-    id: 'ace_king_link',
-    name: 'SNAKE RING',
-    description: 'Ace connects to King',
-    effect: { type: 'aceKingWrap', value: true },
-  },
-  {
     id: 'spade_bonus',
     name: 'SHARP SPADE',
     description: '♠ deal +2',
@@ -97,6 +91,12 @@ const mockRelics: Relic[] = [
     name: 'RED HEART',
     description: '♥ heal +2',
     effect: { type: 'heartHealBonus', value: 2 },
+  },
+  {
+    id: 'diamond_bonus',
+    name: 'GOLD NUGGET',
+    description: '♦ give +2 gold',
+    effect: { type: 'diamondGoldBonus', value: 2 },
   },
 ];
 
@@ -506,7 +506,7 @@ describe('shop actions', () => {
         maxHp: 30,
         armor: 0,
         gold: 30,
-        relics: [mockRelics[1]], // Already has spade_bonus
+        relics: [mockRelics[0]], // Already has spade_bonus (first relic)
       },
       battle: null,
     };
@@ -590,10 +590,9 @@ describe('run progression', () => {
   });
 });
 
-describe('ace-king wrap relic', () => {
-  it('should reject A->K play without aceKingWrap relic', () => {
-    // Create a state with Ace as active card and King on top of tableau
-    let state = createTestBattleState('ak-no-relic');
+describe('ace-king wrap (base rule)', () => {
+  it('should always accept A->K play (base rule)', () => {
+    let state = createTestBattleState('ak-base-rule');
     const aceCard: Card = { rank: 1, suit: 'spades', id: 'test-ace' };
     const kingCard: Card = { rank: 13, suit: 'hearts', id: 'test-king' };
     
@@ -612,45 +611,13 @@ describe('ace-king wrap relic', () => {
 
     const result = playCard(state, kingCard.id, mockConfig);
     
-    // Should not be able to play King on Ace without relic
-    expect(result.state.battle?.chain.length).toBe(0);
-    expect(result.state.battle?.activeCard?.id).toBe('test-ace');
-  });
-
-  it('should accept A->K play with aceKingWrap relic', () => {
-    let state = createTestBattleState('ak-with-relic');
-    const aceCard: Card = { rank: 1, suit: 'spades', id: 'test-ace' };
-    const kingCard: Card = { rank: 13, suit: 'hearts', id: 'test-king' };
-    
-    const aceKingRelic: Relic = {
-      id: 'ace_king_link',
-      name: 'SNAKE RING',
-      description: 'Ace connects to King',
-      effect: { type: 'aceKingWrap', value: true },
-    };
-
-    state = {
-      ...state,
-      player: { ...state.player, relics: [aceKingRelic] },
-      battle: {
-        ...state.battle!,
-        activeCard: aceCard,
-        tableau: [
-          { cards: [kingCard] },
-          ...state.battle!.tableau.slice(1),
-        ],
-      },
-    };
-
-    const result = playCard(state, kingCard.id, mockConfig);
-    
-    // Should be able to play King on Ace with relic
+    // A-K wrap is now always legal (base rule)
     expect(result.state.battle?.chain.length).toBe(1);
     expect(result.state.battle?.activeCard?.id).toBe('test-king');
   });
 
-  it('should reject K->A play without aceKingWrap relic', () => {
-    let state = createTestBattleState('ka-no-relic');
+  it('should always accept K->A play (base rule)', () => {
+    let state = createTestBattleState('ka-base-rule');
     const kingCard: Card = { rank: 13, suit: 'spades', id: 'test-king' };
     const aceCard: Card = { rank: 1, suit: 'hearts', id: 'test-ace' };
     
@@ -669,39 +636,7 @@ describe('ace-king wrap relic', () => {
 
     const result = playCard(state, aceCard.id, mockConfig);
     
-    // Should not be able to play Ace on King without relic
-    expect(result.state.battle?.chain.length).toBe(0);
-    expect(result.state.battle?.activeCard?.id).toBe('test-king');
-  });
-
-  it('should accept K->A play with aceKingWrap relic', () => {
-    let state = createTestBattleState('ka-with-relic');
-    const kingCard: Card = { rank: 13, suit: 'spades', id: 'test-king' };
-    const aceCard: Card = { rank: 1, suit: 'hearts', id: 'test-ace' };
-    
-    const aceKingRelic: Relic = {
-      id: 'ace_king_link',
-      name: 'SNAKE RING',
-      description: 'Ace connects to King',
-      effect: { type: 'aceKingWrap', value: true },
-    };
-
-    state = {
-      ...state,
-      player: { ...state.player, relics: [aceKingRelic] },
-      battle: {
-        ...state.battle!,
-        activeCard: kingCard,
-        tableau: [
-          { cards: [aceCard] },
-          ...state.battle!.tableau.slice(1),
-        ],
-      },
-    };
-
-    const result = playCard(state, aceCard.id, mockConfig);
-    
-    // Should be able to play Ace on King with relic
+    // K-A wrap is now always legal (base rule)
     expect(result.state.battle?.chain.length).toBe(1);
     expect(result.state.battle?.activeCard?.id).toBe('test-ace');
   });
@@ -720,7 +655,7 @@ describe('UI playability matches engine validation', () => {
         if (col.cards.length === 0) continue;
         const topCard = col.cards[col.cards.length - 1];
         
-        const uiSaysPlayable = isPlayable(battle, topCard.id, state.player.relics);
+        const uiSaysPlayable = isPlayable(battle, topCard.id);
         
         if (uiSaysPlayable) {
           // If UI says playable, engine must accept the play
@@ -750,7 +685,7 @@ describe('UI playability matches engine validation', () => {
       },
     };
 
-    const uiSaysPlayable = isPlayable(state.battle!, farCard.id, state.player.relics);
+    const uiSaysPlayable = isPlayable(state.battle!, farCard.id);
     expect(uiSaysPlayable).toBe(false);
     
     const result = playCard(state, farCard.id, mockConfig);

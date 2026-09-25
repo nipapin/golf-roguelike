@@ -154,24 +154,23 @@ export function isTableauEmpty(tableau: TableauColumn[]): boolean {
   return tableau.every((col) => col.cards.length === 0);
 }
 
-export function hasLegalMoves(battle: BattleState, aceKingWrap: boolean): boolean {
+export function hasLegalMoves(battle: BattleState): boolean {
   if (!battle.activeCard) return false;
 
   const exposed = getExposedCards(battle.tableau);
-  return exposed.some((card) => canConnect(card, battle.activeCard!, aceKingWrap, battle.wildActive));
+  return exposed.some((card) => canConnect(card, battle.activeCard!, battle.wildActive));
 }
 
 export function canConnect(
   card: Card,
   activeCard: Card,
-  aceKingWrap: boolean,
   wildActive: boolean
 ): boolean {
   if (wildActive) return true;
 
   const diff = Math.abs(card.rank - activeCard.rank);
-  if (diff === 1) return true;
-  if (aceKingWrap && diff === 12) return true;
+  // A-K wrap is ALWAYS legal (base rule)
+  if (diff === 1 || diff === 12) return true;
   return false;
 }
 

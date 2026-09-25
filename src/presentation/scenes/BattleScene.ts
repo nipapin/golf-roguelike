@@ -512,11 +512,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private canPlayCard(card: Card, battle: BattleState): boolean {
-    const manager = getGameManager();
-    const state = manager.getState();
-    if (!state) return false;
-    
-    return isPlayable(battle, card.id, state.player.relics);
+    return isPlayable(battle, card.id);
   }
 
   private renderActiveCard(battle: BattleState): void {
