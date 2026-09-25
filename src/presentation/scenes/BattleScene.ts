@@ -3,9 +3,19 @@ import { getGameManager } from '../GameManager';
 import { Card, BattleState, GameEvent, PowerCard, RunState, Relic } from '../../core/types';
 import { getPlayableCards, getRankDisplay, getSuitSymbol } from '../../core/GameRules';
 
+interface EnemyData {
+  sprite: string;
+  scale?: number;
+  tint?: string;
+  crown?: boolean;
+}
+
 export class BattleScene extends Phaser.Scene {
   private cardObjects: Map<string, Phaser.GameObjects.Container> = new Map();
   private isAnimating = false;
+  private enemySprite: Phaser.GameObjects.Sprite | null = null;
+  private crownSprite: Phaser.GameObjects.Image | null = null;
+  private currentEnemyState: 'idle' | 'attack' | 'hurt' | 'dead' = 'idle';
 
   constructor() {
     super('BattleScene');
@@ -116,27 +126,35 @@ export class BattleScene extends Phaser.Scene {
     const enemy = battle.enemy;
     const cx = width / 2;
     const panelY = 42;
-    const panelH = 85;
+    const panelH = 110;
+
+    // Get enemy config for scale/tint
+    const manager = getGameManager();
+    const enemyConfig = this.getEnemyConfig(enemy.id);
+    const scale = enemyConfig?.scale || 1;
+    const isBoss = enemyConfig?.crown || false;
+    const hasGoldTint = enemyConfig?.tint === 'gold';
 
     // Enemy panel background
     this.add
       .rectangle(cx, panelY + panelH / 2, width - 20, panelH, 0x141a28)
-      .setStrokeStyle(1, 0x2a3a4a);
+      .setStrokeStyle(1, isBoss ? 0xffd700 : 0x2a3a4a);
 
     // Enemy name
+    const nameColor = isBoss ? '#ffd700' : '#e8e0d0';
     this.add
-      .text(24, panelY + 12, enemy.name, {
+      .text(24, panelY + 10, enemy.name, {
         fontFamily: 'Georgia, serif',
-        fontSize: '16px',
+        fontSize: isBoss ? '18px' : '16px',
         fontStyle: 'bold',
-        color: '#e8e0d0',
+        color: nameColor,
       });
 
     // Intent
     const intent = enemy.intents[enemy.currentIntentIndex];
     const intentIcon = intent.type === 'attack' ? '⚔' : intent.type === 'defend' ? '🛡' : '✦';
     this.add
-      .text(24, panelY + 38, `${intentIcon} ${intent.value}`, {
+      .text(24, panelY + 35, `${intentIcon} ${intent.value}`, {
         fontFamily: 'Arial, sans-serif',
         fontSize: '13px',
         fontStyle: 'bold',
@@ -146,7 +164,7 @@ export class BattleScene extends Phaser.Scene {
     // HP display
     const hpText = `${Math.max(0, enemy.hp)}/${enemy.maxHp}`;
     this.add
-      .text(width - 24, panelY + 12, hpText, {
+      .text(width - 24, panelY + 10, hpText, {
         fontFamily: 'Arial, sans-serif',
         fontSize: '14px',
         fontStyle: 'bold',
@@ -157,32 +175,108 @@ export class BattleScene extends Phaser.Scene {
     // HP bar
     const barWidth = Math.min(120, width * 0.3);
     const barX = width - 24 - barWidth;
-    const barY = panelY + 42;
+    const barY = panelY + 38;
 
     this.add.rectangle(barX + barWidth / 2, barY, barWidth, 8, 0x3a1a2a).setOrigin(0.5);
 
     const hpRatio = Math.max(0, enemy.hp / enemy.maxHp);
     if (hpRatio > 0) {
       this.add
-        .rectangle(barX, barY, barWidth * hpRatio, 8, 0xd84b65)
+        .rectangle(barX, barY, barWidth * hpRatio, 8, isBoss ? 0xffd700 : 0xd84b65)
         .setOrigin(0, 0.5);
     }
 
-    // Enemy sprite (positioned in center of panel)
+    // Enemy sprite
     const spriteKey = enemy.sprite;
-    if (this.textures.exists(spriteKey)) {
-      const sprite = this.add.image(cx, panelY + panelH / 2 + 5, spriteKey);
-      sprite.setDisplaySize(60, 60);
+    const atlasKey = `enemy-${spriteKey}`;
+    const spriteY = panelY + panelH / 2 + 15;
+    const baseSize = 80 * scale;
 
-      // Idle bounce animation
-      this.tweens.add({
-        targets: sprite,
-        y: sprite.y - 4,
-        duration: 900,
-        yoyo: true,
-        repeat: -1,
-        ease: 'Sine.inOut',
-      });
+    if (this.textures.exists(atlasKey)) {
+      // Animated sprite
+      const sprite = this.add.sprite(cx, spriteY, atlasKey);
+      sprite.setDisplaySize(baseSize, baseSize);
+
+      // Apply gold tint for boss
+      if (hasGoldTint) {
+        sprite.setTint(0xffd700);
+      }
+
+      // Play idle animation
+      const idleAnim = `${spriteKey}-idle`;
+      if (this.anims.exists(idleAnim)) {
+        sprite.play(idleAnim);
+      }
+
+      this.enemySprite = sprite;
+      this.currentEnemyState = 'idle';
+
+      // Add crown for boss
+      if (isBoss && this.textures.exists('crown')) {
+        const crown = this.add.image(cx, spriteY - baseSize / 2 - 10, 'crown');
+        crown.setDisplaySize(40, 30);
+        this.crownSprite = crown;
+      }
+    } else {
+      // Fallback to old SVG if atlas not loaded
+      const oldSpriteKey = `enemy-${spriteKey}`;
+      if (this.textures.exists(oldSpriteKey)) {
+        const sprite = this.add.image(cx, spriteY, oldSpriteKey);
+        sprite.setDisplaySize(baseSize, baseSize);
+
+        // Idle bounce animation
+        this.tweens.add({
+          targets: sprite,
+          y: sprite.y - 4,
+          duration: 900,
+          yoyo: true,
+          repeat: -1,
+          ease: 'Sine.inOut',
+        });
+      }
+    }
+  }
+
+  private getEnemyConfig(enemyId: string): EnemyData | null {
+    // This would ideally come from the data file
+    const configs: Record<string, EnemyData> = {
+      slime: { sprite: 'slime' },
+      mushroom: { sprite: 'mushroom' },
+      bat: { sprite: 'bat' },
+      wolf: { sprite: 'wolf' },
+      zombie: { sprite: 'zombie' },
+      goblin: { sprite: 'goblin' },
+      bandit: { sprite: 'bandit' },
+      knight: { sprite: 'knight', scale: 1.3 },
+      golfking: { sprite: 'samurai', scale: 1.5, tint: 'gold', crown: true },
+    };
+    return configs[enemyId] || null;
+  }
+
+  playEnemyAnimation(anim: 'attack' | 'hurt' | 'dead'): void {
+    if (!this.enemySprite) return;
+
+    const manager = getGameManager();
+    const state = manager.getState();
+    if (!state?.battle) return;
+
+    const spriteKey = state.battle.enemy.sprite;
+    const animKey = `${spriteKey}-${anim}`;
+
+    if (this.anims.exists(animKey)) {
+      this.enemySprite.play(animKey);
+      this.currentEnemyState = anim;
+
+      // Return to idle after attack/hurt (not dead)
+      if (anim !== 'dead') {
+        this.enemySprite.once('animationcomplete', () => {
+          const idleAnim = `${spriteKey}-idle`;
+          if (this.anims.exists(idleAnim) && this.enemySprite) {
+            this.enemySprite.play(idleAnim);
+            this.currentEnemyState = 'idle';
+          }
+        });
+      }
     }
   }
 
@@ -563,17 +657,27 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private handleEvents(events: GameEvent[]): void {
-    // Events are handled for visual feedback
-    // Could add more elaborate animations here
     for (const event of events) {
       switch (event.type) {
         case 'chain_resolved':
           if (event.chainLength >= 5) {
             this.showChainText(event.chainLength);
           }
+          // Play hurt animation when damage lands
+          if (event.totalDamage > 0) {
+            this.playEnemyAnimation('hurt');
+          }
           break;
         case 'power_activated':
           this.showPowerText(event.powerType);
+          break;
+        case 'enemy_attacked':
+          // Play attack animation when enemy attacks
+          this.playEnemyAnimation('attack');
+          break;
+        case 'enemy_died':
+          // Play death animation
+          this.playEnemyAnimation('dead');
           break;
       }
     }

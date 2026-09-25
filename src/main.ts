@@ -7,6 +7,7 @@ import { BattleScene } from './presentation/scenes/BattleScene';
 import { RewardScene } from './presentation/scenes/RewardScene';
 import { ShopScene } from './presentation/scenes/ShopScene';
 import { EndScene } from './presentation/scenes/EndScene';
+import { CreditsScene } from './presentation/scenes/CreditsScene';
 
 const config: Phaser.Types.Core.GameConfig = {
   type: Phaser.AUTO,
@@ -17,7 +18,7 @@ const config: Phaser.Types.Core.GameConfig = {
     width: '100%',
     height: '100%',
   },
-  scene: [BootScene, StartScene, BattleScene, RewardScene, ShopScene, EndScene],
+  scene: [BootScene, StartScene, BattleScene, RewardScene, ShopScene, EndScene, CreditsScene],
   render: {
     antialias: true,
     pixelArt: false,

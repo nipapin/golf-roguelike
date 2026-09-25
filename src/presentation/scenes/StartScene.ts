@@ -140,13 +140,28 @@ export class StartScene extends Phaser.Scene {
 
     // Info text
     this.add
-      .text(cx, height - 50, '7 POWER CARDS • 7 BATTLES • RELICS', {
+      .text(cx, height - 60, '7 POWER CARDS • 7 BATTLES • RELICS', {
         fontFamily: 'Arial, sans-serif',
         fontSize: '10px',
         fontStyle: 'bold',
         color: '#6a7a8a',
       })
       .setOrigin(0.5);
+
+    // Credits button
+    const creditsBtn = this.add
+      .text(cx, height - 30, 'CREDITS', {
+        fontFamily: 'Arial, sans-serif',
+        fontSize: '11px',
+        fontStyle: 'bold',
+        color: '#5a6a7a',
+      })
+      .setOrigin(0.5)
+      .setInteractive({ useHandCursor: true });
+
+    creditsBtn.on('pointerdown', () => this.scene.start('CreditsScene'));
+    creditsBtn.on('pointerover', () => creditsBtn.setColor('#8a9aaa'));
+    creditsBtn.on('pointerout', () => creditsBtn.setColor('#5a6a7a'));
   }
 
   private drawBackground(width: number, height: number): void {
