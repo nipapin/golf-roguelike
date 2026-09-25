@@ -204,6 +204,10 @@ let gameManagerInstance: GameManager | null = null;
 export function getGameManager(): GameManager {
   if (!gameManagerInstance) {
     gameManagerInstance = new GameManager();
+    // Dev hook for testing (tree-shaken in production if unused)
+    if (typeof window !== 'undefined') {
+      (window as any).$game = gameManagerInstance;
+    }
   }
   return gameManagerInstance;
 }

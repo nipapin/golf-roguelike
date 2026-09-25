@@ -272,9 +272,10 @@ export class BattleScene extends Phaser.Scene {
     this.drawCountBadge.add(countText);
     this.drawPile.add(this.drawCountBadge);
 
-    // Make entire pile clickable
+    // Make only the DRAW button area clickable (not the full card stack)
+    // Button is at bottom of draw pile, y = ch/2 - 20 to ch/2 + 8
     this.drawPile.setInteractive(
-      new Phaser.Geom.Rectangle(-cw / 2, -ch / 2, cw, ch + 20),
+      new Phaser.Geom.Rectangle(-40, ch / 2 - 24, 80, 36),
       Phaser.Geom.Rectangle.Contains
     );
     this.drawPile.on('pointerdown', () => this.onDrawClick());
@@ -462,7 +463,10 @@ export class BattleScene extends Phaser.Scene {
         }
 
         cardVisual.setState(state);
-        cardVisual.setDepth(15 + cardIndex);
+        // Playable cards need higher depth than draw pile (55) and active card (55)
+        // to receive clicks. Non-playable cards stay at lower depth.
+        const baseDepth = state === 'playable' ? 60 : 15;
+        cardVisual.setDepth(baseDepth + cardIndex);
         this.cardVisuals.push(cardVisual);
       });
     });

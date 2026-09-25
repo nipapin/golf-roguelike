@@ -36,6 +36,7 @@ export class CardVisual {
   private powerFrame: Phaser.GameObjects.Graphics | null = null;
   private powerMedal: Phaser.GameObjects.Container | null = null;
   private powerRibbon: Phaser.GameObjects.Container | null = null;
+  private played: boolean = false;
 
   private card: Card;
   private metrics: ReturnType<typeof getCardMetrics>;
@@ -374,33 +375,28 @@ export class CardVisual {
 
   setInteractive(callback: () => void): void {
     const { cw, ch } = this.metrics;
-    // Expand hit area to cover glow (-8 on sides) and tick mark (+24 on bottom)
-    // This ensures the entire visible clickable area responds to taps
-    const hitArea = new Phaser.Geom.Rectangle(-8, -8, cw + 16, ch + 32);
-
-    this.container.setInteractive(hitArea, Phaser.Geom.Rectangle.Contains);
-    this.container.removeAllListeners();
     
-    // Hover feedback
-    this.container.on('pointerover', () => {
-      this.container.setScale(1.05);
-    });
-    this.container.on('pointerout', () => {
-      this.container.setScale(1);
-    });
+    // Correct Container hit area setup:
+    // 1. Set container size first
+    // 2. Then setInteractive with Rectangle at (0,0) - NOT offset by -w/2,-h/2
+    this.container.setSize(cw, ch);
+    this.container.setInteractive(
+      new Phaser.Geom.Rectangle(0, 0, cw, ch),
+      Phaser.Geom.Rectangle.Contains
+    );
     
-    // Click/tap feedback with visual pulse
-    this.container.on('pointerdown', () => {
-      this.container.setScale(0.95);
-      callback();
-    });
+    // Use pointerup with played guard to prevent double-tap issues
     this.container.on('pointerup', () => {
-      this.container.setScale(1.05);
+      if (this.played) return;
+      this.played = true;
+      this.container.disableInteractive();
+      callback();
     });
   }
 
   disableInteractive(): void {
     this.container.disableInteractive();
+    this.container.removeAllListeners('pointerup');
   }
 
   getContainer(): Phaser.GameObjects.Container {
@@ -412,6 +408,7 @@ export class CardVisual {
   }
 
   destroy(): void {
+    this.container.removeAllListeners();
     this.container.destroy();
   }
 
