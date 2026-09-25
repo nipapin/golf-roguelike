@@ -54,6 +54,10 @@ export class CreditsScene extends Phaser.Scene {
       { text: 'Fonts', style: 'header' },
       { text: 'Lilita One, Fredoka, Rubik', style: 'name' },
       { text: 'Google Fonts • SIL OFL 1.1', style: 'normal' },
+      { text: '', style: 'spacer' },
+      { text: 'Audio', style: 'header' },
+      { text: 'Kenney (kenney.nl)', style: 'name' },
+      { text: 'CC0 Public Domain', style: 'normal' },
     ];
 
     let y = 100;

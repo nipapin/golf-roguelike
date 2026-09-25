@@ -5,6 +5,7 @@ import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground
 import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
 import { CardVisual, createCardBack } from '../design/CardVisual';
 import { isPlayable } from '../../core/GameRules';
+import { AudioSystem } from '../audio/AudioSystem';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
 
 export class BattleScene extends Phaser.Scene {
@@ -615,6 +616,8 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onDrawClick(): void {
+    AudioSystem.play('card_draw');
+    
     const manager = getGameManager();
     const result = manager.draw();
 
@@ -629,14 +632,29 @@ export class BattleScene extends Phaser.Scene {
   private handleEvents(events: Array<{ type: string; [key: string]: unknown }>): void {
     for (const event of events) {
       switch (event.type) {
+        case 'card_played':
+          AudioSystem.playCardSound((event.chainPosition as number) || 1);
+          break;
         case 'enemy_attacked':
           this.playEnemyAttackAnimation();
+          AudioSystem.play('player_hit');
           break;
         case 'enemy_died':
           this.playEnemyDeathAnimation();
+          AudioSystem.play('enemy_death');
           break;
         case 'chain_resolved':
           this.playDamageAnimation(event.totalDamage as number);
+          AudioSystem.play('enemy_hit');
+          break;
+        case 'armor_gained':
+          AudioSystem.play('shield');
+          break;
+        case 'battle_won':
+          AudioSystem.play('victory');
+          break;
+        case 'battle_lost':
+          AudioSystem.play('defeat');
           break;
       }
     }

@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import './style.css';
 
 import { loadFonts } from './presentation/design/fontLoader';
+import { AudioSystem } from './presentation/audio/AudioSystem';
 import { BootScene } from './presentation/scenes/BootScene';
 import { StartScene } from './presentation/scenes/StartScene';
 import { BattleScene } from './presentation/scenes/BattleScene';
@@ -14,8 +15,19 @@ async function initGame() {
   // Load fonts before Phaser starts (per STYLE.md section 13)
   await loadFonts();
 
-  // Get device pixel ratio for crisp text at DPR 3
-  const dpr = Math.min(window.devicePixelRatio || 1, 3);
+  // Initialize audio system (loads sounds in background)
+  AudioSystem.init().catch(() => {
+    // Audio initialization failed, game will work without sound
+  });
+
+  // Unlock audio on first user interaction (required for iOS Safari)
+  const unlockAudio = () => {
+    AudioSystem.unlock();
+    document.removeEventListener('touchstart', unlockAudio);
+    document.removeEventListener('click', unlockAudio);
+  };
+  document.addEventListener('touchstart', unlockAudio, { once: true });
+  document.addEventListener('click', unlockAudio, { once: true });
 
   const config: Phaser.Types.Core.GameConfig = {
     type: Phaser.AUTO,

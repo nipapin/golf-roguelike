@@ -47,6 +47,22 @@ All fonts are licensed under SIL Open Font License 1.1, which permits commercial
 
 ---
 
+## Audio
+
+**Artist:** Kenney (kenney.nl)
+**License:** CC0 1.0 (Public Domain Dedication)
+**Source:** https://kenney.nl/assets
+
+Sound effects used from:
+- **Casino Audio** - Card place, card slide sounds
+- **Interface Sounds** - Click, confirmation, error sounds
+- **Impact Sounds** - Punch and hit sounds
+- **Digital Audio / Jingles** - Victory and defeat fanfares
+
+No attribution required (CC0), but credit given to support the creator.
+
+---
+
 ## Attribution Notice
 
 When using this project's assets, please include the following credit:
@@ -54,4 +70,5 @@ When using this project's assets, please include the following credit:
 ```
 Character art by Segel (Segel2D), OpenGameArt.org.
 Icons by Lorc, Delapouite, sbed, and Carl Olsen from https://game-icons.net, licensed CC BY 3.0.
+Sound effects by Kenney (kenney.nl), CC0.
 ```
