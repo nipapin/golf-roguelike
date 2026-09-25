@@ -4,6 +4,7 @@ import { colors, getLayoutMetrics, getCardMetrics, getComboTier } from '../desig
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
 import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
 import { CardVisual, createCardBack } from '../design/CardVisual';
+import { SettingsModal } from '../design/SettingsModal';
 import { isPlayable } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
@@ -36,6 +37,10 @@ export class BattleScene extends Phaser.Scene {
 
   // State
   private currentState: RunState | null = null;
+  
+  // UI
+  private settingsModal: SettingsModal | null = null;
+  private inputPaused: boolean = false;
 
   constructor() {
     super('BattleScene');
@@ -76,6 +81,24 @@ export class BattleScene extends Phaser.Scene {
 
     // Initial render
     this.refreshState();
+
+    // Create settings modal
+    this.settingsModal = new SettingsModal(this, {
+      onResume: () => {
+        this.inputPaused = false;
+      },
+      onRestart: () => {
+        this.inputPaused = false;
+        const manager = getGameManager();
+        manager.abandonRun();
+        manager.startNewRun();
+        this.scene.restart();
+      },
+      onMainMenu: () => {
+        this.inputPaused = false;
+        this.scene.start('StartScene');
+      },
+    });
 
     // Listen for resize
     this.scale.on('resize', this.handleResize, this);
@@ -197,19 +220,59 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(0, 0.5).setStroke('#1B1030', 3);
     this.topHUD.add(goldText);
 
-    // Settings button on right
+    // Settings button on right (3D Supercell-style)
     const settingsX = width - 30;
+    const settingsBtnContainer = this.add.container(settingsX, hudHeight / 2);
+    
     const settingsBtn = this.add.graphics();
-    settingsBtn.fillStyle(colors.blue, 1);
-    settingsBtn.fillCircle(settingsX, hudHeight / 2, 14);
-    settingsBtn.lineStyle(2, colors.ink, 1);
-    settingsBtn.strokeCircle(settingsX, hudHeight / 2, 14);
-    this.topHUD.add(settingsBtn);
+    // Shadow
+    settingsBtn.fillStyle(colors.ink, 1);
+    settingsBtn.fillRoundedRect(-16, -14 + 3, 32, 28, 10);
+    // Button body
+    settingsBtn.fillGradientStyle(0x6cc2ff, 0x6cc2ff, colors.blue, colors.blue, 1);
+    settingsBtn.fillRoundedRect(-16, -14, 32, 28, 10);
+    // Bottom lip
+    settingsBtn.fillStyle(colors.blueLo, 1);
+    settingsBtn.fillRect(-14, 8, 28, 5);
+    // Outline
+    settingsBtn.lineStyle(2.5, colors.ink, 1);
+    settingsBtn.strokeRoundedRect(-16, -14, 32, 28, 10);
+    settingsBtnContainer.add(settingsBtn);
 
-    const settingsIcon = this.add.text(settingsX, hudHeight / 2, '⚙', {
-      fontSize: '16px',
+    const settingsIcon = this.add.text(0, -1, '⚙', {
+      fontSize: '18px',
+      color: '#ffffff',
     }).setOrigin(0.5);
-    this.topHUD.add(settingsIcon);
+    settingsBtnContainer.add(settingsIcon);
+    
+    // Make interactive
+    settingsBtnContainer.setInteractive(
+      new Phaser.Geom.Rectangle(-18, -16, 36, 32),
+      Phaser.Geom.Rectangle.Contains
+    );
+    
+    settingsBtnContainer.on('pointerdown', () => {
+      settingsBtnContainer.setScale(0.92);
+    });
+    
+    settingsBtnContainer.on('pointerup', () => {
+      settingsBtnContainer.setScale(1);
+      AudioSystem.play('button_tap');
+      this.openSettings();
+    });
+    
+    settingsBtnContainer.on('pointerout', () => {
+      settingsBtnContainer.setScale(1);
+    });
+    
+    this.topHUD.add(settingsBtnContainer);
+  }
+  
+  private openSettings(): void {
+    if (this.settingsModal) {
+      this.inputPaused = true;
+      this.settingsModal.show();
+    }
   }
 
   private createTableBackground(): void {
@@ -604,6 +667,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onCardClick(cardId: string): void {
+    if (this.inputPaused) return;
+    
+    // Unlock audio on first interaction
+    AudioSystem.unlock();
+    
     const manager = getGameManager();
     const result = manager.playCard(cardId);
 
@@ -616,6 +684,11 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private onDrawClick(): void {
+    if (this.inputPaused) return;
+    
+    // Unlock audio on first interaction
+    AudioSystem.unlock();
+    
     AudioSystem.play('card_draw');
     
     const manager = getGameManager();
@@ -760,5 +833,9 @@ export class BattleScene extends Phaser.Scene {
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this);
     setTestHook(null);
+    if (this.settingsModal) {
+      this.settingsModal.destroy();
+      this.settingsModal = null;
+    }
   }
 }

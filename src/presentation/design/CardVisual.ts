@@ -320,12 +320,17 @@ export class CardVisual {
         break;
 
       case 'disabled':
+        // Per mockup: exposed but not playable card gets grey-blue tint
+        // CSS: filter:saturate(.75) brightness(.86) + overlay gradient
         this.outlineGfx.lineStyle(outline, colors.ink, 1);
         this.outlineGfx.strokeRoundedRect(0, 0, cw, ch, radius);
 
-        // Dim overlay
-        this.outlineGfx.fillStyle(0x4632aa, 0.2);
-        this.outlineGfx.fillRoundedRect(0, 0, cw, ch, radius);
+        // Grey-blue veil overlay (matching mockup's disabled state)
+        // Top: rgba(70,50,170,.16), bottom: rgba(40,20,120,.30)
+        this.glowGfx.fillStyle(0x4632aa, 0.18);
+        this.glowGfx.fillRoundedRect(0, 0, cw, ch * 0.5, { tl: radius, tr: radius, bl: 0, br: 0 });
+        this.glowGfx.fillStyle(0x281478, 0.28);
+        this.glowGfx.fillRoundedRect(0, ch * 0.5, cw, ch * 0.5, { tl: 0, tr: 0, bl: radius, br: radius });
         break;
 
       case 'covered':

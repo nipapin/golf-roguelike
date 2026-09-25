@@ -1,6 +1,6 @@
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
- * Uses Kenney.nl CC0 assets
+ * Synthesized CC0 sounds in public/audio/
  */
 
 export type SoundId =
@@ -35,6 +35,7 @@ class AudioSystemClass {
   private settings: AudioSettings = DEFAULT_SETTINGS;
   private unlocked: boolean = false;
   private loadPromise: Promise<void> | null = null;
+  private initialized: boolean = false;
 
   constructor() {
     this.loadSettings();
@@ -67,12 +68,7 @@ class AudioSystemClass {
   }
 
   private async loadAllSounds(): Promise<void> {
-    // Sound file mapping
-    // Expected files from Kenney.nl (CC0):
-    // - Casino Audio: cardPlace, cardSlide
-    // - Interface Sounds: click, confirmation, error
-    // - Impact Sounds: impactPunch
-    // - Digital Audio / Jingles: victory/defeat fanfares
+    // Sound file mapping - synthesized CC0 sounds
     const soundFiles: Record<SoundId, string> = {
       card_play: 'card-place',
       card_draw: 'card-slide',
@@ -104,17 +100,18 @@ class AudioSystemClass {
           this.sounds.set(id as SoundId, buffer);
         }
       } catch {
-        // Silently ignore missing audio files
+        // Silently ignore missing audio files for graceful degradation
       }
     });
 
     await Promise.all(loadPromises);
+    this.initialized = true;
   }
 
   private async loadSound(basePath: string): Promise<AudioBuffer | null> {
     if (!this.context) return null;
 
-    // Try .ogg first, then .mp3
+    // Try .ogg first (smaller, better quality), then .mp3 (Safari fallback)
     const extensions = ['.ogg', '.mp3'];
     
     for (const ext of extensions) {
@@ -137,7 +134,16 @@ class AudioSystemClass {
    * Unlock audio on first user interaction (required for iOS Safari)
    */
   unlock(): void {
-    if (this.unlocked || !this.context) return;
+    if (this.unlocked) return;
+    
+    // Create context if not yet created
+    if (!this.context) {
+      try {
+        this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      } catch {
+        return;
+      }
+    }
 
     // Resume context if suspended
     if (this.context.state === 'suspended') {
@@ -152,6 +158,11 @@ class AudioSystemClass {
     source.start(0);
 
     this.unlocked = true;
+    
+    // Load sounds if not already done
+    if (!this.initialized) {
+      this.init();
+    }
   }
 
   /**
@@ -219,6 +230,13 @@ class AudioSystemClass {
   toggleMusic(): boolean {
     this.isMusicEnabled = !this.isMusicEnabled;
     return this.isMusicEnabled;
+  }
+
+  /**
+   * Check if audio has been successfully initialized
+   */
+  isReady(): boolean {
+    return this.initialized && this.unlocked;
   }
 }
 
