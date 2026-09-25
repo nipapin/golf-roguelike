@@ -1,10 +1,13 @@
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
- * Synthesized CC0 sounds in public/audio/
+ * Kenney.nl CC0 sounds in public/audio/
  */
 
 export type SoundId =
   | 'card_play'
+  | 'card_play_1'
+  | 'card_play_2'
+  | 'card_play_3'
   | 'card_draw'
   | 'invalid_tap'
   | 'combo_up'
@@ -68,9 +71,12 @@ class AudioSystemClass {
   }
 
   private async loadAllSounds(): Promise<void> {
-    // Sound file mapping - synthesized CC0 sounds
+    // Sound file mapping - Kenney.nl CC0 sounds
     const soundFiles: Record<SoundId, string> = {
-      card_play: 'card-place',
+      card_play: 'card-place-1',
+      card_play_1: 'card-place-1',
+      card_play_2: 'card-place-2',
+      card_play_3: 'card-place-3',
       card_draw: 'card-slide',
       invalid_tap: 'error',
       combo_up: 'combo-up',
@@ -197,10 +203,13 @@ class AudioSystemClass {
 
   /**
    * Play card sound with combo-based pitch shift
+   * Randomly selects from 3 card place variants
    */
   playCardSound(comboCount: number): void {
+    const variants: SoundId[] = ['card_play_1', 'card_play_2', 'card_play_3'];
+    const soundId = variants[Math.floor(Math.random() * variants.length)];
     const pitchShift = Math.min(comboCount * 0.05, 0.4);
-    this.play('card_play', { pitchShift, volume: 0.4 });
+    this.play(soundId, { pitchShift, volume: 0.5 });
   }
 
   // Settings getters/setters

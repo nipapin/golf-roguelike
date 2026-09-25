@@ -54,10 +54,22 @@ All fonts are licensed under SIL Open Font License 1.1, which permits commercial
 **Source:** https://kenney.nl/assets
 
 Sound effects used from:
-- **Casino Audio** - Card place, card slide sounds
-- **Interface Sounds** - Click, confirmation, error sounds
-- **Impact Sounds** - Punch and hit sounds
-- **Digital Audio / Jingles** - Victory and defeat fanfares
+- **Casino Audio** (https://kenney.nl/assets/casino-audio)
+  - card-place-1, card-place-2, card-place-3 (card play sounds)
+  - card-slide-3 (draw sound)
+  - chips-stack-3 (reward pickup)
+- **Interface Sounds** (https://kenney.nl/assets/interface-sounds)
+  - click_002 (button tap)
+  - error_004 (invalid action)
+  - maximize_006 (combo tier up)
+- **Impact Sounds** (https://kenney.nl/assets/impact-sounds)
+  - impactPunch_medium_000 (enemy hit)
+  - impactPunch_heavy_001 (player hit)
+  - impactMetal_light_002 (shield gain)
+  - impactPlate_heavy_000 (enemy death)
+- **Music Jingles** (https://kenney.nl/assets/music-jingles)
+  - jingles_PIZZI03 (victory)
+  - jingles_PIZZI16 (defeat)
 
 No attribution required (CC0), but credit given to support the creator.
 
