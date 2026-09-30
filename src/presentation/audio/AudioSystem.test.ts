@@ -11,6 +11,7 @@ class AudioParamStub {
 class AudioNodeStub {
   gain = new AudioParamStub();
   frequency = new AudioParamStub();
+  Q = new AudioParamStub();
   playbackRate = new AudioParamStub();
   connect = vi.fn();
   disconnect = vi.fn();
@@ -27,10 +28,12 @@ class ContextStub {
   destination = {};
   gains: AudioNodeStub[] = [];
   voices: AudioNodeStub[] = [];
+  filters: AudioNodeStub[] = [];
   sources: AudioNodeStub[] = [];
   resume = vi.fn(async () => { this.state = 'running'; });
   constructor() { ContextStub.instances.push(this); }
   createGain() { const node = new AudioNodeStub(); this.gains.push(node); return node; }
+  createBiquadFilter() { const node = new AudioNodeStub(); this.filters.push(node); return node; }
   createOscillator() { const node = new AudioNodeStub(); this.voices.push(node); return node; }
   createBufferSource() { const node = new AudioNodeStub(); this.sources.push(node); return node; }
   createBuffer() { return {}; }
@@ -85,21 +88,29 @@ it('persists independent volumes and resumes a suspended context on a new gestur
   expect(context.state).toBe('running');
 });
 
-it('switches recorded themes without overlapping loops and plays results once', async () => {
+it('keeps one soundtrack playing and filters it outside battle', async () => {
   const { AudioSystem } = await import('./AudioSystem');
   await AudioSystem.init(); AudioSystem.unlock();
   const context = ContextStub.instances[0];
-  const menu = context.sources.find(source => (source as AudioNodeStub & { loop?: boolean }).loop)!;
+  const music = context.sources.find(source => (source as AudioNodeStub & { loop?: boolean }).loop)!;
+  const filter = context.filters[0];
   AudioSystem.setMusicScene('battle');
-  expect(menu.stop).toHaveBeenCalledOnce();
-  const battle = context.sources.at(-1)!;
-  expect((battle as AudioNodeStub & { loop?: boolean }).loop).toBe(true);
+  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(18000, 0, .25);
   AudioSystem.setMusicScene('defeat');
-  expect(battle.stop).toHaveBeenCalledOnce();
-  const result = context.sources.at(-1)!;
-  expect((result as AudioNodeStub & { loop?: boolean }).loop).toBe(false);
-  result.onended?.();
-  AudioSystem.unlock();
-  expect(context.sources.at(-1)).not.toBe(result); // Only the silent unlock buffer was created.
-  expect(context.sources.filter(source => source.buffer === result.buffer && source !== result && !(source as AudioNodeStub & { loop?: boolean }).loop)).toHaveLength(0);
+  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(650, 0, .25);
+  AudioSystem.setMusicScene('menu');
+  expect(music.stop).not.toHaveBeenCalled();
+  expect(context.sources.filter(source => (source as AudioNodeStub & { loop?: boolean }).loop)).toHaveLength(1);
+});
+
+it('uses rising combo pitches and distinct short power phrases', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init(); AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  AudioSystem.playCombo(1); const first = context.voices.at(-2)!.frequency.setValueAtTime.mock.calls[0][0];
+  AudioSystem.playCombo(6); const sixth = context.voices.at(-2)!.frequency.setValueAtTime.mock.calls[0][0];
+  expect(sixth).toBeGreaterThan(first);
+  AudioSystem.playPower('HEAL'); const heal = context.voices.at(-1)!.frequency.setValueAtTime.mock.calls[0][0];
+  AudioSystem.playPower('BOMB'); const bomb = context.voices.at(-1)!.frequency.setValueAtTime.mock.calls[0][0];
+  expect(heal).not.toBe(bomb);
 });

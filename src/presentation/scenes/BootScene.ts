@@ -28,6 +28,8 @@ export class BootScene extends Phaser.Scene {
       );
     }
 
+    this.load.svg('coin', '/assets/coin.svg');
+
     // Load crown overlay for boss
     this.load.svg('crown', '/assets/enemies/crown.svg');
 

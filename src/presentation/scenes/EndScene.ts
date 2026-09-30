@@ -18,7 +18,7 @@ export class EndScene extends Phaser.Scene {
     content.add(emblem);
     this.tweens.add({ targets: emblem, angle: 5, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     content.add(this.add.text(0, top + 210, `FIGHT ${Math.min(state.currentFight + 1, manager.getTotalFights())} / ${manager.getTotalFights()}`, { fontFamily: 'Lilita One', fontSize: '24px', color: '#ffffff' }).setOrigin(.5).setStroke('#1b1030', 4));
-    content.add(this.add.text(0, top + 246, `♦ ${state.player.gold} GOLD    ◆ ${state.player.relics.length} RELICS`, { fontFamily: 'Fredoka', fontSize: '16px', color: '#ffe0a1' }).setOrigin(.5));
+    content.add(this.add.text(0, top + 246, `🪙 ${state.player.gold} GOLD    ◆ ${state.player.relics.length} RELICS`, { fontFamily: 'Fredoka', fontSize: '16px', color: '#ffe0a1' }).setOrigin(.5));
     const build = this.add.text(0, top + 280, 'VIEW YOUR BUILD', { fontFamily: 'Lilita One', fontSize: '15px', color: '#b6d9ff' }).setOrigin(.5).setInteractive();
     build.on('pointerup', () => { const panel = showBuildPanel(this, state.player.relics, () => {}); panel.setDepth(3000); });
     content.add(build);

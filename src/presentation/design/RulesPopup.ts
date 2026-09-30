@@ -9,9 +9,9 @@ export function showRules(scene: Phaser.Scene, onClose?: () => void): void {
   const { content, width, top } = modal;
   const rules = [
     ['1 · TAKE AN OPEN CARD', 'Tap the bottom card of a column. Its rank must be ±1 from your active card.'],
-    ['5 → 6 → 7 → 6', 'Build a chain to deal more damage. A ↔ K also works. Gold outlines show valid moves.'],
+    ['5 → 6 → 7 → 6', 'Build a chain to deal more damage. A ↔ K also works. WILD allows any next card. Gold outlines show valid moves.'],
     ['2 · DRAW / END TURN', 'Bank your damage and draw. A chain of 3+ cards stops the enemy; with 0–2 cards it acts.'],
-    ['3 · GROW YOUR BUILD', 'WILD lets your next card be any rank. Other power-cards heal, guard or boost damage. Win relics to grow your build.'],
+    ['3 · JOKERS', 'Red joker: 30% lifesteal, red cards next. Black joker: ×5 chain damage, black cards next. Jokers connect to each other.'],
   ];
   rules.forEach(([title, text], i) => {
     content.add(scene.add.text(-width / 2 + 20, top + 108 + i * 77, title, { fontFamily: 'Lilita One', fontSize: '17px', color: '#ffe35a' }));

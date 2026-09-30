@@ -17,8 +17,8 @@ function card(value: unknown): boolean {
     record(value) &&
     text(value.id) &&
     integer(value.rank) &&
-    value.rank >= 1 &&
-    value.rank <= 13 &&
+    (value.joker === undefined ? value.rank >= 1 && value.rank <= 13 :
+      value.rank === 0 && (value.joker === 'red' || value.joker === 'black') && value.suit === (value.joker === 'red' ? 'hearts' : 'spades')) &&
     ['spades', 'hearts', 'diamonds', 'clubs'].includes(String(value.suit))
   );
 }
@@ -81,6 +81,8 @@ export function isSavedRun(value: unknown): value is RunState {
     !arrayOf(battle.chain, card) ||
     !card(battle.activeCard) ||
     !integer(battle.accumulatedDamage) ||
+    ['chainBaseDamage', 'jokerMultiplier', 'lifestealMultiplier'].some(key => battle[key] !== undefined && (!number(battle[key]) || (battle[key] as number) < 0)) ||
+    (battle.jokerMultiplier !== undefined && (!number(battle.jokerMultiplier) || battle.jokerMultiplier < 1)) ||
     !integer(battle.turnNumber) ||
     typeof battle.wildActive !== 'boolean' ||
     typeof battle.isFirstChain !== 'boolean' ||
@@ -127,5 +129,7 @@ export function isSavedRun(value: unknown): value is RunState {
     battle.activeCard,
   ];
   const ids = cards.map((item) => (item as { id: string }).id);
-  return ids.length === 52 && new Set(ids).size === ids.length;
+  const jokers = cards.filter(item => (item as { joker?: string }).joker);
+  const validPack = ids.length === 52 && jokers.length === 0 || ids.length === 54 && jokers.length === 2 && new Set(jokers.map(item => (item as { joker: string }).joker)).size === 2;
+  return validPack && new Set(ids).size === ids.length;
 }

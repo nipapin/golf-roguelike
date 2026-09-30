@@ -1,44 +1,37 @@
 export type MusicScene = 'menu' | 'battle' | 'victory' | 'defeat';
-/** Recorded themes share one context; transitions fade, results play once. */
+/** One uninterrupted soundtrack; noncombat scenes sound like the room next door. */
 export class MusicSequencer {
   private source: AudioBufferSourceNode | null = null;
-  private buffers = new Map<MusicScene, AudioBuffer>();
-  private scene: MusicScene = 'menu';
+  private buffer: AudioBuffer | null = null;
+  private filter: BiquadFilterNode;
+  private roomGain: GainNode;
   private wanted = false;
-  private finished = false;
   private offset = 0;
   private startedAt = 0;
-  constructor(private context: AudioContext, private output: GainNode) {}
-  setBuffer(scene: MusicScene, buffer: AudioBuffer): void { this.buffers.set(scene, buffer); if (this.wanted) this.start(); }
+  constructor(private context: AudioContext, output: GainNode) {
+    this.filter = context.createBiquadFilter(); this.filter.type = 'lowpass'; this.filter.Q.value = .65;
+    this.roomGain = context.createGain(); this.filter.connect(this.roomGain); this.roomGain.connect(output);
+    this.setScene('menu');
+  }
+  setBuffer(buffer: AudioBuffer): void { this.buffer = buffer; if (this.wanted) this.start(); }
   setScene(scene: MusicScene): void {
-    if (this.scene === scene) return;
-    const wanted = this.wanted;
-    this.stop(); this.scene = scene; this.offset = 0; this.finished = false;
-    if (wanted) this.start();
+    const battle = scene === 'battle';
+    this.filter.frequency.setTargetAtTime(battle ? 18000 : 650, this.context.currentTime, .25);
+    this.roomGain.gain.setTargetAtTime(battle ? 1 : .48, this.context.currentTime, .25);
   }
   start(): void {
     this.wanted = true;
-    const buffer = this.buffers.get(this.scene);
-    if (this.source || !buffer || this.finished || this.context.state !== 'running') return;
+    if (this.source || !this.buffer || this.context.state !== 'running') return;
     const source = this.context.createBufferSource();
-    const envelope = this.context.createGain();
-    envelope.gain.setValueAtTime(0, this.context.currentTime);
-    envelope.gain.linearRampToValueAtTime(1, this.context.currentTime + .3);
-    source.buffer = buffer; source.loop = this.scene === 'menu' || this.scene === 'battle';
-    source.connect(envelope); envelope.connect(this.output);
+    source.buffer = this.buffer; source.loop = true; source.connect(this.filter);
     this.startedAt = this.context.currentTime;
-    source.start(0, this.offset % buffer.duration);
-    this.source = source;
-    source.onended = () => {
-      source.disconnect(); envelope.disconnect();
-      if (this.source === source) { this.source = null; this.finished = true; }
-    };
+    source.start(0, this.offset % this.buffer.duration); this.source = source;
+    source.onended = () => source.disconnect();
   }
   stop(): void {
     this.wanted = false;
     if (!this.source) return;
     this.offset += this.context.currentTime - this.startedAt;
-    const source = this.source; this.source = null;
-    source.stop();
+    const source = this.source; this.source = null; source.stop();
   }
 }

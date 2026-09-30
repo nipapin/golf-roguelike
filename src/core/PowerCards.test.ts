@@ -21,28 +21,16 @@ function fixture(powerType: PowerType, suit: Suit = 'spades'): RunState {
 }
 
 describe('power cards', () => {
-  it('WILD permits exactly one arbitrary-rank play', () => {
-    const first = playCard(fixture('WILD'), 'power', config);
+  it('WILD permits any next rank and is consumed by that play', () => {
+    const initial = fixture('WILD');
+    const state = { ...initial, battle: { ...initial.battle!, tableau: [...initial.battle!.tableau, { cards: [{ id: 'spare', rank: 3, suit: 'clubs' as const }] }] } };
+    const first = playCard(state, 'power', config);
     expect(first.state.battle!.wildActive).toBe(true);
-    // Keep one covered card so the next play does not clear the whole tableau.
-    const state = {
-      ...first.state,
-      battle: {
-        ...first.state.battle!,
-        tableau: [
-          {
-            cards: [
-              { id: 'covered', rank: 3, suit: 'hearts' as const },
-              { id: 'next', rank: 10, suit: 'clubs' as const },
-            ],
-          },
-        ],
-      },
-    };
-    const second = playCard(state, 'next', config);
-    expect(second.state.battle!.chain).toHaveLength(2);
-    expect(second.state.battle!.wildActive).toBe(false);
-    expect(playCard(second.state, 'covered', config).state).toBe(second.state);
+    expect(first.events.find(e => e.type === 'card_played')).toMatchObject({ damage: 2 });
+    const next = playCard(first.state, 'next', config);
+    expect(next.state).not.toBe(first.state);
+    expect(next.state.battle!.wildActive).toBe(false);
+    expect(playCard(next.state, 'spare', config).state).toBe(next.state);
   });
 
   it('ECHO increases the played card damage position by the configured bonus', () => {

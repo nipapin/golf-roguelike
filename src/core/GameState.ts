@@ -23,6 +23,7 @@ export function createDeck(): Card[] {
       deck.push({ rank, suit, id: `card-${id++}` });
     }
   }
+  deck.push({ id: 'joker-red', rank: 0, suit: 'hearts', joker: 'red' }, { id: 'joker-black', rank: 0, suit: 'spades', joker: 'black' });
   return deck;
 }
 
@@ -105,7 +106,7 @@ export function setupBattle(
   const allTableauCards: { col: number; row: number; card: Card }[] = [];
   tableau.forEach((column, col) => {
     column.cards.forEach((card, row) => {
-      allTableauCards.push({ col, row, card });
+      if (!card.joker) allTableauCards.push({ col, row, card });
     });
   });
 
@@ -122,6 +123,9 @@ export function setupBattle(
     activeCard,
     chain: [],
     accumulatedDamage: 0,
+    chainBaseDamage: 0,
+    jokerMultiplier: activeCard?.joker === 'black' ? 5 : 1,
+    lifestealMultiplier: activeCard?.joker === 'red' ? 1 : 0,
     enemy: createEnemy(enemyData),
     powerCards,
     wildActive: false,
@@ -157,9 +161,15 @@ export function hasLegalMoves(battle: BattleState): boolean {
 export function canConnect(
   card: Card,
   activeCard: Card,
-  wildActive: boolean
+  wildActive: boolean = false
 ): boolean {
+  // WILD explicitly allows any next rank; jokers apply their color rule.
   if (wildActive) return true;
+  if (card.joker) return true;
+  if (activeCard.joker) {
+    const red = card.suit === 'hearts' || card.suit === 'diamonds';
+    return activeCard.joker === 'red' ? red : !red;
+  }
 
   const diff = Math.abs(card.rank - activeCard.rank);
   // A-K wrap is ALWAYS legal (base rule)
