@@ -2,8 +2,9 @@ import Phaser from 'phaser';
 import { getGameManager, setTestHook } from '../GameManager';
 import { colors, getLayoutMetrics, getCardMetrics } from '../design/tokens';
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
-import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
-import { CardVisual, createCardBack } from '../design/CardVisual';
+import { HPBar, ComboBanner, createIntentBubble } from '../design/HudComponents';
+import { CardVisual } from '../design/CardVisual';
+import { showBuildPanel } from '../design/BuildPanel';
 import { SettingsModal } from '../design/SettingsModal';
 import { isPlayable } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
@@ -23,8 +24,12 @@ export class BattleScene extends Phaser.Scene {
   private intentBubble: Phaser.GameObjects.Container | null = null;
   private comboBanner!: ComboBanner;
   private playerHPBar!: HPBar;
-  private goldChip!: Phaser.GameObjects.Container;
-  private armorChip: Phaser.GameObjects.Container | null = null;
+  private goldText!: Phaser.GameObjects.Text;
+  private armorText!: Phaser.GameObjects.Text;
+  private buildText!: Phaser.GameObjects.Text;
+  private turnHint!: Phaser.GameObjects.Text;
+  private drawText!: Phaser.GameObjects.Text;
+  private buildPanel: Phaser.GameObjects.Container | null = null;
   private topHUD: Phaser.GameObjects.Container | null = null;
   private activeLabel: Phaser.GameObjects.Text | null = null;
 
@@ -33,7 +38,6 @@ export class BattleScene extends Phaser.Scene {
   private cardVisuals: CardVisual[] = [];
   private activeCardVisual: CardVisual | null = null;
   private drawPile: Phaser.GameObjects.Container | null = null;
-  private drawCountBadge!: Phaser.GameObjects.Container;
 
   // State
   private currentState: RunState | null = null;
@@ -94,7 +98,7 @@ export class BattleScene extends Phaser.Scene {
         const manager = getGameManager();
         manager.abandonRun();
         manager.startNewRun();
-        this.scene.restart();
+        this.scene.start('RewardScene');
       },
       onMainMenu: () => {
         this.inputPaused = false;
@@ -111,7 +115,6 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private setupTestHook(): void {
-    const { ch } = this.layout;
     setTestHook({
       isActive: true,
       getPlayableCards: () => {
@@ -125,10 +128,10 @@ export class BattleScene extends Phaser.Scene {
       getDrawPileBounds: () => {
         if (!this.drawPile) return { x: 0, y: 0, width: 0, height: 0 };
         return {
-          x: this.drawPile.x - 40,
-          y: this.drawPile.y + ch / 2 - 24,
-          width: 80,
-          height: 36,
+          x: 12,
+          y: this.layout.trayTop + 14,
+          width: this.scale.width * 0.46,
+          height: this.layout.trayHeight - 28,
         };
       },
       getTableauCount: () => {
@@ -149,129 +152,36 @@ export class BattleScene extends Phaser.Scene {
 
   private createTopHUD(): void {
     const width = this.scale.width;
-    const { hudTop, hudHeight } = this.layout;
-
-    this.topHUD = this.add.container(0, hudTop);
-    this.topHUD.setDepth(100);
-
-    // Dark rounded pill background (like mockup)
-    const bg = this.add.graphics();
-    bg.fillStyle(colors.ink, 0.85);
-    bg.fillRoundedRect(8, 4, width - 16, hudHeight - 8, 14);
-    this.topHUD.add(bg);
-
-    // Fight progress nodes (7 fights)
+    const { hudTop, hudHeight, relicTop } = this.layout;
     const manager = getGameManager();
-    const nodeStartX = 12;
-    const nodeSpacing = 24;
-
-    for (let i = 0; i < 7; i++) {
-      const nodeX = nodeStartX + i * nodeSpacing;
-      const nodeY = hudHeight / 2;
-      const currentFight = manager.getCurrentFightNumber() - 1;
-
-      const node = this.add.graphics();
-      
-      if (i < currentFight) {
-        // Completed fight
-        node.fillStyle(colors.green, 1);
-        node.fillCircle(nodeX, nodeY, 8);
-        node.lineStyle(2, colors.ink, 1);
-        node.strokeCircle(nodeX, nodeY, 8);
-      } else if (i === currentFight) {
-        // Current fight - gold with swords icon
-        node.fillStyle(colors.gold, 1);
-        node.fillCircle(nodeX, nodeY, 10);
-        node.lineStyle(2, colors.ink, 1);
-        node.strokeCircle(nodeX, nodeY, 10);
-      } else if (i === 3) {
-        // Elite (fight 4)
-        node.fillStyle(colors.violet, 0.5);
-        node.fillCircle(nodeX, nodeY, 8);
-        node.lineStyle(2, colors.ink, 0.5);
-        node.strokeCircle(nodeX, nodeY, 8);
-      } else if (i === 6) {
-        // Boss (fight 7)
-        node.fillStyle(colors.red, 0.5);
-        node.fillCircle(nodeX, nodeY, 8);
-        node.lineStyle(2, colors.ink, 0.5);
-        node.strokeCircle(nodeX, nodeY, 8);
-      } else {
-        // Future fight
-        node.fillStyle(colors.white, 0.3);
-        node.fillCircle(nodeX, nodeY, 6);
-        node.lineStyle(2, colors.ink, 0.3);
-        node.strokeCircle(nodeX, nodeY, 6);
-      }
-      this.topHUD.add(node);
-    }
-
-    // Gold display in center
-    const goldX = width / 2;
-    const state = manager.getState();
-    const goldAmount = state?.player.gold || 0;
-
-    const goldIcon = this.add.text(goldX - 30, hudHeight / 2, '💰', {
-      fontSize: '18px',
+    this.topHUD = this.add.container(0, hudTop).setDepth(100);
+    const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
+    const progress = this.add.text(16, hudHeight / 2, `FIGHT ${manager.getCurrentFightNumber()} / ${manager.getTotalFights()}`, {
+      fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
+    }).setOrigin(0, 0.5);
+    this.goldText = this.add.text(width * 0.58, hudHeight / 2, '♦ 0', {
+      fontFamily: 'Fredoka', fontSize: '16px', color: '#ffd267',
     }).setOrigin(0.5);
-    this.topHUD.add(goldIcon);
-
-    const goldText = this.add.text(goldX + 5, hudHeight / 2, goldAmount.toString(), {
-      fontFamily: 'Lilita One',
-      fontSize: '18px',
-      color: '#FFD700',
-    }).setOrigin(0, 0.5).setStroke('#1B1030', 3);
-    this.topHUD.add(goldText);
-
-    // Settings button on right (3D Supercell-style)
-    const settingsX = width - 30;
-    const settingsBtnContainer = this.add.container(settingsX, hudHeight / 2);
-    
-    const settingsBtn = this.add.graphics();
-    // Shadow
-    settingsBtn.fillStyle(colors.ink, 1);
-    settingsBtn.fillRoundedRect(-16, -14 + 3, 32, 28, 10);
-    // Button body
-    settingsBtn.fillGradientStyle(0x6cc2ff, 0x6cc2ff, colors.blue, colors.blue, 1);
-    settingsBtn.fillRoundedRect(-16, -14, 32, 28, 10);
-    // Bottom lip
-    settingsBtn.fillStyle(colors.blueLo, 1);
-    settingsBtn.fillRect(-14, 8, 28, 5);
-    // Outline
-    settingsBtn.lineStyle(2.5, colors.ink, 1);
-    settingsBtn.strokeRoundedRect(-16, -14, 32, 28, 10);
-    settingsBtnContainer.add(settingsBtn);
-
-    const settingsIcon = this.add.text(0, -1, '⚙', {
-      fontSize: '18px',
-      color: '#ffffff',
-    }).setOrigin(0.5);
-    settingsBtnContainer.add(settingsIcon);
-    
-    // Make interactive
-    settingsBtnContainer.setInteractive(
-      new Phaser.Geom.Rectangle(-18, -16, 36, 32),
-      Phaser.Geom.Rectangle.Contains
-    );
-    
-    settingsBtnContainer.on('pointerdown', () => {
-      settingsBtnContainer.setScale(0.92);
+    const settings = this.add.rectangle(width - 30, hudHeight / 2, 40, 36, 0x3d2c66).setInteractive();
+    settings.on('pointerup', () => { AudioSystem.unlock(); this.openSettings(); });
+    const gear = this.add.text(width - 30, hudHeight / 2, '⚙', { fontSize: '22px', color: '#fff' }).setOrigin(0.5);
+    this.topHUD.add([bg, progress, this.goldText, settings, gear]);
+    const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100).setInteractive();
+    this.buildText = this.add.text(width / 2, build.y, 'BUILD · CHOOSE A RELIC', {
+      fontFamily: 'Fredoka', fontSize: '12px', color: '#dac6ff',
+    }).setOrigin(0.5).setDepth(101);
+    build.on('pointerup', () => {
+      if (this.inputPaused) return;
+      this.inputPaused = true;
+      this.buildPanel = showBuildPanel(this, manager.getState()?.player.relics ?? [], () => {
+        this.inputPaused = false;
+        this.buildPanel = null;
+      });
     });
-    
-    settingsBtnContainer.on('pointerup', () => {
-      settingsBtnContainer.setScale(1);
-      AudioSystem.play('button_tap');
-      this.openSettings();
-    });
-    
-    settingsBtnContainer.on('pointerout', () => {
-      settingsBtnContainer.setScale(1);
-    });
-    
-    this.topHUD.add(settingsBtnContainer);
   }
-  
+
   private openSettings(): void {
+    if (this.inputPaused) return;
     if (this.settingsModal) {
       this.inputPaused = true;
       this.settingsModal.show();
@@ -287,8 +197,8 @@ export class BattleScene extends Phaser.Scene {
     this.tableBackground.setDepth(10);
 
     // Felt gradient - extends to bottom of screen minus safe area
-    this.tableBackground.fillGradientStyle(
-      colors.feltHi,
+    this.tableBackground.fillStyle(colors.feltHi, 1);
+    this.tableBackground.fillGradientStyle(colors.feltHi,
       colors.feltHi,
       colors.feltLo,
       colors.feltLo,
@@ -311,81 +221,30 @@ export class BattleScene extends Phaser.Scene {
 
   private createPlayerHUD(): void {
     const width = this.scale.width;
-    const { trayTop, trayHeight } = this.layout;
-
-    // Player HUD at bottom of tray area
-    const hudY = trayTop + trayHeight - 10;
-
-    // Player HP bar (smaller, right side)
-    this.playerHPBar = new HPBar(this, width - 70, hudY, 100, 18, 30, true);
-    this.playerHPBar.setDepth(60);
-
-    // Gold chip above HP bar
-    this.goldChip = createChip(this, width - 140, hudY - 30, colors.diamond, '♦', 0);
-    this.goldChip.setDepth(60);
+    const y = this.layout.playerHudTop + 15;
+    this.playerHPBar = new HPBar(this, 76, y, 126, 20, 30, true);
+    this.playerHPBar.setDepth(100);
+    this.armorText = this.add.text(width - 16, y, 'ARMOR 0', {
+      fontFamily: 'Fredoka', fontSize: '13px', color: '#9ccfff',
+    }).setOrigin(1, 0.5).setDepth(100);
   }
 
   private createDrawPile(): void {
-    const { trayTop, trayHeight, cw, ch, side } = this.layout;
-
-    const pileX = side + cw / 2 + 10;
-    // Position draw pile in the tray area, vertically centered with some offset for button
-    const pileY = trayTop + trayHeight / 2 - 10;
-
-    this.drawPile = this.add.container(pileX, pileY);
-    this.drawPile.setDepth(55);
-
-    // Stack of card backs
-    for (let i = 2; i >= 0; i--) {
-      const back = createCardBack(this, -cw / 2 + i * 3, -ch / 2 - i * 3);
-      this.drawPile.add(back);
-    }
-
-    // DRAW button overlay
-    const drawBtn = this.add.graphics();
-    drawBtn.fillGradientStyle(colors.blue, colors.blue, colors.blueLo, colors.blueLo, 1);
-    drawBtn.fillRoundedRect(-35, ch / 2 - 20, 70, 28, 8);
-    drawBtn.lineStyle(2.5, colors.ink, 1);
-    drawBtn.strokeRoundedRect(-35, ch / 2 - 20, 70, 28, 8);
-    this.drawPile.add(drawBtn);
-
-    const drawText = this.add
-      .text(0, ch / 2 - 6, 'DRAW', {
-        fontFamily: 'Lilita One',
-        fontSize: '14px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 3);
-    this.drawPile.add(drawText);
-
-    // Count badge
-    this.drawCountBadge = this.add.container(cw / 2 - 5, -ch / 2 + 5);
-    const badgeBg = this.add.graphics();
-    badgeBg.fillStyle(colors.red, 1);
-    badgeBg.fillCircle(0, 0, 14);
-    badgeBg.lineStyle(2, colors.ink, 1);
-    badgeBg.strokeCircle(0, 0, 14);
-    this.drawCountBadge.add(badgeBg);
-
-    const countText = this.add
-      .text(0, 0, '0', {
-        fontFamily: 'Lilita One',
-        fontSize: '14px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 2);
-    this.drawCountBadge.add(countText);
-    this.drawPile.add(this.drawCountBadge);
-
-    // Make only the DRAW button area clickable (not the full card stack)
-    // Button is at bottom of draw pile, y = ch/2 - 20 to ch/2 + 8
-    this.drawPile.setInteractive(
-      new Phaser.Geom.Rectangle(-40, ch / 2 - 24, 80, 36),
-      Phaser.Geom.Rectangle.Contains
-    );
-    this.drawPile.on('pointerdown', () => this.onDrawClick());
+    const { trayTop, trayHeight } = this.layout;
+    const width = this.scale.width;
+    const buttonWidth = width * 0.46;
+    const buttonHeight = trayHeight - 28;
+    this.drawPile = this.add.container(12 + buttonWidth / 2, trayTop + 14 + buttonHeight / 2).setDepth(55);
+    const bg = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x31559a).setStrokeStyle(2, 0x9aafe0);
+    this.drawText = this.add.text(0, -10, 'DRAW', {
+      fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff',
+    }).setOrigin(0.5);
+    this.turnHint = this.add.text(0, 16, 'Enemy turn', {
+      fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', align: 'center',
+    }).setOrigin(0.5);
+    this.drawPile.add([bg, this.drawText, this.turnHint]);
+    this.drawPile.setInteractive(new Phaser.Geom.Rectangle(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
+    this.drawPile.on('pointerup', () => this.onDrawClick());
   }
 
   private refreshState(): void {
@@ -418,7 +277,6 @@ export class BattleScene extends Phaser.Scene {
 
   private renderEnemy(battle: BattleState): void {
     const width = this.scale.width;
-    const height = this.scale.height;
     const { arenaTop, arenaHeight } = this.layout;
 
     const enemy = battle.enemy;
@@ -437,7 +295,7 @@ export class BattleScene extends Phaser.Scene {
     const enemyY = arenaTop + arenaHeight - 70;
 
     // Target enemy height: ~26% of screen height per STYLE.md
-    const targetEnemyHeight = height * 0.26;
+    const targetEnemyHeight = this.layout.enemyHeight;
 
     // Enemy shadow (dark oval under feet)
     if (this.enemyShadow) {
@@ -539,9 +397,10 @@ export class BattleScene extends Phaser.Scene {
     if (intent) {
       this.intentBubble = createIntentBubble(
         this, this.scale.width / 2 + 80,
-        this.layout.arenaTop + this.layout.arenaHeight * 0.2,
+        this.layout.arenaTop + 36,
         intent.type, intent.value
       );
+      this.intentBubble.setScale(0.72);
       this.intentBubble.setDepth(25);
     }
   }
@@ -555,7 +414,7 @@ export class BattleScene extends Phaser.Scene {
     battle.tableau.forEach((column, colIndex) => {
       column.cards.forEach((card, cardIndex) => {
         const x = side + colIndex * (cw + gap);
-        const y = tableauTop + 20 + cardIndex * strip;
+        const y = tableauTop + cardIndex * strip;
         const visual = existing.get(card.id) ?? new CardVisual(this, x, y, card, powers.get(card.id) ?? null);
         existing.delete(card.id);
         const exposed = cardIndex === column.cards.length - 1;
@@ -590,12 +449,12 @@ export class BattleScene extends Phaser.Scene {
 
     if (!battle.activeCard) return;
 
-    const { trayTop, trayHeight, activeW, activeH, activeScale, cw } = this.layout;
+    const { trayTop, activeW, activeH, activeScale } = this.layout;
     const width = this.scale.width;
 
     // Position active card in center of tray, slightly right of center
-    const activeX = width / 2 + cw * 0.5;
-    const activeY = trayTop + trayHeight / 2;
+    const activeX = width * 0.76;
+    const activeY = trayTop + 12 + activeH / 2;
 
     // Get power type if any
     const powerCard = battle.powerCards.find((pc) => pc.cardId === battle.activeCard!.id);
@@ -609,7 +468,7 @@ export class BattleScene extends Phaser.Scene {
     // "ACTIVE" label - always show
     const labelY = activeY + activeH / 2 + 12;
     this.activeLabel = this.add
-      .text(activeX, labelY, 'ACTIVE', {
+      .text(activeX, labelY, 'ACTIVE · ±1', {
         fontFamily: 'Fredoka',
         fontSize: '11px',
         color: '#9a8aba',
@@ -625,80 +484,77 @@ export class BattleScene extends Phaser.Scene {
     if (chainLength > 0) {
       this.comboBanner.update(chainLength, damage);
     } else {
-      this.comboBanner.setVisible(false);
+      this.comboBanner.update(0, 0);
     }
   }
 
   private updateDrawPile(battle: BattleState): void {
-    // Update count badge
-    const countText = this.drawCountBadge.getAt(1) as Phaser.GameObjects.Text;
-    if (countText) {
-      countText.setText(battle.deck.length.toString());
-    }
+    this.drawText.setText(battle.chain.length ? 'END TURN' : 'DRAW');
+    const intent = battle.enemy.intents[battle.enemy.currentIntentIndex];
+    const action = intent.type === 'attack' ? `Enemy hits ${intent.value}` : `Enemy: ${intent.type}`;
+    this.turnHint.setText(`${battle.deck.length} cards left\n${action}`);
   }
 
   private updatePlayerHUD(state: RunState): void {
     this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
-
-    // Update gold chip
-    const goldText = this.goldChip.getAt(3) as Phaser.GameObjects.Text;
-    if (goldText) {
-      goldText.setText(state.player.gold.toString());
-    }
-
-    // Armor chip (create/update if armor > 0)
-    if (state.player.armor > 0) {
-      if (!this.armorChip) {
-        const width = this.scale.width;
-        const { trayTop, trayHeight } = this.layout;
-        this.armorChip = createChip(this, width - 140, trayTop + trayHeight - 70, colors.club, '🛡', state.player.armor);
-        this.armorChip.setDepth(60);
-      } else {
-        const armorText = this.armorChip.getAt(3) as Phaser.GameObjects.Text;
-        if (armorText) {
-          armorText.setText(state.player.armor.toString());
-        }
-      }
-    } else if (this.armorChip) {
-      this.armorChip.destroy();
-      this.armorChip = null;
-    }
+    this.goldText.setText(`♦ ${state.player.gold}`);
+    this.armorText.setText(`ARMOR ${state.player.armor}`);
+    const relics = state.player.relics;
+    this.buildText.setText(relics.length ? `BUILD · ${relics.length} RELICS · TAP TO VIEW` : 'BUILD · RELICS AFTER EACH VICTORY');
   }
 
   private onCardClick(cardId: string): void {
     if (this.inputPaused) return;
-    
-    // Unlock audio on first interaction
     AudioSystem.unlock();
-    
-    const manager = getGameManager();
-    const result = manager.playCard(cardId);
-
-    if (result && result.events.length > 0) {
-      this.handleEvents(result.events);
-    }
-
+    const visual = this.cardVisuals.find((item) => item.getCard().id === cardId);
+    if (!visual) return;
+    const bounds = visual.getWorldBounds();
+    const result = getGameManager().playCard(cardId);
+    if (!result?.events.length) return;
+    // Logic and autosave commit immediately; animation only presents the accepted action.
+    const card = visual.getCard();
+    const power = this.currentState?.battle?.powerCards.find((item) => item.cardId === cardId)?.type ?? null;
+    const flying = new CardVisual(this, bounds.x, bounds.y, card, power);
+    this.inputPaused = true;
     this.refreshState();
-    this.checkPhaseTransition();
+    flying.setDepth(180);
+    this.activeCardVisual?.getContainer().setVisible(false);
+    this.handleEvents(result.events);
+    this.tweens.add({
+      targets: flying.getContainer(),
+      x: this.scale.width * 0.76 - this.layout.activeW / 2,
+      y: this.layout.trayTop + 12,
+      scale: this.layout.activeScale, angle: 0,
+      duration: 260, ease: 'Cubic.out',
+      onComplete: () => {
+        flying.destroy();
+        this.activeCardVisual?.getContainer().setVisible(true);
+        this.inputPaused = false;
+        this.checkPhaseTransition();
+      },
+    });
   }
 
   private onDrawClick(): void {
     if (this.inputPaused) return;
-    
-    // Unlock audio on first interaction
     AudioSystem.unlock();
-    
+    const before = getGameManager().getState();
+    const result = getGameManager().draw();
+    if (!result || result.state === before) return;
+    this.inputPaused = true;
     AudioSystem.play('card_draw');
-    
-    const manager = getGameManager();
-    const result = manager.draw();
-
-    if (result && result.events.length > 0) {
-      this.handleEvents(result.events);
-    }
-
     this.refreshState();
-    this.checkPhaseTransition();
+    this.handleEvents(result.events);
+    const active = this.activeCardVisual?.getContainer();
+    if (active && result.state.battle) {
+      const targetX = active.x;
+      active.setX(16).setAlpha(0.4);
+      this.tweens.add({ targets: active, x: targetX, alpha: 1, duration: 230, ease: 'Cubic.out' });
+    }
+    this.time.delayedCall(260, () => {
+      this.inputPaused = false;
+      this.checkPhaseTransition();
+    });
   }
 
   private handleEvents(events: Array<{ type: string; [key: string]: unknown }>): void {
@@ -828,7 +684,8 @@ export class BattleScene extends Phaser.Scene {
     this.enemyShadow = null;
     this.crownSprite = null;
     this.intentBubble = null;
-    this.armorChip = null;
+    this.buildPanel?.destroy();
+    this.buildPanel = null;
     this.currentState = null;
     this.renderedEnemyId = null;
     this.renderedIntentKey = null;

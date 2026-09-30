@@ -100,3 +100,11 @@ describe('power cards', () => {
     expect(result).toEqual(drawCard(structuredClone(emptyDeck), config));
   });
 });
+
+it('deals all seven power types across seeded normal encounters', () => {
+  const dealt = new Set<string>();
+  for (let i = 0; i < 40; i++) {
+    for (const power of battleFixture(`power-variety-${i}`).battle!.powerCards) dealt.add(power.type);
+  }
+  expect([...dealt].sort()).toEqual(['BOMB', 'CRIT', 'ECHO', 'GOLD', 'GUARD', 'HEAL', 'WILD']);
+});

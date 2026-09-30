@@ -4,7 +4,7 @@
  */
 
 import Phaser from 'phaser';
-import { colors, getComboTier, comboTiers } from './tokens';
+import { colors } from './tokens';
 
 /**
  * Chip - small stat display (gold, armor, etc)
@@ -36,6 +36,7 @@ export function createChip(
 
   // Background pill
   const bg = scene.add.graphics();
+  bg.fillStyle(0x281450, 1);
   bg.fillGradientStyle(0x281450, 0x281450, 0x1b1030, 0x1b1030, 0.85);
   bg.fillRoundedRect(-iconSize / 2 - 6, -height / 2, width + 12, height, height / 2);
   bg.lineStyle(2.5, colors.ink, 1);
@@ -99,6 +100,7 @@ export class HPBar {
 
     // Track background
     const trackBg = scene.add.graphics();
+    trackBg.fillStyle(colors.hpTrackHi, 1);
     trackBg.fillGradientStyle(colors.hpTrackHi, colors.hpTrackHi, colors.hpTrackLo, colors.hpTrackLo, 1);
     trackBg.fillRoundedRect(-width / 2, -height / 2, width, height, height / 2);
     trackBg.lineStyle(3, colors.ink, 1);
@@ -163,6 +165,8 @@ export class HPBar {
       const fillColorHi = this.isPlayer ? 0xffa0b8 : colors.hpFillHi;
       const fillColorLo = this.isPlayer ? 0xd02060 : colors.hpFillLo;
 
+      this.fillGraphics.fillStyle(fillColorHi, 1);
+
       this.fillGraphics.fillGradientStyle(fillColorHi, fillColorHi, fillColorLo, fillColorLo, 1);
       this.fillGraphics.fillRoundedRect(
         -this.width / 2 + 3,
@@ -226,149 +230,37 @@ export class HPBar {
  * Combo Banner - shows current chain multiplier and tier
  */
 export class ComboBanner {
-  private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container;
-  private multiplierText: Phaser.GameObjects.Text;
-  private tierText: Phaser.GameObjects.Text;
+  private chainText: Phaser.GameObjects.Text;
   private damageText: Phaser.GameObjects.Text;
-  private tierIndicators: Phaser.GameObjects.Graphics;
-  private currentChain: number = 0;
 
   constructor(scene: Phaser.Scene, x: number, y: number, width: number, height: number) {
-    this.scene = scene;
     this.container = scene.add.container(x, y);
-
-    // Banner background gradient
     const bg = scene.add.graphics();
-    bg.fillGradientStyle(0xff8a2a, 0xff8a2a, 0xc8252e, 0xc8252e, 1);
-    bg.fillRoundedRect(-width / 2, 0, width, height, 18);
-    bg.lineStyle(3, colors.ink, 1);
-    bg.strokeRoundedRect(-width / 2, 0, width, height, 18);
-    this.container.add(bg);
-
-    // Flame medallion on left
-    const medallionX = -width / 2 + 40;
-    const medallionY = height / 2;
-
-    const medallion = scene.add.graphics();
-    medallion.fillGradientStyle(0xffa030, 0xffa030, 0xff4020, 0xff4020, 1);
-    medallion.fillCircle(medallionX, medallionY, 30);
-    medallion.lineStyle(3, colors.ink, 1);
-    medallion.strokeCircle(medallionX, medallionY, 30);
-    this.container.add(medallion);
-
-    // Multiplier text
-    this.multiplierText = scene.add
-      .text(medallionX, medallionY + 2, 'x1', {
-        fontFamily: 'Lilita One',
-        fontSize: '28px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 7)
-      .setShadow(0, 2, '#1B1030', 0, true, true);
-    this.container.add(this.multiplierText);
-
-    // "COMBO" text
-    const comboLabel = scene.add
-      .text(0, height * 0.3, 'COMBO', {
-        fontFamily: 'Lilita One',
-        fontSize: '16px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 4);
-    this.container.add(comboLabel);
-
-    // Tier text (NICE, GREAT!, etc)
-    this.tierText = scene.add
-      .text(0, height * 0.65, '', {
-        fontFamily: 'Lilita One',
-        fontSize: '14px',
-        color: '#FFE45C',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 3);
-    this.container.add(this.tierText);
-
-    // Tier progress indicators
-    this.tierIndicators = scene.add.graphics();
-    this.container.add(this.tierIndicators);
-
-    // Damage preview on right
-    const damageX = width / 2 - 50;
-    this.damageText = scene.add
-      .text(damageX, height / 2, '0', {
-        fontFamily: 'Lilita One',
-        fontSize: '24px',
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 6)
-      .setShadow(0, 2, '#1B1030', 0, true, true);
-    this.container.add(this.damageText);
-
-    // Sword icon next to damage
-    const swordIcon = scene.add
-      .text(damageX - 30, height / 2, '⚔', {
-        fontSize: '20px',
-        color: '#FFD070',
-      })
-      .setOrigin(0.5);
-    this.container.add(swordIcon);
-
-    this.setVisible(false);
+    bg.fillStyle(0x211740, 1);
+    bg.fillRoundedRect(-width / 2, 0, width, height, 10);
+    bg.lineStyle(1, 0x9271bc, 0.6);
+    bg.strokeRoundedRect(-width / 2, 0, width, height, 10);
+    this.chainText = scene.add.text(-width / 2 + 12, height / 2, 'MAKE A CHAIN', {
+      fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff4d6',
+    }).setOrigin(0, 0.5);
+    this.damageText = scene.add.text(width / 2 - 12, height / 2, '±1  •  A ↔ K', {
+      fontFamily: 'Fredoka', fontSize: '13px', color: '#c6b7dd',
+    }).setOrigin(1, 0.5);
+    this.container.add([bg, this.chainText, this.damageText]);
   }
 
   update(chainLength: number, totalDamage: number): void {
-    this.currentChain = chainLength;
-    const tier = getComboTier(chainLength);
-
-    this.multiplierText.setText(`x${chainLength}`);
-    this.tierText.setText(tier.label);
-    this.tierText.setColor('#' + tier.color.toString(16).padStart(6, '0'));
-    this.damageText.setText(totalDamage.toString());
-
-    // Draw tier indicators
-    this.tierIndicators.clear();
-    const indicatorY = 42;
-    const indicatorWidth = 25;
-    const indicatorGap = 4;
-    const startX = -((4 * indicatorWidth + 3 * indicatorGap) / 2);
-
-    for (let i = 0; i < 4; i++) {
-      const tierThreshold = comboTiers[i];
-      const x = startX + i * (indicatorWidth + indicatorGap);
-      const isFilled = chainLength >= tierThreshold.min;
-
-      this.tierIndicators.fillStyle(isFilled ? tierThreshold.color : 0x1b1030, isFilled ? 1 : 0.3);
-      this.tierIndicators.fillRoundedRect(x, indicatorY, indicatorWidth, 10, 3);
-      this.tierIndicators.lineStyle(1.5, colors.ink, 1);
-      this.tierIndicators.strokeRoundedRect(x, indicatorY, indicatorWidth, 10, 3);
-    }
-
-    this.setVisible(chainLength > 0);
+    this.chainText.setText(chainLength ? `CHAIN ${chainLength}` : 'MAKE A CHAIN');
+    this.chainText.setColor(chainLength >= 6 ? '#ffcc66' : '#fff4d6');
+    this.damageText.setText(chainLength ? `DAMAGE ${totalDamage}` : '±1  •  A ↔ K');
+    this.container.setVisible(true);
   }
-
-  setVisible(visible: boolean): void {
-    this.container.setVisible(visible);
-  }
-
-  setPosition(x: number, y: number): void {
-    this.container.setPosition(x, y);
-  }
-
-  setDepth(depth: number): void {
-    this.container.setDepth(depth);
-  }
-
-  getContainer(): Phaser.GameObjects.Container {
-    return this.container;
-  }
-
-  destroy(): void {
-    this.container.destroy();
-  }
+  setVisible(visible: boolean): void { this.container.setVisible(visible); }
+  setPosition(x: number, y: number): void { this.container.setPosition(x, y); }
+  setDepth(depth: number): void { this.container.setDepth(depth); }
+  getContainer(): Phaser.GameObjects.Container { return this.container; }
+  destroy(): void { this.container.destroy(); }
 }
 
 /**
@@ -399,6 +291,7 @@ export function createIntentBubble(
 
   // Bubble background
   const bg = scene.add.graphics();
+  bg.fillStyle(0xffffff, 1);
   bg.fillGradientStyle(0xffffff, 0xffffff, 0xffe9ec, 0xffe9ec, 1);
   bg.fillRoundedRect(-35, -25, 70, 50, 18);
   bg.lineStyle(3, colors.ink, 1);

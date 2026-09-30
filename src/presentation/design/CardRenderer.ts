@@ -61,6 +61,7 @@ export class CardRenderer {
     const graphics = this.scene.make.graphics({ x: 0, y: 0 });
 
     // Card face gradient (cream)
+    graphics.fillStyle(colors.faceHi, 1);
     graphics.fillGradientStyle(colors.faceHi, colors.faceHi, colors.faceLo, colors.faceLo, 1);
     graphics.fillRoundedRect(0, 0, w, h, radius);
 
@@ -144,6 +145,7 @@ export class CardRenderer {
     const graphics = this.scene.make.graphics({ x: 0, y: 0 });
 
     // Purple gradient background
+    graphics.fillStyle(colors.backHi, 1);
     graphics.fillGradientStyle(colors.backHi, colors.backHi, colors.backLo, colors.backLo, 1);
     graphics.fillRoundedRect(0, 0, w, h, radius);
 

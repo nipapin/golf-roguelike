@@ -54,6 +54,7 @@ export function isSavedRun(value: unknown): value is RunState {
     !record(value.player)
   )
     return false;
+  if (value.rewardKind !== undefined && value.rewardKind !== 'starter' && value.rewardKind !== 'battle') return false;
   const player = value.player;
   if (
     !number(player.hp) ||
