@@ -25,7 +25,7 @@ export default defineConfig({
       },
       workbox: {
         // Pre-cache static assets for offline play (including audio)
-        globPatterns: ['**/*.{js,css,svg,png,woff2,ogg,mp3}'],
+        globPatterns: ['**/*.{js,css,svg,png,webp,json,ttf,woff2,ogg,mp3}'],
 
         // Don't pre-cache HTML - fetch from network first
         navigateFallback: null,

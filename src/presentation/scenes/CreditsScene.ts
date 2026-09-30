@@ -1,3 +1,4 @@
+import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
 import { AudioSystem } from '../audio/AudioSystem';
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
@@ -8,9 +9,10 @@ export class CreditsScene extends Phaser.Scene {
   }
 
   create(): void {
+    configureViewport(this);
     AudioSystem.setMusicScene('menu');
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const width = viewport(this).width;
+    const height = viewport(this).height;
     const cx = width / 2;
 
     // Background
@@ -19,7 +21,7 @@ export class CreditsScene extends Phaser.Scene {
     // Title
     this.add
       .text(cx, 50, 'CREDITS', {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '36px',
         color: '#ffffff',
       })
@@ -29,6 +31,11 @@ export class CreditsScene extends Phaser.Scene {
 
     // Content
     const content = [
+      { text: 'Combat VFX · Kalponic Studio / Jony', style: 'subheader' },
+      { text: 'Free Stylized Sprite VFX · CC BY 4.0', style: 'item' },
+      { text: 'kalponic-studio.itch.io', style: 'item' },
+      { text: 'Atlases resized and recolored for Golf Rogue', style: 'item' },
+      { text: '', style: 'spacer' },
       { text: 'Character Art', style: 'header' },
       { text: 'Segel (Segel2D)', style: 'name' },
       { text: 'OpenGameArt.org', style: 'normal' },
@@ -82,7 +89,7 @@ export class CreditsScene extends Phaser.Scene {
     // License links
     this.add
       .text(cx, height - 100, 'creativecommons.org/licenses/by/3.0/', {
-        fontFamily: 'Fredoka',
+        resolution: getRenderDensity(), fontFamily: 'Fredoka',
         fontSize: '10px',
         color: '#7090b0',
       })
@@ -110,7 +117,7 @@ export class CreditsScene extends Phaser.Scene {
 
     const text = this.add
       .text(0, -2, 'BACK', {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '18px',
         color: '#ffffff',
       })
@@ -136,32 +143,32 @@ export class CreditsScene extends Phaser.Scene {
     switch (type) {
       case 'header':
         return {
-          fontFamily: 'Lilita One',
+          resolution: getRenderDensity(), fontFamily: 'Lilita One',
           fontSize: '20px',
           color: '#f0cf68',
         };
       case 'subheader':
         return {
-          fontFamily: 'Fredoka',
+          resolution: getRenderDensity(), fontFamily: 'Fredoka',
           fontSize: '14px',
           fontStyle: 'bold',
           color: '#a0b0c0',
         };
       case 'name':
         return {
-          fontFamily: 'Lilita One',
+          resolution: getRenderDensity(), fontFamily: 'Lilita One',
           fontSize: '18px',
           color: '#ffffff',
         };
       case 'item':
         return {
-          fontFamily: 'Fredoka',
+          resolution: getRenderDensity(), fontFamily: 'Fredoka',
           fontSize: '13px',
           color: '#8a9aaa',
         };
       default:
         return {
-          fontFamily: 'Fredoka',
+          resolution: getRenderDensity(), fontFamily: 'Fredoka',
           fontSize: '12px',
           color: '#7a8a9a',
         };

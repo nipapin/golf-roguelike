@@ -1,3 +1,4 @@
+import { viewport, getRenderDensity } from './viewport';
 /**
  * CardRenderer - Pre-renders card textures for all ranks/suits/states
  * Per STYLE.md: render cards once to RenderTexture rather than rebuilding per frame
@@ -29,7 +30,7 @@ export class CardRenderer {
 
   constructor(scene: Phaser.Scene) {
     this.scene = scene;
-    this.metrics = getCardMetrics(scene.scale.width);
+    this.metrics = getCardMetrics(viewport(scene).width);
   }
 
   generateAllTextures(): void {
@@ -86,7 +87,7 @@ export class CardRenderer {
     const fontSize = rank === '10' ? rankSize10 : rankSize;
 
     const rankText = this.scene.add.text(cw * 0.09, cw * 0.04, displayRank, {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: `${fontSize}px`,
       color: this.hexToString(suit === 'diamonds' ? colors.diamondTxt : suitColor),
     });
@@ -94,7 +95,7 @@ export class CardRenderer {
 
     // Small pip (suit symbol) in top right
     const pipText = this.scene.add.text(cw - cw * 0.07, cw * 0.08, SUIT_SYMBOLS[suit], {
-      fontFamily: 'Arial',
+      resolution: getRenderDensity(), fontFamily: 'Arial',
       fontSize: `${cw * 0.25}px`,
       color: this.hexToString(suitColor),
     });
@@ -103,7 +104,7 @@ export class CardRenderer {
 
     // Big suit in center-bottom
     const bigSuit = this.scene.add.text(cw / 2, ch - cw * 0.35, SUIT_SYMBOLS[suit], {
-      fontFamily: 'Arial',
+      resolution: getRenderDensity(), fontFamily: 'Arial',
       fontSize: `${cw * 0.5}px`,
       color: this.hexToString(suitColor),
     });

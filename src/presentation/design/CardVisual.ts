@@ -1,3 +1,4 @@
+import { viewport, getRenderDensity } from './viewport';
 /**
  * CardVisual - Renders individual cards with all visual states
  * Per STYLE.md section 5-6: card anatomy, states, power cards
@@ -48,7 +49,7 @@ export class CardVisual {
     this.scene = scene;
     this.card = card;
     this.powerType = powerType;
-    this.metrics = getCardMetrics(scene.scale.width);
+    this.metrics = getCardMetrics(viewport(scene).width);
 
     this.container = scene.add.container(x, y);
 
@@ -81,7 +82,7 @@ export class CardVisual {
 
     this.rankText = scene.add
       .text(cw * 0.09, cw * 0.06, rankDisplay, {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: `${card.joker ? cw * .4 : fontSize}px`,
         color: powerType ? '#1B1030' : this.hexToString(textColor),
       })
@@ -94,7 +95,7 @@ export class CardVisual {
     // Pip (small suit symbol)
     this.pipText = scene.add
       .text(cw - cw * 0.07, cw * 0.1, card.joker ? '' : SUIT_SYMBOLS[card.suit], {
-        fontFamily: 'Arial',
+        resolution: getRenderDensity(), fontFamily: 'Arial',
         fontSize: `${cw * 0.22}px`,
         color: this.hexToString(suitColor),
       })
@@ -107,7 +108,7 @@ export class CardVisual {
     // Big suit symbol
     this.bigSuitText = scene.add
       .text(cw / 2, ch - cw * 0.35, card.joker ? '♛' : SUIT_SYMBOLS[card.suit], {
-        fontFamily: 'Arial',
+        resolution: getRenderDensity(), fontFamily: 'Arial',
         fontSize: `${cw * 0.45}px`,
         color: this.hexToString(suitColor),
       })
@@ -126,7 +127,7 @@ export class CardVisual {
       this.container.add(border);
       this.powerRibbon = scene.add.container(cw / 2, ch - 10);
       const badge = scene.add.rectangle(0, 0, cw - 8, 14, card.joker === 'red' ? 0xc62951 : 0x322149);
-      const label = scene.add.text(0, 0, card.joker === 'red' ? 'VAMP 30%' : 'CRIT ×5', { fontFamily: 'Lilita One', fontSize: `${cw * .16}px`, color: '#fff5df' }).setOrigin(.5);
+      const label = scene.add.text(0, 0, card.joker === 'red' ? 'VAMP 30%' : 'CRIT ×5', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: `${cw * .16}px`, color: '#fff5df' }).setOrigin(.5);
       this.powerRibbon.add([badge, label]); this.container.add(this.powerRibbon);
     }
     this.updateOutline();
@@ -259,7 +260,7 @@ export class CardVisual {
 
     const text = this.scene.add
       .text(0, 0, powerType, {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: `${cw * 0.15}px`,
         color: '#ffffff',
       })
@@ -464,7 +465,7 @@ export class CardVisual {
  * Create a card back visual
  */
 export function createCardBack(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Container {
-  const metrics = getCardMetrics(scene.scale.width);
+  const metrics = getCardMetrics(viewport(scene).width);
   const { cw, ch, radius } = metrics;
 
   const container = scene.add.container(x, y);

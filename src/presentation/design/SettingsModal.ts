@@ -1,3 +1,4 @@
+import { viewport, getRenderDensity } from './viewport';
 /**
  * SettingsModal - In-game settings panel
  * Per STYLE.md: dark ink outline, cream panel, 3D Supercell-style buttons
@@ -25,8 +26,8 @@ export class SettingsModal {
     this.scene = scene;
     this.callbacks = callbacks;
     
-    const width = scene.scale.width;
-    const height = scene.scale.height;
+    const width = viewport(scene).width;
+    const height = viewport(scene).height;
     
     // Dark overlay
     this.overlay = scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
@@ -69,7 +70,7 @@ export class SettingsModal {
     
     // Title
     const title = this.scene.add.text(0, -panelHeight / 2 + 40, 'SETTINGS', {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '28px',
       color: '#1B1030',
     }).setOrigin(0.5);
@@ -127,7 +128,7 @@ export class SettingsModal {
     
     // Label
     const labelText = this.scene.add.text(x - 80, y, label, {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '20px',
       color: '#1B1030',
     }).setOrigin(0, 0.5);
@@ -174,7 +175,7 @@ export class SettingsModal {
 
   private createVolume(y: number, get: () => number, set: (value: number) => void): void {
     const valueText = this.scene.add.text(0, y, `${Math.round(get() * 100)}%`, {
-      fontFamily: 'Fredoka', fontSize: '16px', color: '#442960',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#442960',
     }).setOrigin(0.5);
     this.container.add(valueText);
     for (const [x, delta, label] of [[-80, -0.1, '−'], [80, 0.1, '+']] as const) {
@@ -184,7 +185,7 @@ export class SettingsModal {
         set(Math.round((get() + delta) * 100) / 100);
         valueText.setText(`${Math.round(get() * 100)}%`);
       });
-      this.container.add([button, this.scene.add.text(x, y, label, { fontFamily: 'Fredoka', fontSize: '20px', color: '#27173d' }).setOrigin(0.5)]);
+      this.container.add([button, this.scene.add.text(x, y, label, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '20px', color: '#27173d' }).setOrigin(0.5)]);
     }
   }
 
@@ -224,7 +225,7 @@ export class SettingsModal {
     
     // Text
     const buttonText = this.scene.add.text(0, -3, text, {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '18px',
       color: '#ffffff',
     }).setOrigin(0.5).setStroke('#1B1030', 4);
@@ -277,14 +278,14 @@ export class SettingsModal {
     
     // Warning text
     const warningText = this.scene.add.text(0, -confirmHeight / 2 + 30, 'Restart this run?', {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '20px',
       color: '#ffffff',
     }).setOrigin(0.5).setStroke('#1B1030', 3);
     this.confirmContainer.add(warningText);
     
     const subText = this.scene.add.text(0, -confirmHeight / 2 + 55, 'Progress will be lost!', {
-      fontFamily: 'Fredoka',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka',
       fontSize: '14px',
       color: '#FFD0D0',
     }).setOrigin(0.5);
@@ -332,7 +333,7 @@ export class SettingsModal {
     btn.add(bg);
     
     const txt = this.scene.add.text(0, -2, text, {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '16px',
       color: '#ffffff',
     }).setOrigin(0.5).setStroke('#1B1030', 3);

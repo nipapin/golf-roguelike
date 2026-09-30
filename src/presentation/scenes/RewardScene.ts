@@ -1,3 +1,4 @@
+import { configureViewport } from '../design/viewport';
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
 import { AudioSystem } from '../audio/AudioSystem';
@@ -9,6 +10,7 @@ export class RewardScene extends Phaser.Scene {
   private selected = false;
   constructor() { super('RewardScene'); }
   create(): void {
+    configureViewport(this);
     AudioSystem.setMusicScene('menu');
     this.selected = false;
     const state = getGameManager().getState();
