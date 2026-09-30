@@ -1,3 +1,4 @@
+import { AudioSystem } from '../audio/AudioSystem';
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
@@ -7,6 +8,7 @@ export class CreditsScene extends Phaser.Scene {
   }
 
   create(): void {
+    AudioSystem.setMusicScene('menu');
     const width = this.scale.width;
     const height = this.scale.height;
     const cx = width / 2;
@@ -56,7 +58,7 @@ export class CreditsScene extends Phaser.Scene {
       { text: 'Google Fonts • SIL OFL 1.1', style: 'normal' },
       { text: '', style: 'spacer' },
       { text: 'Audio', style: 'header' },
-      { text: 'Kenney (kenney.nl)', style: 'name' },
+      { text: 'Kenney · HydroGene · RandomMind', style: 'name' },
       { text: 'CC0 Public Domain', style: 'normal' },
     ];
 

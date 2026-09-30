@@ -6,7 +6,8 @@ import { HPBar, ComboBanner, createIntentBubble } from '../design/HudComponents'
 import { CardVisual } from '../design/CardVisual';
 import { showBuildPanel } from '../design/BuildPanel';
 import { SettingsModal } from '../design/SettingsModal';
-import { isPlayable } from '../../core/GameRules';
+import { showRules, hasSeenRules } from '../design/RulesPopup';
+import { isPlayable, MIN_ATTACK_CHAIN } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
 import type { RunState, Card, BattleState } from '../../core/types';
 
@@ -47,6 +48,12 @@ export class BattleScene extends Phaser.Scene {
   // UI
   private settingsModal: SettingsModal | null = null;
   private inputPaused: boolean = false;
+  private enemyScale = 1;
+  private enemyBaseY = 0;
+  private enemyKey = 'goblin';
+  private enemyDying = false;
+  private dealt = false;
+  private lastShake = 0;
 
   constructor() {
     super('BattleScene');
@@ -86,7 +93,12 @@ export class BattleScene extends Phaser.Scene {
     this.createDrawPile();
 
     // Initial render
+    this.dealt = false;
+    this.enemyDying = false;
+    AudioSystem.setMusicScene('battle');
     this.refreshState();
+    if (hasSeenRules()) { this.inputPaused = true; this.time.delayedCall(650, () => { this.inputPaused = false; }); }
+    if (!hasSeenRules()) { this.inputPaused = true; showRules(this, () => { this.inputPaused = false; }); }
 
     // Create settings modal
     this.settingsModal = new SettingsModal(this, {
@@ -119,7 +131,7 @@ export class BattleScene extends Phaser.Scene {
       isActive: true,
       getPlayableCards: () => {
         return this.cardVisuals
-          .filter((cv) => cv.isInteractive())
+          .filter((cv) => cv.getState() === 'playable')
           .map((cv) => ({
             cardId: cv.getCard().id,
             bounds: cv.getWorldBounds(),
@@ -322,6 +334,10 @@ export class BattleScene extends Phaser.Scene {
       
       this.enemySprite.setScale(scale);
       this.enemySprite.setDepth(20);
+      this.enemyKey = enemy.sprite || 'goblin';
+      this.enemyScale = scale;
+      this.enemyBaseY = enemyY;
+      this.startEnemyIdle();
 
       // Update shadow size based on sprite size
       const shadowWidth = Math.min(this.enemySprite.displayWidth * 0.7, 150);
@@ -408,6 +424,8 @@ export class BattleScene extends Phaser.Scene {
   private renderTableau(battle: BattleState): void {
     const existing = new Map(this.cardVisuals.map((visual) => [visual.getCard().id, visual]));
     const next: CardVisual[] = [];
+    const firstDeal = !this.dealt;
+    this.dealt = true;
     const { tableauTop, cw, strip, side, gap } = this.layout;
     const powers = new Map(battle.powerCards.map((power) => [power.cardId, power.type]));
 
@@ -415,6 +433,7 @@ export class BattleScene extends Phaser.Scene {
       column.cards.forEach((card, cardIndex) => {
         const x = side + colIndex * (cw + gap);
         const y = tableauTop + cardIndex * strip;
+        const isNew = !existing.has(card.id);
         const visual = existing.get(card.id) ?? new CardVisual(this, x, y, card, powers.get(card.id) ?? null);
         existing.delete(card.id);
         const exposed = cardIndex === column.cards.length - 1;
@@ -422,9 +441,18 @@ export class BattleScene extends Phaser.Scene {
         visual.setPosition(x, y);
         const state = !exposed ? 'covered' : playable ? 'playable' : 'disabled';
         if (visual.getState() !== state) visual.setState(state);
-        if (playable) visual.setInteractive(() => this.onCardClick(card.id));
-        else visual.disableInteractive();
+        visual.setInteractive(() => {
+          if (this.inputPaused) return;
+          const live = getGameManager().getState()?.battle;
+          if (live && isPlayable(live, card.id)) this.onCardClick(card.id);
+          else this.rejectCard(visual, exposed);
+        });
         visual.setDepth((playable ? 60 : 15) + cardIndex);
+        if (isNew && firstDeal) {
+          const container = visual.getContainer();
+          container.setPosition(12, this.layout.trayTop).setScale(.35).setAlpha(0);
+          this.tweens.add({ targets: container, x, y, scale: 1, alpha: 1, duration: 350, delay: colIndex * 35 + cardIndex * 22, ease: 'Cubic.out' });
+        }
         next.push(visual);
       });
     });
@@ -465,10 +493,10 @@ export class BattleScene extends Phaser.Scene {
     this.activeCardVisual.getContainer().setScale(activeScale);
     this.activeCardVisual.setDepth(55);
 
-    // "ACTIVE" label - always show
+    // Active rule hint — power state overrides base rank rule.
     const labelY = activeY + activeH / 2 + 12;
     this.activeLabel = this.add
-      .text(activeX, labelY, 'ACTIVE · ±1', {
+      .text(activeX, labelY, battle.wildActive ? 'WILD · ANY RANK' : 'ACTIVE · ±1', {
         fontFamily: 'Fredoka',
         fontSize: '11px',
         color: '#9a8aba',
@@ -486,12 +514,14 @@ export class BattleScene extends Phaser.Scene {
     } else {
       this.comboBanner.update(0, 0);
     }
+    this.activeLabel?.setText(battle.wildActive ? 'WILD · ANY RANK' : 'ACTIVE · ±1');
   }
 
   private updateDrawPile(battle: BattleState): void {
     this.drawText.setText(battle.chain.length ? 'END TURN' : 'DRAW');
     const intent = battle.enemy.intents[battle.enemy.currentIntentIndex];
-    const action = intent.type === 'attack' ? `Enemy hits ${intent.value}` : `Enemy: ${intent.type}`;
+    const ready = battle.chain.length >= MIN_ATTACK_CHAIN;
+    const action = ready ? 'Enemy skips this turn' : `Chain ${battle.chain.length}/${MIN_ATTACK_CHAIN} · ${intent.type === 'attack' ? `Enemy hits ${intent.value}` : intent.type}`;
     this.turnHint.setText(`${battle.deck.length} cards left\n${action}`);
   }
 
@@ -520,19 +550,23 @@ export class BattleScene extends Phaser.Scene {
     flying.setDepth(180);
     this.activeCardVisual?.getContainer().setVisible(false);
     this.handleEvents(result.events);
-    this.tweens.add({
-      targets: flying.getContainer(),
-      x: this.scale.width * 0.76 - this.layout.activeW / 2,
-      y: this.layout.trayTop + 12,
-      scale: this.layout.activeScale, angle: 0,
-      duration: 260, ease: 'Cubic.out',
-      onComplete: () => {
+    const moving = flying.getContainer();
+    const destinationX = this.scale.width * 0.76 - this.layout.activeW / 2;
+    const destinationY = this.layout.trayTop + 12;
+    this.tweens.add({ targets: moving, y: bounds.y - 22, angle: -8, scale: 1.15, duration: 90, ease: 'Quad.out', onComplete: () => {
+      const path = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(moving.x, moving.y), new Phaser.Math.Vector2(destinationX + 20, bounds.y - 55), new Phaser.Math.Vector2(destinationX, destinationY));
+      const progress = { t: 0 };
+      this.tweens.add({ targets: progress, t: 1, duration: 240, ease: 'Cubic.inOut', onUpdate: () => {
+        const point = path.getPoint(progress.t); moving.setPosition(point.x, point.y).setAngle(-8 * (1 - progress.t));
+      }, onComplete: () => {
         flying.destroy();
-        this.activeCardVisual?.getContainer().setVisible(true);
-        this.inputPaused = false;
-        this.checkPhaseTransition();
-      },
-    });
+        const active = this.activeCardVisual?.getContainer();
+        active?.setVisible(true).setScale(this.layout.activeScale * 1.12);
+        if (active) this.tweens.add({ targets: active, scale: this.layout.activeScale, duration: 140, ease: 'Back.out' });
+        this.cardBurst(destinationX + this.layout.activeW / 2, destinationY + this.layout.activeH / 2, power ? 0xff7cee : 0xffdf70);
+        this.time.delayedCall(getGameManager().getState()?.phase === 'battle' ? 160 : 450, () => { this.inputPaused = false; this.checkPhaseTransition(); });
+      } });
+    } });
   }
 
   private onDrawClick(): void {
@@ -548,10 +582,10 @@ export class BattleScene extends Phaser.Scene {
     const active = this.activeCardVisual?.getContainer();
     if (active && result.state.battle) {
       const targetX = active.x;
-      active.setX(16).setAlpha(0.4);
-      this.tweens.add({ targets: active, x: targetX, alpha: 1, duration: 230, ease: 'Cubic.out' });
+      active.setX(16).setAlpha(0.4).setAngle(-18).setScale(.55);
+      this.tweens.add({ targets: active, x: targetX, alpha: 1, angle: 0, scale: this.layout.activeScale, duration: 340, ease: 'Back.out' });
     }
-    this.time.delayedCall(260, () => {
+    this.time.delayedCall(750, () => {
       this.inputPaused = false;
       this.checkPhaseTransition();
     });
@@ -562,6 +596,9 @@ export class BattleScene extends Phaser.Scene {
       switch (event.type) {
         case 'card_played':
           AudioSystem.playCardSound((event.chainPosition as number) || 1);
+          break;
+        case 'enemy_staggered':
+          this.cardBurst(this.scale.width / 2, this.enemyBaseY - 40, 0x69d6ff);
           break;
         case 'enemy_attacked':
           this.playEnemyAttackAnimation();
@@ -588,45 +625,70 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private playEnemyAttackAnimation(): void {
-    if (!this.enemySprite) return;
-
-    const attackKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-attack`;
-    if (this.anims.exists(attackKey)) {
-      this.enemySprite.play(attackKey);
-      this.enemySprite.once('animationcomplete', () => {
-        const idleKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-idle`;
-        if (this.anims.exists(idleKey)) {
-          this.enemySprite?.play(idleKey);
-        }
-      });
+  private startEnemyIdle(): void {
+    if (!this.enemySprite || this.enemyDying) return;
+    this.tweens.killTweensOf(this.enemySprite);
+    this.enemySprite.setY(this.enemyBaseY).setAngle(0).setScale(this.enemyScale).setAlpha(1);
+    this.tweens.add({ targets: this.enemySprite, scaleX: this.enemyScale * 1.035, scaleY: this.enemyScale * .965, y: this.enemyBaseY - 4, duration: 900, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    if (this.enemyShadow) {
+      this.tweens.killTweensOf(this.enemyShadow);
+      this.tweens.add({ targets: this.enemyShadow, scaleX: .9, alpha: .3, duration: 900, yoyo: true, repeat: -1 });
     }
+  }
 
-    // Screen shake
-    this.cameras.main.shake(100, 0.01);
+  private playEnemyAttackAnimation(): void {
+    const sprite = this.enemySprite;
+    if (!sprite || this.enemyDying) return;
+    this.tweens.killTweensOf(sprite);
+    sprite.play(`${this.enemyKey}-attack`, true);
+    this.tweens.add({ targets: sprite, y: this.enemyBaseY - 18, angle: -7, duration: 130, ease: 'Quad.out', onComplete: () => {
+      this.tweens.add({ targets: sprite, y: this.enemyBaseY + 16, angle: 7, scaleX: this.enemyScale * 1.12, scaleY: this.enemyScale * .92, duration: 110, ease: 'Cubic.in', onComplete: () => {
+        this.cameras.main.shake(110, .006);
+        this.cardBurst(this.scale.width / 2, this.layout.arenaTop + this.layout.arenaHeight - 70, 0xff6655);
+        this.tweens.add({ targets: sprite, y: this.enemyBaseY, angle: 0, scale: this.enemyScale, duration: 240, onComplete: () => { sprite.play(`${this.enemyKey}-idle`); this.startEnemyIdle(); } });
+      } });
+    } });
   }
 
   private playEnemyDeathAnimation(): void {
-    if (!this.enemySprite) return;
+    const sprite = this.enemySprite;
+    if (!sprite) return;
+    this.enemyDying = true;
+    this.tweens.killTweensOf(sprite);
+    sprite.play(`${this.enemyKey}-dead`, true);
+    this.tweens.add({ targets: sprite, y: this.enemyBaseY + 20, angle: 22, alpha: 0, scaleY: this.enemyScale * .4, duration: 650, ease: 'Cubic.in' });
+    if (this.enemyShadow) this.tweens.add({ targets: this.enemyShadow, alpha: 0, scaleX: .3, duration: 650 });
+  }
 
-    const deadKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-dead`;
-    if (this.anims.exists(deadKey)) {
-      this.enemySprite.play(deadKey);
+  private rejectCard(visual: CardVisual, exposed: boolean): void {
+    if (this.time.now - this.lastShake < 220) return;
+    this.lastShake = this.time.now;
+    AudioSystem.unlock(); AudioSystem.play('invalid_tap', { volume: .45 });
+    const container = visual.getContainer();
+    const x = container.x;
+    this.tweens.killTweensOf(container);
+    this.tweens.add({ targets: container, x: x + 5, angle: 3, duration: 40, yoyo: true, repeat: 2, onComplete: () => container.setX(x).setAngle(0) });
+    const hint = this.add.text(this.scale.width / 2, this.layout.bannerTop + 16, exposed ? 'Choose ±1 from the active card' : 'Use the bottom card of a column', { fontFamily: 'Fredoka', fontSize: '13px', color: '#ff8585', backgroundColor: '#211740', padding: { x: 8, y: 4 } }).setOrigin(.5).setDepth(200);
+    this.tweens.add({ targets: hint, alpha: 0, duration: 200, delay: 700, onComplete: () => hint.destroy() });
+  }
+
+  private cardBurst(x: number, y: number, color: number): void {
+    for (let i = 0; i < 8; i++) {
+      const angle = i * Math.PI / 4;
+      const spark = this.add.star(x, y, 4, 2, 5, color).setDepth(180);
+      this.tweens.add({ targets: spark, x: x + Math.cos(angle) * 30, y: y + Math.sin(angle) * 25, alpha: 0, scale: .1, angle: 90, duration: 270, onComplete: () => spark.destroy() });
     }
   }
 
   private playDamageAnimation(damage: number): void {
     if (!this.enemySprite) return;
 
-    const hurtKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-hurt`;
-    if (this.anims.exists(hurtKey)) {
-      this.enemySprite.play(hurtKey);
-      this.enemySprite.once('animationcomplete', () => {
-        const idleKey = `${this.currentState?.battle?.enemy.sprite || 'goblin'}-idle`;
-        if (this.anims.exists(idleKey)) {
-          this.enemySprite?.play(idleKey);
-        }
-      });
+    if (!this.enemyDying) {
+      const sprite = this.enemySprite;
+      sprite.setTint(0xff8c8c);
+      this.time.delayedCall(150, () => { if (sprite.active) sprite.clearTint(); });
+      this.tweens.add({ targets: sprite, x: this.scale.width / 2 + 7, duration: 45, yoyo: true, repeat: 2, onComplete: () => sprite.setX(this.scale.width / 2) });
+      this.cardBurst(sprite.x, sprite.y - sprite.displayHeight / 2, 0xffdf70);
     }
 
     // Damage number popup
@@ -659,11 +721,13 @@ export class BattleScene extends Phaser.Scene {
 
     switch (state.phase) {
       case 'reward':
-        this.scene.start('RewardScene');
+        this.scene.launch('RewardScene');
+        this.scene.pause();
         break;
       case 'victory':
       case 'defeat':
-        this.scene.start('EndScene');
+        this.scene.launch('EndScene');
+        this.scene.pause();
         break;
     }
   }

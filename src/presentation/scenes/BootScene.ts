@@ -105,18 +105,14 @@ export class BootScene extends Phaser.Scene {
       const frameCount = frames.length;
 
       if (frameCount > 0) {
-        const idleEnd = Math.min(11, frameCount - 1);
-        const attackStart = idleEnd + 1;
-        const attackEnd = Math.min(attackStart + 7, frameCount - 1);
-        const hurtStart = attackEnd + 1;
-        const hurtEnd = Math.min(hurtStart + 7, frameCount - 1);
-        const deadStart = hurtEnd + 1;
-        const deadEnd = frameCount - 1;
-
-        this.createAnimationFromRange(atlasKey, 'idle', enemy, 0, idleEnd, 10, -1);
-        this.createAnimationFromRange(atlasKey, 'attack', enemy, attackStart, attackEnd, 12, 0);
-        this.createAnimationFromRange(atlasKey, 'hurt', enemy, hurtStart, hurtEnd, 12, 0);
-        this.createAnimationFromRange(atlasKey, 'dead', enemy, deadStart, deadEnd, 10, 0);
+        // Goblin's generated atlas has repeated placeholder frames after frame 8.
+        // Keep idle out of the death pose; all actors also receive motion tweens.
+        const ranges = enemy === 'goblin'
+          ? { idle: [0, 3], attack: [4, 7], hurt: [7, 7], dead: [8, 8] }
+          : { idle: [0, Math.min(11, frameCount - 1)], attack: [12, Math.min(19, frameCount - 1)], hurt: [20, Math.min(27, frameCount - 1)], dead: [28, frameCount - 1] };
+        for (const [name, [start, end]] of Object.entries(ranges)) {
+          this.createAnimationFromRange(atlasKey, name, enemy, start, end, name === 'idle' ? 8 : 12, name === 'idle' ? -1 : 0);
+        }
       }
     }
   }

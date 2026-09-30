@@ -390,8 +390,6 @@ export class CardVisual {
     this.hitZone.setInteractive();
     this.hitZone.on('pointerup', () => {
       if (this.played) return;
-      this.played = true;
-      this.hitZone?.disableInteractive();
       callback();
     });
   }

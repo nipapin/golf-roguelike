@@ -162,3 +162,6 @@ export function getSuitSymbol(suit: string): string {
 export function formatCard(card: Card): string {
   return getRankDisplay(card.rank) + getSuitSymbol(card.suit);
 }
+
+/** Cards needed to prevent the enemy response when banking a turn. */
+export const MIN_ATTACK_CHAIN = 3;

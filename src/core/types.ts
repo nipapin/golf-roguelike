@@ -130,6 +130,7 @@ export type GameEvent =
   | { type: 'power_activated'; powerType: PowerType; card: Card }
   | { type: 'chain_resolved'; totalDamage: number; chainLength: number }
   | { type: 'enemy_attacked'; damage: number; blocked: number }
+  | { type: 'enemy_staggered'; chainLength: number }
   | { type: 'enemy_died' }
   | { type: 'player_healed'; amount: number }
   | { type: 'armor_gained'; amount: number }
