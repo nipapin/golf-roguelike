@@ -127,6 +127,7 @@ export class CardVisual {
     const { cw, ch, radius, bevelHeight } = this.metrics;
 
     this.cardBg.clear();
+    this.cardBg.fillStyle(colors.face, 1);
 
     if (this.powerType) {
       const pc = powerColors[this.powerType.toLowerCase() as keyof typeof powerColors];
@@ -142,6 +143,7 @@ export class CardVisual {
       }
     } else {
       // Normal cream face
+      this.cardBg.fillStyle(colors.faceHi, 1);
       this.cardBg.fillGradientStyle(colors.faceHi, colors.faceHi, colors.faceLo, colors.faceLo, 1);
     }
 
@@ -207,10 +209,11 @@ export class CardVisual {
     const pc = powerColors[powerType.toLowerCase() as keyof typeof powerColors];
     if (!pc) return;
 
-    this.powerMedal = this.scene.add.container(cw + cw * 0.1, -cw * 0.1);
+    this.powerMedal = this.scene.add.container(cw - cw * 0.18, cw * 0.18);
 
-    const size = cw * 0.44;
+    const size = cw * 0.3;
     const medal = this.scene.add.graphics();
+    medal.fillStyle(pc.pw3, 1);
     medal.fillGradientStyle(pc.pw3, pc.pw2, pc.pw2, pc.pw1, 1);
     medal.fillCircle(0, 0, size / 2);
     medal.lineStyle(2, colors.ink, 1);
@@ -243,12 +246,12 @@ export class CardVisual {
     const pc = powerColors[powerType.toLowerCase() as keyof typeof powerColors];
     if (!pc) return;
 
-    this.powerRibbon = this.scene.add.container(cw / 2, ch + cw * 0.05);
+    this.powerRibbon = this.scene.add.container(cw / 2, ch - 8);
 
     const text = this.scene.add
       .text(0, 0, powerType, {
         fontFamily: 'Lilita One',
-        fontSize: `${cw * 0.18}px`,
+        fontSize: `${cw * 0.15}px`,
         color: '#ffffff',
       })
       .setOrigin(0.5)
@@ -259,6 +262,7 @@ export class CardVisual {
     const ribbonH = text.height + 4;
 
     const ribbon = this.scene.add.graphics();
+    ribbon.fillStyle(pc.pw2, 1);
     ribbon.fillGradientStyle(pc.pw2, pc.pw2, pc.pw1, pc.pw1, 1);
     ribbon.fillRoundedRect(-ribbonW / 2, -ribbonH / 2, ribbonW, ribbonH, 5);
     ribbon.lineStyle(2, colors.ink, 1);
@@ -284,7 +288,7 @@ export class CardVisual {
       case 'playable':
         // Gold ring + glow
         this.glowGfx.fillStyle(0xffd646, 0.4);
-        this.glowGfx.fillRoundedRect(-8, -8, cw + 16, ch + 24, radius + 8);
+        this.glowGfx.fillRoundedRect(-3, -3, cw + 6, ch + 6, radius + 3);
 
         this.outlineGfx.lineStyle(outline, colors.ink, 1);
         this.outlineGfx.strokeRoundedRect(0, 0, cw, ch, radius);
@@ -293,17 +297,6 @@ export class CardVisual {
         this.outlineGfx.lineStyle(1.5, colors.ink, 1);
         this.outlineGfx.strokeRoundedRect(-4, -4, cw + 8, ch + 8, radius + 4);
 
-        // Tick mark below card
-        this.tickMark = this.scene.add.triangle(
-          cw / 2,
-          ch + 10,
-          0, 7,
-          6, 0,
-          12, 7,
-          colors.goldRing
-        );
-        this.tickMark.setStrokeStyle(1.5, colors.ink);
-        this.container.add(this.tickMark);
         break;
 
       case 'selected':
@@ -358,6 +351,8 @@ export class CardVisual {
 
   setState(state: CardState): void {
     this.state = state;
+    this.powerMedal?.setVisible(state !== 'covered');
+    this.powerRibbon?.setVisible(state !== 'covered');
 
     // Reset transforms
     this.container.setScale(1);
@@ -470,6 +465,7 @@ export function createCardBack(scene: Phaser.Scene, x: number, y: number): Phase
   const bg = scene.add.graphics();
 
   // Purple gradient
+  bg.fillStyle(colors.backHi, 1);
   bg.fillGradientStyle(colors.backHi, colors.backHi, colors.backLo, colors.backLo, 1);
   bg.fillRoundedRect(0, 0, cw, ch, radius);
 

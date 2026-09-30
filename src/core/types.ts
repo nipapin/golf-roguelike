@@ -80,6 +80,7 @@ export interface RunState {
   readonly battle: BattleState | null;
   readonly phase: 'start' | 'battle' | 'reward' | 'shop' | 'victory' | 'defeat';
   readonly availableRewards: Relic[];
+  readonly rewardKind?: 'starter' | 'battle';
   readonly rngState: number;
 }
 

@@ -137,73 +137,37 @@ export function getCardMetrics(screenWidth: number) {
  * - 430×932: HUD 44, Arena 391, Banner 56, Tableau 221, Tray 145
  */
 export function getLayoutMetrics(width: number, height: number) {
-  const isCompact = height <= 760;
   const metrics = getCardMetrics(width);
-
-  // Safe areas (iPhone-style)
-  const safeTop = height >= 800 ? 47 : 20;
-  const safeBottom = height >= 800 ? 34 : 6;
-
-  // Fixed heights for HUD and banner
-  const hudHeight = isCompact ? 40 : 44;
-  const bannerHeight = isCompact ? 50 : 56;
-
-  // Calculate tableau height: 4 visible strips + 1 full card + padding
-  const tableauHeight = 4 * metrics.strip + metrics.ch + 14;
-
-  // Active card sizing
-  const activeScale = isCompact ? 1.3 : 1.42;
+  // #game is already inset by the actual CSS safe areas. No guessed notch offsets.
+  const safeTop = 8;
+  const safeBottom = 8;
+  const hudHeight = 40;
+  const playerHudHeight = 30;
+  const relicHeight = 28;
+  const bannerHeight = 34;
+  const strip = metrics.cw * 0.48;
+  const tableauHeight = 4 * strip + metrics.ch;
+  const activeScale = 1.08;
   const activeW = metrics.cw * activeScale;
   const activeH = metrics.ch * activeScale;
-
-  // Tray height: needs to fit active card + waste cards + HUD elements
-  const trayHeight = isCompact ? 109 : 133;
-
-  // Calculate from known fixed positions (top down)
+  const trayHeight = activeH + 28;
   const hudTop = safeTop;
-  const arenaTop = hudTop + hudHeight;
-  
-  // Table area = tableau + tray, positioned from bottom
-  const tableHeight = tableauHeight + trayHeight;
-  const tableTop = height - safeBottom - tableHeight;
-  
-  // Tableau starts inside table area with top padding
-  const tableauTop = tableTop + 30;
-  
-  // Tray is below tableau
-  const trayTop = tableauTop + tableauHeight;
-
-  // Banner overlaps the seam between arena and table
-  const bannerTop = tableTop - bannerHeight + 22;
-
-  // Arena fills the space between HUD and banner
-  const arenaHeight = bannerTop - arenaTop + 14; // +14 for banner overlap
-
-  // Enemy sprite height
-  const maxEnemyHeight = 250;
-  const enemyHeight = Math.min(arenaHeight * 0.66, maxEnemyHeight);
-
+  const playerHudTop = hudTop + hudHeight;
+  const relicTop = playerHudTop + playerHudHeight;
+  const arenaTop = relicTop + relicHeight + 4;
+  const trayTop = height - safeBottom - trayHeight;
+  const tableauTop = trayTop - 12 - tableauHeight;
+  const tableTop = tableauTop - 8;
+  const bannerTop = tableTop - bannerHeight - 6;
+  const arenaHeight = Math.max(60, bannerTop - arenaTop - 6);
   return {
-    safeTop,
-    safeBottom,
-    hudHeight,
-    hudTop,
-    arenaTop,
-    arenaHeight,
-    bannerTop,
-    bannerHeight,
-    tableTop,
-    tableHeight,
-    tableauTop,
-    tableauHeight,
-    trayTop,
-    trayHeight,
-    enemyHeight,
-    activeScale,
-    activeW,
-    activeH,
-    isCompact,
-    ...metrics,
+    ...metrics, strip,
+    safeTop, safeBottom, hudHeight, hudTop, playerHudTop, playerHudHeight,
+    relicTop, relicHeight, arenaTop, arenaHeight, bannerTop, bannerHeight,
+    tableTop, tableHeight: height - safeBottom - tableTop,
+    tableauTop, tableauHeight, trayTop, trayHeight,
+    enemyHeight: Math.max(40, Math.min(arenaHeight - 66, 185)),
+    activeScale, activeW, activeH, isCompact: height <= 760,
   };
 }
 

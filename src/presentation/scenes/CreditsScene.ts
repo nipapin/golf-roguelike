@@ -99,6 +99,7 @@ export class CreditsScene extends Phaser.Scene {
     const bg = this.add.graphics();
     bg.fillStyle(colors.ink, 1);
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2 + 4, buttonWidth, buttonHeight, 14);
+    bg.fillStyle(colors.blue, 1);
     bg.fillGradientStyle(colors.blue, colors.blue, colors.blueLo, colors.blueLo, 1);
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight - 4, 14);
     bg.lineStyle(3, colors.ink, 1);

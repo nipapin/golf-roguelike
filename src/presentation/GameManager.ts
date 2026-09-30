@@ -68,7 +68,7 @@ export class GameManager {
   startNewRun(seed?: string): void {
     const useSeed = seed || generateSeed();
     this.state = startRun(useSeed, this.config);
-    this.state = startNextBattle(this.state, this.enemies, this.config);
+    this.state = setupRewards({ ...this.state, phase: 'reward', rewardKind: 'starter' }, this.allRelics);
     this.save();
   }
 
@@ -130,9 +130,12 @@ export class GameManager {
 
     const result = chooseRelic(this.state, relicId);
     this.state = result.state;
+    if (this.state.phase === 'battle' && !this.state.battle) {
+      this.state = startNextBattle(this.state, this.enemies, this.config);
+    }
     this.save();
     this.emitEvents(result.events);
-    return result;
+    return { ...result, state: this.state };
   }
 
   skipReward(): ActionResult | null {
@@ -140,9 +143,12 @@ export class GameManager {
 
     const result = skipReward(this.state);
     this.state = result.state;
+    if (this.state.phase === 'battle' && !this.state.battle) {
+      this.state = startNextBattle(this.state, this.enemies, this.config);
+    }
     this.save();
     this.emitEvents(result.events);
-    return result;
+    return { ...result, state: this.state };
   }
 
   buyHealing(): ActionResult | null {

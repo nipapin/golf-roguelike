@@ -43,7 +43,7 @@ export class SettingsModal {
 
   private createPanel(): void {
     const panelWidth = 280;
-    const panelHeight = 340;
+    const panelHeight = 440;
     
     // Panel background (cream with dark outline)
     const panel = this.scene.add.graphics();
@@ -53,6 +53,7 @@ export class SettingsModal {
     panel.fillRoundedRect(-panelWidth / 2 + 4, -panelHeight / 2 + 6, panelWidth, panelHeight, 20);
     
     // Cream background with gradient
+    panel.fillStyle(colors.faceHi, 1);
     panel.fillGradientStyle(colors.faceHi, colors.faceHi, colors.faceLo, colors.faceLo, 1);
     panel.fillRoundedRect(-panelWidth / 2, -panelHeight / 2, panelWidth, panelHeight, 20);
     
@@ -75,14 +76,21 @@ export class SettingsModal {
     this.container.add(title);
     
     // Sound toggle
-    const soundY = -70;
+    const soundY = -130;
     this.createToggle(0, soundY, 'Sound', AudioSystem.isSoundEnabled, (enabled) => {
       AudioSystem.isSoundEnabled = enabled;
       if (enabled) AudioSystem.play('button_tap');
     });
     
+    this.createVolume(-95, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; });
+    this.createToggle(0, -45, 'Music', AudioSystem.isMusicEnabled, (enabled) => {
+      AudioSystem.unlock();
+      AudioSystem.isMusicEnabled = enabled;
+    });
+    this.createVolume(-10, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; });
+
     // Buttons
-    const buttonY = 20;
+    const buttonY = 55;
     const buttonSpacing = 54;
     
     // Resume button (green - primary action)
@@ -164,6 +172,22 @@ export class SettingsModal {
     this.container.add(hitZone);
   }
 
+  private createVolume(y: number, get: () => number, set: (value: number) => void): void {
+    const valueText = this.scene.add.text(0, y, `${Math.round(get() * 100)}%`, {
+      fontFamily: 'Fredoka', fontSize: '16px', color: '#442960',
+    }).setOrigin(0.5);
+    this.container.add(valueText);
+    for (const [x, delta, label] of [[-80, -0.1, '−'], [80, 0.1, '+']] as const) {
+      const button = this.scene.add.rectangle(x, y, 40, 30, 0xd9c6eb).setInteractive();
+      button.on('pointerup', () => {
+        AudioSystem.unlock();
+        set(Math.round((get() + delta) * 100) / 100);
+        valueText.setText(`${Math.round(get() * 100)}%`);
+      });
+      this.container.add([button, this.scene.add.text(x, y, label, { fontFamily: 'Fredoka', fontSize: '20px', color: '#27173d' }).setOrigin(0.5)]);
+    }
+  }
+
   private createButton(
     x: number,
     y: number,
@@ -184,6 +208,7 @@ export class SettingsModal {
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2 + 5, buttonWidth, buttonHeight, 14);
     
     // Button body
+    bg.fillStyle(colorHi, 1);
     bg.fillGradientStyle(colorHi, colorHi, colorLo, colorLo, 1);
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight - 5, 14);
     
@@ -299,6 +324,7 @@ export class SettingsModal {
     const bg = this.scene.add.graphics();
     bg.fillStyle(colors.ink, 1);
     bg.fillRoundedRect(-btnW / 2, -btnH / 2 + 4, btnW, btnH, 12);
+    bg.fillStyle(colorHi, 1);
     bg.fillGradientStyle(colorHi, colorHi, colorLo, colorLo, 1);
     bg.fillRoundedRect(-btnW / 2, -btnH / 2, btnW, btnH - 4, 12);
     bg.lineStyle(2.5, colors.ink, 1);

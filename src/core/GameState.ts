@@ -110,9 +110,9 @@ export function setupBattle(
   });
 
   const powerPositions = rng.pick(allTableauCards, powerCardCount);
-  const powerCards: PowerCard[] = powerPositions.map((pos, i) => ({
+  const powerCards: PowerCard[] = powerPositions.map((pos) => ({
     cardId: pos.card.id,
-    type: POWER_TYPES[i % POWER_TYPES.length],
+    type: rng.pickOne(POWER_TYPES),
   }));
 
   const battle: BattleState = {

@@ -1,3 +1,5 @@
+import { MusicSequencer } from './MusicSequencer';
+
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
  * Kenney.nl CC0 sounds in public/audio/
@@ -23,11 +25,15 @@ export type SoundId =
 interface AudioSettings {
   soundEnabled: boolean;
   musicEnabled: boolean;
+  soundVolume: number;
+  musicVolume: number;
 }
 
 const DEFAULT_SETTINGS: AudioSettings = {
   soundEnabled: true,
   musicEnabled: true,
+  soundVolume: 0.22,
+  musicVolume: 0.18,
 };
 
 const STORAGE_KEY = 'golf_rogue_audio_settings';
@@ -35,23 +41,36 @@ const STORAGE_KEY = 'golf_rogue_audio_settings';
 class AudioSystemClass {
   private context: AudioContext | null = null;
   private sounds: Map<SoundId, AudioBuffer> = new Map();
-  private settings: AudioSettings = DEFAULT_SETTINGS;
+  private settings: AudioSettings = { ...DEFAULT_SETTINGS };
+  private soundBus: GainNode | null = null;
+  private musicBus: GainNode | null = null;
+  private music: MusicSequencer | null = null;
   private unlocked: boolean = false;
   private loadPromise: Promise<void> | null = null;
   private initialized: boolean = false;
 
   constructor() {
     this.loadSettings();
+    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
+      if (document.hidden) this.music?.stop();
+      else this.updateMix();
+    });
   }
 
   private loadSettings(): void {
     try {
       const stored = localStorage.getItem(STORAGE_KEY);
       if (stored) {
-        this.settings = { ...DEFAULT_SETTINGS, ...JSON.parse(stored) };
+        const saved = JSON.parse(stored);
+        this.settings = {
+          soundEnabled: typeof saved.soundEnabled === 'boolean' ? saved.soundEnabled : true,
+          musicEnabled: typeof saved.musicEnabled === 'boolean' ? saved.musicEnabled : true,
+          soundVolume: this.clampVolume(saved.soundVolume, DEFAULT_SETTINGS.soundVolume),
+          musicVolume: this.clampVolume(saved.musicVolume, DEFAULT_SETTINGS.musicVolume),
+        };
       }
     } catch {
-      this.settings = DEFAULT_SETTINGS;
+      this.settings = { ...DEFAULT_SETTINGS };
     }
   }
 
@@ -92,7 +111,7 @@ class AudioSystemClass {
 
     // Try to create audio context
     try {
-      this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+      this.ensureContext();
     } catch {
       console.warn('Web Audio API not supported');
       return;
@@ -140,20 +159,21 @@ class AudioSystemClass {
    * Unlock audio on first user interaction (required for iOS Safari)
    */
   unlock(): void {
-    if (this.unlocked) return;
+
     
     // Create context if not yet created
     if (!this.context) {
       try {
-        this.context = new (window.AudioContext || (window as any).webkitAudioContext)();
+        this.ensureContext();
       } catch {
         return;
       }
     }
 
-    // Resume context if suspended
+    if (!this.context) return;
+    // iOS can suspend the context again after backgrounding. Retry on each gesture.
     if (this.context.state === 'suspended') {
-      this.context.resume();
+      void this.context.resume().then(() => this.updateMix()).catch(() => {});
     }
 
     // Play a silent buffer to unlock
@@ -164,6 +184,7 @@ class AudioSystemClass {
     source.start(0);
 
     this.unlocked = true;
+    this.updateMix();
     
     // Load sounds if not already done
     if (!this.initialized) {
@@ -191,10 +212,11 @@ class AudioSystemClass {
 
       // Apply volume
       const gainNode = this.context.createGain();
-      gainNode.gain.value = options?.volume ?? 0.5;
+      gainNode.gain.value = options?.volume ?? 0.65;
 
       source.connect(gainNode);
-      gainNode.connect(this.context.destination);
+      gainNode.connect(this.soundBus!);
+      source.onended = () => { source.disconnect(); gainNode.disconnect(); };
       source.start(0);
     } catch (err) {
       console.warn('Error playing sound:', err);
@@ -209,7 +231,43 @@ class AudioSystemClass {
     const variants: SoundId[] = ['card_play_1', 'card_play_2', 'card_play_3'];
     const soundId = variants[Math.floor(Math.random() * variants.length)];
     const pitchShift = Math.min(comboCount * 0.05, 0.4);
-    this.play(soundId, { pitchShift, volume: 0.5 });
+    this.play(soundId, { pitchShift, volume: 0.6 });
+  }
+
+  private clampVolume(value: unknown, fallback: number): number {
+    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+  }
+
+  private ensureContext(): void {
+    if (this.context) return;
+    const Audio = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    if (!Audio) throw new Error('Web Audio unavailable');
+    this.context = new Audio();
+    this.soundBus = this.context.createGain();
+    this.musicBus = this.context.createGain();
+    this.soundBus.connect(this.context.destination);
+    this.musicBus.connect(this.context.destination);
+    this.music = new MusicSequencer(this.context, this.musicBus);
+    this.updateMix();
+  }
+
+  private updateMix(): void {
+    if (!this.context || !this.soundBus || !this.musicBus) return;
+    this.soundBus.gain.setTargetAtTime(this.settings.soundEnabled ? this.settings.soundVolume : 0, this.context.currentTime, 0.04);
+    this.musicBus.gain.setTargetAtTime(this.settings.musicEnabled ? this.settings.musicVolume : 0, this.context.currentTime, 0.08);
+    if (this.unlocked && this.settings.musicEnabled && !document.hidden) this.music?.start();
+    else this.music?.stop();
+  }
+
+  get soundVolume(): number { return this.settings.soundVolume; }
+  set soundVolume(value: number) {
+    this.settings.soundVolume = this.clampVolume(value, DEFAULT_SETTINGS.soundVolume);
+    this.updateMix(); this.saveSettings();
+  }
+  get musicVolume(): number { return this.settings.musicVolume; }
+  set musicVolume(value: number) {
+    this.settings.musicVolume = this.clampVolume(value, DEFAULT_SETTINGS.musicVolume);
+    this.updateMix(); this.saveSettings();
   }
 
   // Settings getters/setters
@@ -219,6 +277,7 @@ class AudioSystemClass {
 
   set isSoundEnabled(value: boolean) {
     this.settings.soundEnabled = value;
+    this.updateMix();
     this.saveSettings();
   }
 
@@ -228,6 +287,7 @@ class AudioSystemClass {
 
   set isMusicEnabled(value: boolean) {
     this.settings.musicEnabled = value;
+    this.updateMix();
     this.saveSettings();
   }
 

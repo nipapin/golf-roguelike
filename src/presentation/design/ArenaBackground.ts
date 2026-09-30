@@ -150,8 +150,9 @@ export class ArenaBackground {
     const mountainY = arenaTop + arenaHeight * 0.4;
     const mountainHeight = arenaHeight * 0.35;
 
-    g.fillGradientStyle(
-      palette.mountainHi,
+    g.fillStyle(palette.mountainHi, 1);
+
+    g.fillGradientStyle(palette.mountainHi,
       palette.mountainHi,
       palette.mountainLo,
       palette.mountainLo,
@@ -192,8 +193,9 @@ export class ArenaBackground {
     const groundY = arenaTop + arenaHeight * 0.65;
     const groundHeight = arenaHeight * 0.35;
 
-    g.fillGradientStyle(
-      palette.groundHi,
+    g.fillStyle(palette.groundHi, 1);
+
+    g.fillGradientStyle(palette.groundHi,
       palette.groundHi,
       palette.groundLo,
       palette.groundLo,

@@ -49,3 +49,33 @@ it('does not save or emit events for a rejected action', () => {
   expect(write).not.toHaveBeenCalled();
   expect(listener).not.toHaveBeenCalled();
 });
+
+it('offers a persisted starter relic and begins fight 1 after choosing it', () => {
+  const manager = new GameManager();
+  manager.startNewRun('starter-build');
+  const choices = manager.getState()!;
+  expect(choices.phase).toBe('reward');
+  expect(choices.rewardKind).toBe('starter');
+  expect(choices.availableRewards).toHaveLength(3);
+  expect(choices.battle).toBeNull();
+  const reloaded = new GameManager();
+  expect(reloaded.loadSavedGame()).toBe(true);
+  expect(reloaded.getState()).toEqual(choices);
+  const chosen = choices.availableRewards[0];
+  const result = reloaded.selectRelic(chosen.id)!;
+  expect(result.state.phase).toBe('battle');
+  expect(result.state.currentFight).toBe(0);
+  expect(result.state.player.relics).toContainEqual(chosen);
+  expect(result.state.battle?.tableau).toHaveLength(7);
+  expect(loadGame()).toEqual(result.state);
+});
+
+it('skips a starter upgrade without skipping the first encounter', () => {
+  const manager = new GameManager();
+  manager.startNewRun('skip-starter');
+  const result = manager.skipReward()!;
+  expect(result.state.phase).toBe('battle');
+  expect(result.state.currentFight).toBe(0);
+  expect(result.state.player.relics).toHaveLength(0);
+  expect(result.state.battle).not.toBeNull();
+});

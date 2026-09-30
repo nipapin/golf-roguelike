@@ -524,7 +524,8 @@ export function chooseRelic(state: RunState, relicId: string): ActionResult {
     state: {
       ...state,
       player: newPlayer,
-      phase: 'shop',
+      phase: state.rewardKind === 'starter' ? 'battle' : 'shop',
+      rewardKind: 'battle',
       availableRewards: [],
     },
     events,
@@ -540,7 +541,7 @@ export function skipReward(state: RunState): ActionResult {
   }
 
   return {
-    state: { ...state, phase: 'shop', availableRewards: [] },
+    state: { ...state, phase: state.rewardKind === 'starter' ? 'battle' : 'shop', rewardKind: 'battle', availableRewards: [] },
     events: [],
   };
 }

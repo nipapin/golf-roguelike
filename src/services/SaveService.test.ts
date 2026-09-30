@@ -39,11 +39,12 @@ describe('saved battle', () => {
     }
     // Reward selection and a new deal consume RNG after a reload too.
     uninterrupted = setupRewards(
-      { ...uninterrupted, phase: 'reward', battle: null },
+      { ...uninterrupted, phase: 'reward', battle: null, player: { ...uninterrupted.player, hp: uninterrupted.player.maxHp } },
       relicsData.relics as Relic[]
     );
     expect(saveGame(uninterrupted)).toBe(true);
     resumed = loadGame()!;
+    expect(resumed).not.toBeNull();
     expect(startNextBattle({ ...resumed, currentFight: 1 }, enemies, config)).toEqual(
       startNextBattle({ ...uninterrupted, currentFight: 1 }, enemies, config)
     );

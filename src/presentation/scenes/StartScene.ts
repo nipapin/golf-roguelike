@@ -1,8 +1,10 @@
+import { SettingsModal } from '../design/SettingsModal';
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
 import { colors } from '../design/tokens';
 
 export class StartScene extends Phaser.Scene {
+  private settings: SettingsModal | null = null;
   constructor() {
     super('StartScene');
   }
@@ -47,6 +49,7 @@ export class StartScene extends Phaser.Scene {
     const bannerHeight = 32;
 
     const banner = this.add.graphics();
+    banner.fillStyle(0xff5050, 1);
     banner.fillGradientStyle(0xff5050, 0xff5050, 0xd02040, 0xd02040, 1);
     banner.fillRoundedRect(cx - bannerWidth / 2, bannerY - bannerHeight / 2, bannerWidth, bannerHeight, 6);
     banner.lineStyle(3, colors.ink, 1);
@@ -95,12 +98,25 @@ export class StartScene extends Phaser.Scene {
     const buttonY = height - 180;
     this.createStartButton(cx, buttonY, manager.hasSavedGame());
 
+    this.settings = new SettingsModal(this, {
+      onResume: () => {},
+      onMainMenu: () => {},
+      onRestart: () => {
+        manager.startNewRun();
+        this.scene.start('RewardScene');
+      },
+    });
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.settings?.destroy();
+      this.settings = null;
+    });
+
     // Bottom buttons row
     const bottomY = height - 100;
 
     // Settings button
     this.createSecondaryButton(cx - 60, bottomY, 'SETTINGS', colors.blue, colors.blueLo, () => {
-      // Settings not implemented yet
+      this.settings?.show();
     });
 
     // Credits button
@@ -174,6 +190,7 @@ export class StartScene extends Phaser.Scene {
 
       // Card background
       const bg = this.add.graphics();
+      bg.fillStyle(colors.faceHi, 1);
       bg.fillGradientStyle(colors.faceHi, colors.faceHi, colors.faceLo, colors.faceLo, 1);
       bg.fillRoundedRect(-cardW / 2, -cardH / 2, cardW, cardH, 10);
       bg.fillStyle(colors.bevel, 1);
@@ -212,6 +229,7 @@ export class StartScene extends Phaser.Scene {
         const [pwHi, pwLo] = powerColors[card.power] || [0xffcc00, 0xff8800];
 
         const badge = this.add.graphics();
+        badge.fillStyle(pwHi, 1);
         badge.fillGradientStyle(pwHi, pwHi, pwLo, pwLo, 1);
         badge.fillRoundedRect(-22, badgeY - 10, 44, 18, 6);
         badge.lineStyle(2, colors.ink, 1);
@@ -245,6 +263,7 @@ export class StartScene extends Phaser.Scene {
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2 + 8, buttonWidth, buttonHeight, 20);
 
     // Main button body
+    bg.fillStyle(colors.goldHi, 1);
     bg.fillGradientStyle(colors.goldHi, colors.goldHi, colors.gold, colors.gold, 1);
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight - 6, 20);
 
@@ -312,7 +331,7 @@ export class StartScene extends Phaser.Scene {
       }
 
       manager.startNewRun();
-      this.scene.start('BattleScene');
+      this.navigateToPhase(manager.getState()!.phase);
     });
 
     container.on('pointerup', () => {
@@ -344,6 +363,7 @@ export class StartScene extends Phaser.Scene {
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2 + 5, buttonWidth, buttonHeight, 14);
 
     // Body
+    bg.fillStyle(colorHi, 1);
     bg.fillGradientStyle(colorHi, colorHi, colorLo, colorLo, 1);
     bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight - 5, 14);
 
