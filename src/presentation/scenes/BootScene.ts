@@ -1,3 +1,5 @@
+import { VFX_KEYS, createCombatAnimations } from '../design/CombatVFX';
+import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
@@ -19,6 +21,9 @@ export class BootScene extends Phaser.Scene {
   }
 
   preload(): void {
+    configureViewport(this);
+    for (const key of VFX_KEYS) this.load.atlas('vfx-' + key, '/assets/vfx/' + key + '.webp', '/assets/vfx/' + key + '.json');
+
     // Load enemy sprite atlases
     for (const enemy of ENEMY_SPRITES) {
       this.load.atlas(
@@ -28,7 +33,7 @@ export class BootScene extends Phaser.Scene {
       );
     }
 
-    this.load.svg('coin', '/assets/coin.svg');
+    this.load.svg('coin', '/assets/coin.svg', { width: 96, height: 96 });
 
     // Load crown overlay for boss
     this.load.svg('crown', '/assets/enemies/crown.svg');
@@ -53,8 +58,8 @@ export class BootScene extends Phaser.Scene {
     }
 
     // Show loading progress
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const width = viewport(this).width;
+    const height = viewport(this).height;
 
     // Background
     this.cameras.main.setBackgroundColor(colors.feltLo);
@@ -66,7 +71,7 @@ export class BootScene extends Phaser.Scene {
 
     const loadingText = this.add
       .text(width / 2, height / 2 - 60, 'Loading...', {
-        fontFamily: 'Lilita One, sans-serif',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One, sans-serif',
         fontSize: '22px',
         color: '#ffffff',
       })
@@ -88,8 +93,10 @@ export class BootScene extends Phaser.Scene {
   }
 
   create(): void {
+    configureViewport(this);
     // Create enemy animations
     this.createEnemyAnimations();
+    createCombatAnimations(this);
 
     this.scene.start('StartScene');
   }

@@ -1,3 +1,4 @@
+import { getRenderDensity } from './viewport';
 /**
  * HUD Components - Chips, HP bars, Combo banner, Intent bubble
  * Per STYLE.md section 7: dark semi-transparent pills, outlined text
@@ -24,7 +25,7 @@ export function createChip(
 
   const valueText = scene.add
     .text(iconSize / 2, 0, value.toString(), {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '18px',
       color: '#ffffff',
     })
@@ -52,7 +53,7 @@ export function createChip(
   // Icon text/symbol
   const iconText = scene.add
     .text(-iconSize / 2, -1, iconChar, {
-      fontFamily: 'Arial',
+      resolution: getRenderDensity(), fontFamily: 'Arial',
       fontSize: `${iconSize * 0.6}px`,
       color: '#ffffff',
     })
@@ -118,7 +119,7 @@ export class HPBar {
     // HP text
     this.hpText = scene.add
       .text(0, 1, `${maxHp}/${maxHp}`, {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '17px',
         color: '#ffffff',
       })
@@ -130,7 +131,7 @@ export class HPBar {
     // Preview damage text (right side)
     this.previewText = scene.add
       .text(width / 2 - 8, 1, '', {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '15px',
         color: '#FFF3B0',
       })
@@ -242,10 +243,10 @@ export class ComboBanner {
     bg.lineStyle(1, 0x9271bc, 0.6);
     bg.strokeRoundedRect(-width / 2, 0, width, height, 10);
     this.chainText = scene.add.text(-width / 2 + 12, height / 2, 'MAKE A CHAIN', {
-      fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff4d6',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff4d6',
     }).setOrigin(0, 0.5);
     this.damageText = scene.add.text(width / 2 - 12, height / 2, '±1  •  A ↔ K', {
-      fontFamily: 'Fredoka', fontSize: '13px', color: '#c6b7dd',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '13px', color: '#c6b7dd',
     }).setOrigin(1, 0.5);
     this.container.add([bg, this.chainText, this.damageText]);
   }
@@ -314,7 +315,7 @@ export function createIntentBubble(
   // "NEXT TURN" label
   const label = scene.add
     .text(0, -35, 'NEXT TURN', {
-      fontFamily: 'Fredoka',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka',
       fontSize: '10px',
       fontStyle: 'bold',
       color: '#ffffff',
@@ -339,7 +340,7 @@ export function createIntentBubble(
   // Value
   const valueText = scene.add
     .text(14, 0, value.toString(), {
-      fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One',
       fontSize: '26px',
       color: '#' + intentColors[intentType].toString(16).padStart(6, '0'),
     })

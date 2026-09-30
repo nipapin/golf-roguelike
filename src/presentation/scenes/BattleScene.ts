@@ -1,3 +1,5 @@
+import { playCombatVFX } from '../design/CombatVFX';
+import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
 import Phaser from 'phaser';
 import { getGameManager, setTestHook } from '../GameManager';
 import { colors, getLayoutMetrics, getCardMetrics } from '../design/tokens';
@@ -60,8 +62,9 @@ export class BattleScene extends Phaser.Scene {
   }
 
   create(): void {
-    const width = this.scale.width;
-    const height = this.scale.height;
+    configureViewport(this);
+    const width = viewport(this).width;
+    const height = viewport(this).height;
 
     this.layout = getLayoutMetrics(width, height);
     this.cardMetrics = getCardMetrics(width);
@@ -142,7 +145,7 @@ export class BattleScene extends Phaser.Scene {
         return {
           x: 12,
           y: this.layout.trayTop + 14,
-          width: this.scale.width * 0.46,
+          width: viewport(this).width * 0.46,
           height: this.layout.trayHeight - 28,
         };
       },
@@ -163,25 +166,25 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTopHUD(): void {
-    const width = this.scale.width;
+    const width = viewport(this).width;
     const { hudTop, hudHeight, relicTop } = this.layout;
     const manager = getGameManager();
     this.topHUD = this.add.container(0, hudTop).setDepth(100);
     const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
     const progress = this.add.text(16, hudHeight / 2, `FIGHT ${manager.getCurrentFightNumber()} / ${manager.getTotalFights()}`, {
-      fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
     }).setOrigin(0, 0.5);
     const coin = this.add.image(width * 0.58 - 20, hudHeight / 2, 'coin').setDisplaySize(24, 24);
     this.goldText = this.add.text(width * 0.58 + 6, hudHeight / 2, '0', {
-      fontFamily: 'Fredoka', fontSize: '16px', color: '#ffd267',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#ffd267',
     }).setOrigin(0.5);
     const settings = this.add.rectangle(width - 30, hudHeight / 2, 40, 36, 0x3d2c66).setInteractive();
     settings.on('pointerup', () => { AudioSystem.unlock(); this.openSettings(); });
-    const gear = this.add.text(width - 30, hudHeight / 2, '⚙', { fontSize: '22px', color: '#fff' }).setOrigin(0.5);
+    const gear = this.add.text(width - 30, hudHeight / 2, '⚙', { resolution: getRenderDensity(), fontSize: '22px', color: '#fff' }).setOrigin(0.5);
     this.topHUD.add([bg, progress, coin, this.goldText, settings, gear]);
     const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100).setInteractive();
     this.buildText = this.add.text(width / 2, build.y, 'BUILD · CHOOSE A RELIC', {
-      fontFamily: 'Fredoka', fontSize: '12px', color: '#dac6ff',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '12px', color: '#dac6ff',
     }).setOrigin(0.5).setDepth(101);
     build.on('pointerup', () => {
       if (this.inputPaused) return;
@@ -203,8 +206,8 @@ export class BattleScene extends Phaser.Scene {
 
   private createTableBackground(): void {
     const { tableTop, safeBottom } = this.layout;
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const width = viewport(this).width;
+    const height = viewport(this).height;
 
     this.tableBackground = this.add.graphics();
     this.tableBackground.setDepth(10);
@@ -233,27 +236,27 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createPlayerHUD(): void {
-    const width = this.scale.width;
+    const width = viewport(this).width;
     const y = this.layout.playerHudTop + 15;
     this.playerHPBar = new HPBar(this, 76, y, 126, 20, 30, true);
     this.playerHPBar.setDepth(100);
     this.armorText = this.add.text(width - 16, y, 'ARMOR 0', {
-      fontFamily: 'Fredoka', fontSize: '13px', color: '#9ccfff',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '13px', color: '#9ccfff',
     }).setOrigin(1, 0.5).setDepth(100);
   }
 
   private createDrawPile(): void {
     const { trayTop, trayHeight } = this.layout;
-    const width = this.scale.width;
+    const width = viewport(this).width;
     const buttonWidth = width * 0.46;
     const buttonHeight = trayHeight - 28;
     this.drawPile = this.add.container(12 + buttonWidth / 2, trayTop + 14 + buttonHeight / 2).setDepth(55);
     const bg = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x31559a).setStrokeStyle(2, 0x9aafe0);
     this.drawText = this.add.text(0, -10, 'DRAW', {
-      fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff',
+      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff',
     }).setOrigin(0.5);
     this.turnHint = this.add.text(0, 16, 'Enemy turn', {
-      fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', align: 'center',
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', align: 'center',
     }).setOrigin(0.5);
     this.drawPile.add([bg, this.drawText, this.turnHint]);
     this.drawPile.setInteractive(new Phaser.Geom.Rectangle(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
@@ -272,7 +275,7 @@ export class BattleScene extends Phaser.Scene {
     if (state.battle) {
       const encounter = getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
       if (!previousState?.battle || previousState.battle.enemy.id !== state.battle.enemy.id) this.arenaBackground.draw(
-        this.scale.width,
+        viewport(this).width,
         this.layout.arenaTop,
         this.layout.arenaHeight,
         encounter
@@ -289,7 +292,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private renderEnemy(battle: BattleState): void {
-    const width = this.scale.width;
+    const width = viewport(this).width;
     const { arenaTop, arenaHeight } = this.layout;
 
     const enemy = battle.enemy;
@@ -380,7 +383,7 @@ export class BattleScene extends Phaser.Scene {
 
     this.enemyNameText = this.add
       .text(width / 2, arenaTop + arenaHeight - 42, rankBadge + enemy.name, {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '19px',
         color: '#ffffff',
       })
@@ -413,7 +416,7 @@ export class BattleScene extends Phaser.Scene {
     this.intentBubble = null;
     if (intent) {
       this.intentBubble = createIntentBubble(
-        this, this.scale.width / 2 + 80,
+        this, viewport(this).width / 2 + 80,
         this.layout.arenaTop + 36,
         intent.type, intent.value
       );
@@ -479,7 +482,7 @@ export class BattleScene extends Phaser.Scene {
     if (!battle.activeCard) return;
 
     const { trayTop, activeW, activeH, activeScale } = this.layout;
-    const width = this.scale.width;
+    const width = viewport(this).width;
 
     // Position active card in center of tray, slightly right of center
     const activeX = width * 0.76;
@@ -498,7 +501,7 @@ export class BattleScene extends Phaser.Scene {
     const labelY = activeY + activeH / 2 + 12;
     this.activeLabel = this.add
       .text(activeX, labelY, battle.wildActive ? 'WILD · ANY CARD' : battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1', {
-        fontFamily: 'Fredoka',
+        resolution: getRenderDensity(), fontFamily: 'Fredoka',
         fontSize: '11px',
         color: '#9a8aba',
       })
@@ -552,7 +555,7 @@ export class BattleScene extends Phaser.Scene {
     this.activeCardVisual?.getContainer().setVisible(false);
     this.handleEvents(result.events);
     const moving = flying.getContainer();
-    const destinationX = this.scale.width * 0.76 - this.layout.activeW / 2;
+    const destinationX = viewport(this).width * 0.76 - this.layout.activeW / 2;
     const destinationY = this.layout.trayTop + 12;
     this.tweens.add({ targets: moving, y: bounds.y - 22, angle: -8, scale: 1.15, duration: 90, ease: 'Quad.out', onComplete: () => {
       const path = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(moving.x, moving.y), new Phaser.Math.Vector2(destinationX + 20, bounds.y - 55), new Phaser.Math.Vector2(destinationX, destinationY));
@@ -599,13 +602,15 @@ export class BattleScene extends Phaser.Scene {
           AudioSystem.playCardSound((event.chainPosition as number) || 1);
           break;
         case 'enemy_staggered':
-          this.cardBurst(this.scale.width / 2, this.enemyBaseY - 40, 0x69d6ff);
+          playCombatVFX(this, 'stagger', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight - 8, 84);
+          this.cardBurst(viewport(this).width / 2, this.enemyBaseY - 40, 0x69d6ff);
           break;
         case 'enemy_attacked':
           this.playEnemyAttackAnimation();
           AudioSystem.play('player_hit');
           break;
         case 'enemy_died':
+          playCombatVFX(this, 'smoke', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight * .4, 140, 0xcfc2ff);
           this.playEnemyDeathAnimation();
           AudioSystem.play('enemy_death');
           break;
@@ -653,7 +658,8 @@ export class BattleScene extends Phaser.Scene {
     this.tweens.add({ targets: sprite, y: this.enemyBaseY - 18, angle: -7, duration: 130, ease: 'Quad.out', onComplete: () => {
       this.tweens.add({ targets: sprite, y: this.enemyBaseY + 16, angle: 7, scaleX: this.enemyScale * 1.12, scaleY: this.enemyScale * .92, duration: 110, ease: 'Cubic.in', onComplete: () => {
         this.cameras.main.shake(110, .006);
-        this.cardBurst(this.scale.width / 2, this.layout.arenaTop + this.layout.arenaHeight - 70, 0xff6655);
+        playCombatVFX(this, 'slash', 76, this.layout.playerHudTop + 15, 94, 0xff606f, 35);
+        this.cardBurst(viewport(this).width / 2, this.layout.arenaTop + this.layout.arenaHeight - 70, 0xff6655);
         this.tweens.add({ targets: sprite, y: this.enemyBaseY, angle: 0, scale: this.enemyScale, duration: 240, onComplete: () => { sprite.play(`${this.enemyKey}-idle`); this.startEnemyIdle(); } });
       } });
     } });
@@ -677,7 +683,7 @@ export class BattleScene extends Phaser.Scene {
     const x = container.x;
     this.tweens.killTweensOf(container);
     this.tweens.add({ targets: container, x: x + 5, angle: 3, duration: 40, yoyo: true, repeat: 2, onComplete: () => container.setX(x).setAngle(0) });
-    const hint = this.add.text(this.scale.width / 2, this.layout.bannerTop + 16, exposed ? 'Choose ±1 from the active card' : 'Use the bottom card of a column', { fontFamily: 'Fredoka', fontSize: '13px', color: '#ff8585', backgroundColor: '#211740', padding: { x: 8, y: 4 } }).setOrigin(.5).setDepth(200);
+    const hint = this.add.text(viewport(this).width / 2, this.layout.bannerTop + 16, exposed ? 'Choose ±1 from the active card' : 'Use the bottom card of a column', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '13px', color: '#ff8585', backgroundColor: '#211740', padding: { x: 8, y: 4 } }).setOrigin(.5).setDepth(200);
     this.tweens.add({ targets: hint, alpha: 0, duration: 200, delay: 700, onComplete: () => hint.destroy() });
   }
 
@@ -690,7 +696,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private playPowerEffect(power: PowerType | 'RED_JOKER' | 'BLACK_JOKER'): void {
-    const x = this.scale.width / 2;
+    const x = viewport(this).width / 2;
     const y = this.enemyBaseY - this.layout.enemyHeight * .5;
     const themes: Record<typeof power, { color: number; symbol: string; text: string }> = {
       CRIT: { color: 0xff6633, symbol: '⚔', text: 'CRITICAL ×3' },
@@ -704,8 +710,26 @@ export class BattleScene extends Phaser.Scene {
       BLACK_JOKER: { color: 0xb795ff, symbol: '♛', text: 'CHAIN CRIT ×5' },
     };
     const theme = themes[power];
+    const arenaSize = Math.min(180, this.layout.arenaHeight * .7);
+    if (power === 'CRIT' || power === 'BLACK_JOKER') {
+      playCombatVFX(this, 'slash', x, y, arenaSize, power === 'CRIT' ? 0xffad57 : 0xc2a2ff, -30);
+      this.time.delayedCall(100, () => playCombatVFX(this, 'slash', x, y, arenaSize, theme.color, 35));
+    } else if (power === 'HEAL' || power === 'RED_JOKER') {
+      playCombatVFX(this, 'heal', 76, this.layout.playerHudTop + 15, 88, power === 'RED_JOKER' ? 0xff608a : undefined);
+    } else if (power === 'GUARD') {
+      playCombatVFX(this, 'shield', viewport(this).width - 60, this.layout.playerHudTop + 15, 76);
+    } else if (power === 'GOLD') {
+      playCombatVFX(this, 'reward', viewport(this).width * .58, this.layout.hudTop + 20, 80);
+    } else if (power === 'WILD') {
+      playCombatVFX(this, 'magic', viewport(this).width * .76, this.layout.trayTop + this.layout.activeH / 2, 96);
+    } else if (power === 'ECHO') {
+      playCombatVFX(this, 'slash', x, y, arenaSize, 0xc58aff, 20);
+      this.time.delayedCall(140, () => playCombatVFX(this, 'slash', x, y, arenaSize, 0xc58aff, -20));
+    } else if (power === 'BOMB') {
+      playCombatVFX(this, 'smoke', x, y, arenaSize, 0xffb86a);
+    }
     const hex = '#' + theme.color.toString(16).padStart(6, '0');
-    const label = this.add.text(x, this.layout.arenaTop + 70, theme.text, { fontFamily: 'Lilita One', fontSize: '23px', color: hex }).setOrigin(.5).setStroke('#1b1030', 5).setDepth(190);
+    const label = this.add.text(x, this.layout.arenaTop + 70, theme.text, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '23px', color: hex }).setOrigin(.5).setStroke('#1b1030', 5).setDepth(190);
     label.setScale(.6);
     this.tweens.add({ targets: label, scale: 1, duration: 170, ease: 'Back.out' });
     this.tweens.add({ targets: label, y: label.y - 20, alpha: 0, delay: 450, duration: 300, onComplete: () => label.destroy() });
@@ -728,9 +752,9 @@ export class BattleScene extends Phaser.Scene {
       for (let i = 0; i < 5; i++) {
         const icon = power === 'GOLD'
           ? this.add.image(x + (i - 2) * 14, y, 'coin').setDisplaySize(20, 20)
-          : this.add.text(x + (i - 2) * 14, y, theme.symbol, { fontSize: '24px', color: hex }).setOrigin(.5);
+          : this.add.text(x + (i - 2) * 14, y, theme.symbol, { resolution: getRenderDensity(), fontSize: '24px', color: hex }).setOrigin(.5);
         icon.setDepth(180);
-        const destinationX = power === 'GOLD' ? this.scale.width * .58 : power === 'GUARD' ? this.scale.width - 30 : 76;
+        const destinationX = power === 'GOLD' ? viewport(this).width * .58 : power === 'GUARD' ? viewport(this).width - 30 : 76;
         this.tweens.add({ targets: icon, x: destinationX, y: this.layout.playerHudTop + 15, alpha: 0, delay: i * 40, duration: 500, ease: 'Cubic.in', onComplete: () => icon.destroy() });
       }
     }
@@ -738,20 +762,21 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private playDamageAnimation(damage: number): void {
+    playCombatVFX(this, 'slash', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight * .45, Math.min(195, this.layout.arenaHeight * .75), damage >= 20 ? 0xffb43b : undefined, -20);
     if (!this.enemySprite) return;
 
     if (!this.enemyDying) {
       const sprite = this.enemySprite;
       sprite.setTint(0xff8c8c);
       this.time.delayedCall(150, () => { if (sprite.active) sprite.clearTint(); });
-      this.tweens.add({ targets: sprite, x: this.scale.width / 2 + 7, duration: 45, yoyo: true, repeat: 2, onComplete: () => sprite.setX(this.scale.width / 2) });
+      this.tweens.add({ targets: sprite, x: viewport(this).width / 2 + 7, duration: 45, yoyo: true, repeat: 2, onComplete: () => sprite.setX(viewport(this).width / 2) });
       this.cardBurst(sprite.x, sprite.y - sprite.displayHeight / 2, 0xffdf70);
     }
 
     // Damage number popup
     const dmgText = this.add
-      .text(this.scale.width / 2, this.layout.arenaTop + this.layout.arenaHeight * 0.4, damage.toString(), {
-        fontFamily: 'Lilita One',
+      .text(viewport(this).width / 2, this.layout.arenaTop + this.layout.arenaHeight * 0.4, damage.toString(), {
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '40px',
         color: '#FFD070',
       })

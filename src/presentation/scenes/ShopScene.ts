@@ -1,3 +1,4 @@
+import { configureViewport } from '../design/viewport';
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
 import { gamePopup, popupButton, popupTile } from '../design/GamePopup';
@@ -8,6 +9,7 @@ export class ShopScene extends Phaser.Scene {
   private busy = false;
   constructor() { super('ShopScene'); }
   create(): void {
+    configureViewport(this);
     AudioSystem.setMusicScene('menu');
     this.busy = false;
     const manager = getGameManager();

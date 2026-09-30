@@ -1,3 +1,4 @@
+import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
 import { showRules } from '../design/RulesPopup';
 import { AudioSystem } from '../audio/AudioSystem';
 import { SettingsModal } from '../design/SettingsModal';
@@ -12,9 +13,10 @@ export class StartScene extends Phaser.Scene {
   }
 
   create(): void {
+    configureViewport(this);
     AudioSystem.setMusicScene('menu');
-    const width = this.scale.width;
-    const height = this.scale.height;
+    const width = viewport(this).width;
+    const height = viewport(this).height;
     const cx = width / 2;
     const manager = getGameManager();
 
@@ -27,7 +29,7 @@ export class StartScene extends Phaser.Scene {
     // "GOLF" text
     this.add
       .text(cx, logoY, 'GOLF', {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '92px',
         color: '#ffffff',
       })
@@ -38,7 +40,7 @@ export class StartScene extends Phaser.Scene {
     // "ROGUE" text
     this.add
       .text(cx, logoY + 80, 'ROGUE', {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '104px',
         color: '#ffffff',
       })
@@ -60,7 +62,7 @@ export class StartScene extends Phaser.Scene {
 
     this.add
       .text(cx, bannerY, 'SOLITAIRE • ROGUELIKE', {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '14px',
         color: '#ffffff',
       })
@@ -89,7 +91,7 @@ export class StartScene extends Phaser.Scene {
     // Tagline
     this.add
       .text(cx, cardsY + 100, 'Chain cards. Smash monsters.', {
-        fontFamily: 'Fredoka',
+        resolution: getRenderDensity(), fontFamily: 'Fredoka',
         fontSize: '18px',
         fontStyle: 'bold',
         color: '#ffffff',
@@ -127,7 +129,7 @@ export class StartScene extends Phaser.Scene {
       this.scene.start('CreditsScene');
     });
 
-    this.add.text(cx, height - 40, 'HOW TO PLAY', { fontFamily: 'Lilita One', fontSize: '15px', color: '#ffe35a' }).setOrigin(.5).setInteractive().on('pointerup', () => showRules(this));
+    this.add.text(cx, height - 40, 'HOW TO PLAY', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#ffe35a' }).setOrigin(.5).setInteractive().on('pointerup', () => showRules(this));
 
     // Mascot (small slime in corner)
     if (this.textures.exists('enemy-slime')) {
@@ -207,7 +209,7 @@ export class StartScene extends Phaser.Scene {
       // Rank
       const rankText = this.add
         .text(-cardW / 2 + 8, -cardH / 2 + 6, card.rank, {
-          fontFamily: 'Lilita One',
+          resolution: getRenderDensity(), fontFamily: 'Lilita One',
           fontSize: '28px',
           color: '#' + card.color.toString(16).padStart(6, '0'),
         });
@@ -216,7 +218,7 @@ export class StartScene extends Phaser.Scene {
       // Big suit
       const suitText = this.add
         .text(0, 10, card.suit, {
-          fontFamily: 'Arial',
+          resolution: getRenderDensity(), fontFamily: 'Arial',
           fontSize: '32px',
           color: '#' + card.color.toString(16).padStart(6, '0'),
         })
@@ -243,7 +245,7 @@ export class StartScene extends Phaser.Scene {
 
         const badgeText = this.add
           .text(0, badgeY, card.power, {
-            fontFamily: 'Lilita One',
+            resolution: getRenderDensity(), fontFamily: 'Lilita One',
             fontSize: '10px',
             color: '#ffffff',
           })
@@ -290,7 +292,7 @@ export class StartScene extends Phaser.Scene {
     const text = hasSave ? 'CONTINUE' : 'START RUN';
     const buttonText = this.add
       .text(0, -3, text, {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '38px',
         color: '#ffffff',
       })
@@ -381,7 +383,7 @@ export class StartScene extends Phaser.Scene {
 
     const buttonText = this.add
       .text(0, -2, text, {
-        fontFamily: 'Lilita One',
+        resolution: getRenderDensity(), fontFamily: 'Lilita One',
         fontSize: '14px',
         color: '#ffffff',
       })

@@ -1,3 +1,4 @@
+import { getRenderDensity } from './viewport';
 import Phaser from 'phaser';
 import { gamePopup, popupButton } from './GamePopup';
 const KEY = 'golf_rogue_rules_v1';
@@ -14,8 +15,8 @@ export function showRules(scene: Phaser.Scene, onClose?: () => void): void {
     ['3 · JOKERS', 'Red joker: 30% lifesteal, red cards next. Black joker: ×5 chain damage, black cards next. Jokers connect to each other.'],
   ];
   rules.forEach(([title, text], i) => {
-    content.add(scene.add.text(-width / 2 + 20, top + 108 + i * 77, title, { fontFamily: 'Lilita One', fontSize: '17px', color: '#ffe35a' }));
-    content.add(scene.add.text(-width / 2 + 20, top + 133 + i * 77, text, { fontFamily: 'Fredoka', fontSize: '13px', color: '#f4e9ff', wordWrap: { width: width - 40 } }));
+    content.add(scene.add.text(-width / 2 + 20, top + 108 + i * 77, title, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '17px', color: '#ffe35a' }));
+    content.add(scene.add.text(-width / 2 + 20, top + 133 + i * 77, text, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '13px', color: '#f4e9ff', wordWrap: { width: width - 40 } }));
   });
   popupButton(scene, content, modal.height / 2 - 38, width - 40, 'GOT IT — LET’S PLAY', () => {
     try { localStorage.setItem(KEY, 'yes'); } catch { /* Private mode. */ }
