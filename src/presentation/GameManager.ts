@@ -98,16 +98,21 @@ export class GameManager {
     if (!this.state) return null;
 
     const result = playCard(this.state, cardId, this.config);
+    if (result.state === this.state) return result;
     this.state = result.state;
+    if (this.state.phase === 'reward') {
+      this.state = setupRewards(this.state, this.allRelics);
+    }
     this.save();
     this.emitEvents(result.events);
-    return result;
+    return { ...result, state: this.state };
   }
 
   draw(): ActionResult | null {
     if (!this.state) return null;
 
     const result = drawCard(this.state, this.config);
+    if (result.state === this.state) return result;
     this.state = result.state;
 
     // Handle state transitions
@@ -117,7 +122,7 @@ export class GameManager {
 
     this.save();
     this.emitEvents(result.events);
-    return result;
+    return { ...result, state: this.state };
   }
 
   selectRelic(relicId: string): ActionResult | null {

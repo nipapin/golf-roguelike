@@ -52,7 +52,7 @@ export class CardVisual {
 
     this.container = scene.add.container(x, y);
 
-    const { cw, ch, radius, bevelHeight } = this.metrics;
+    const { cw, ch } = this.metrics;
     const suitKey = card.suit as keyof typeof suitColors;
     const suitColor = suitColors[suitKey]?.suit || colors.spade;
 
@@ -386,11 +386,13 @@ export class CardVisual {
     
     // Use a Zone child for hit detection - Zones have origin 0.5 by default
     // Position at card center (cw/2, ch/2), size cw x ch
-    this.hitZone = this.scene.add.zone(cw / 2, ch / 2, cw, ch);
+    if (!this.hitZone) {
+      this.hitZone = this.scene.add.zone(cw / 2, ch / 2, cw, ch);
+      this.container.add(this.hitZone);
+    }
+    this.played = false;
+    this.hitZone.removeAllListeners();
     this.hitZone.setInteractive();
-    this.container.add(this.hitZone);
-    
-    // Use pointerup with played guard to prevent double-tap issues
     this.hitZone.on('pointerup', () => {
       if (this.played) return;
       this.played = true;
@@ -400,10 +402,8 @@ export class CardVisual {
   }
 
   disableInteractive(): void {
-    if (this.hitZone) {
-      this.hitZone.disableInteractive();
-      this.hitZone.removeAllListeners();
-    }
+    this.hitZone?.disableInteractive();
+    this.hitZone?.removeAllListeners();
   }
 
   getContainer(): Phaser.GameObjects.Container {
@@ -425,7 +425,7 @@ export class CardVisual {
   }
 
   isInteractive(): boolean {
-    return this.hitZone !== null && !this.played;
+    return !!this.hitZone?.input?.enabled && !this.played;
   }
 
   destroy(): void {

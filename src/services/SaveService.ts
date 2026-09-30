@@ -1,4 +1,5 @@
 import { RunState } from '../core/types';
+import { isSavedRun } from './validateSave';
 
 const SAVE_KEY = 'golf-rogue-save';
 const SAVE_VERSION = 1;
@@ -29,7 +30,12 @@ export function loadGame(): RunState | null {
     const raw = localStorage.getItem(SAVE_KEY);
     if (!raw) return null;
 
-    const saveData: SaveData = JSON.parse(raw);
+    const parsed: unknown = JSON.parse(raw);
+    if (typeof parsed !== 'object' || parsed === null) {
+      clearSave();
+      return null;
+    }
+    const saveData = parsed as Partial<SaveData>;
 
     // Version check - for now just accept version 1
     if (saveData.version !== SAVE_VERSION) {
@@ -39,7 +45,7 @@ export function loadGame(): RunState | null {
     }
 
     // Basic validation
-    if (!saveData.state || !saveData.state.seed) {
+    if (!isSavedRun(saveData.state)) {
       console.warn('Invalid save data, clearing save');
       clearSave();
       return null;
@@ -63,7 +69,7 @@ export function clearSave(): void {
 
 export function hasSave(): boolean {
   try {
-    return localStorage.getItem(SAVE_KEY) !== null;
+    return loadGame() !== null;
   } catch {
     return false;
   }

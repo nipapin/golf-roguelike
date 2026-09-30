@@ -4,7 +4,6 @@
  */
 
 import Phaser from 'phaser';
-import { colors } from './tokens';
 
 export type EncounterType =
   | 'forest'

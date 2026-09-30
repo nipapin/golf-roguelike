@@ -1,7 +1,4 @@
 import {
-  Card,
-  Suit,
-  PowerType,
   Relic,
   BattleState,
   RunState,
@@ -19,9 +16,7 @@ import {
   isTableauEmpty,
   hasLegalMoves,
   setupBattle,
-  EnemyData,
   EnemiesData,
-  createDeck,
 } from './GameState';
 import { calculateCardDamage } from './DamageCalculator';
 
@@ -161,6 +156,27 @@ export function playCard(
     events.push({ type: 'suit_effect', suit: 'diamonds', value: goldAmount });
   }
 
+  // A power is independent of its card's suit. Matching suits were combined
+  // above to preserve their existing event amounts and avoid double application.
+  if (powerType === 'HEAL' && card.suit !== 'hearts') {
+    const doubled = state.player.relics.some((r) => r.effect.type === 'doublePower' && r.effect.powerType === 'HEAL');
+    const amount = config.powerCards.HEAL.healAmount * (doubled ? 2 : 1);
+    newPlayer = { ...newPlayer, hp: Math.min(newPlayer.maxHp, newPlayer.hp + amount) };
+    events.push({ type: 'player_healed', amount });
+  }
+  if (powerType === 'GUARD' && card.suit !== 'clubs') {
+    const doubled = state.player.relics.some((r) => r.effect.type === 'doublePower' && r.effect.powerType === 'GUARD');
+    const amount = config.powerCards.GUARD.armorAmount * (doubled ? 2 : 1);
+    newPlayer = { ...newPlayer, armor: newPlayer.armor + amount };
+    events.push({ type: 'armor_gained', amount });
+  }
+  if (powerType === 'GOLD' && card.suit !== 'diamonds') {
+    const doubled = state.player.relics.some((r) => r.effect.type === 'doublePower' && r.effect.powerType === 'GOLD');
+    const amount = config.powerCards.GOLD.goldAmount * (doubled ? 2 : 1);
+    newPlayer = { ...newPlayer, gold: newPlayer.gold + amount };
+    events.push({ type: 'gold_gained', amount });
+  }
+
   // Handle power card effects
   if (powerType) {
     events.push({ type: 'power_activated', powerType, card });
@@ -292,7 +308,7 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
   };
 }
 
-function resolveChain(state: RunState, config: GameConfig): ActionResult {
+function resolveChain(state: RunState, _config: GameConfig): ActionResult {
   const events: GameEvent[] = [];
 
   if (!state.battle) {
@@ -364,7 +380,7 @@ function resolveTableauCleared(
   return handleEnemyDeath(newState, config, events);
 }
 
-function enemyAttack(state: RunState, config: GameConfig): ActionResult {
+function enemyAttack(state: RunState, _config: GameConfig): ActionResult {
   const events: GameEvent[] = [];
 
   if (!state.battle) {
@@ -411,7 +427,7 @@ function enemyAttack(state: RunState, config: GameConfig): ActionResult {
   };
 }
 
-function reshuffleDeck(state: RunState, config: GameConfig): ActionResult {
+function reshuffleDeck(state: RunState, _config: GameConfig): ActionResult {
   const events: GameEvent[] = [];
 
   if (!state.battle) {

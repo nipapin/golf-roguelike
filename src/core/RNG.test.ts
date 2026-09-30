@@ -89,3 +89,14 @@ describe('generateSeed', () => {
     expect(seeds.size).toBeGreaterThan(1);
   });
 });
+
+it('keeps serialized state bounded and preserves legacy save sequences', () => {
+  const legacyState = 158564176314;
+  const restored = RNG.fromState(legacyState);
+  const normalized = RNG.fromState(legacyState >>> 0);
+  for (let i = 0; i < 1000; i++) {
+    expect(restored.next()).toBe(normalized.next());
+    expect(restored.getState()).toBeGreaterThanOrEqual(0);
+    expect(restored.getState()).toBeLessThan(4294967296);
+  }
+});

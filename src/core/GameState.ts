@@ -4,7 +4,6 @@ import {
   PowerType,
   PowerCard,
   Enemy,
-  Relic,
   TableauColumn,
   BattleState,
   PlayerState,
@@ -94,7 +93,6 @@ export function setupBattle(
 
   const deck = rng.shuffle(createDeck());
   const tableau: TableauColumn[] = [];
-  const totalTableauCards = config.tableau.columns * config.tableau.rows;
 
   for (let col = 0; col < config.tableau.columns; col++) {
     const cards = deck.splice(0, config.tableau.rows);
@@ -116,11 +114,6 @@ export function setupBattle(
     cardId: pos.card.id,
     type: POWER_TYPES[i % POWER_TYPES.length],
   }));
-
-  // Check if first chain bonus from relics
-  const hasFirstChainBonus = state.player.relics.some(
-    (r) => r.effect.type === 'firstChainBonus'
-  );
 
   const battle: BattleState = {
     tableau,
