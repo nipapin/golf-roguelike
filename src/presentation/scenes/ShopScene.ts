@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
-import { Relic, RunState } from '../../core/types';
+import { RunState } from '../../core/types';
 
 export class ShopScene extends Phaser.Scene {
   constructor() {
@@ -194,7 +194,7 @@ export class ShopScene extends Phaser.Scene {
 
     // Show relics
     if (state.player.relics.length > 0) {
-      const relicText = state.player.relics.map((r) => '◆').join(' ');
+      const relicText = state.player.relics.map(() => '◆').join(' ');
       this.add
         .text(width - 20, y, relicText, {
           fontFamily: 'Arial',

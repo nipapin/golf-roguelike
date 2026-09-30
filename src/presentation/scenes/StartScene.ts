@@ -1,6 +1,6 @@
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
-import { colors, getLayoutMetrics } from '../design/tokens';
+import { colors } from '../design/tokens';
 
 export class StartScene extends Phaser.Scene {
   constructor() {
@@ -20,7 +20,7 @@ export class StartScene extends Phaser.Scene {
     const logoY = height * 0.12;
 
     // "GOLF" text
-    const golfText = this.add
+    this.add
       .text(cx, logoY, 'GOLF', {
         fontFamily: 'Lilita One',
         fontSize: '92px',
@@ -31,7 +31,7 @@ export class StartScene extends Phaser.Scene {
       .setShadow(0, 8, '#1B1030', 0, true, true);
 
     // "ROGUE" text
-    const rogueText = this.add
+    this.add
       .text(cx, logoY + 80, 'ROGUE', {
         fontFamily: 'Lilita One',
         fontSize: '104px',

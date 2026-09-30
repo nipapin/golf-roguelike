@@ -4,8 +4,8 @@
  */
 
 import Phaser from 'phaser';
-import { colors, suitColors, getCardMetrics, powerColors } from './tokens';
-import type { Card, PowerType } from '../../core/types';
+import { colors, suitColors, getCardMetrics } from './tokens';
+import type { Card } from '../../core/types';
 
 const RANKS = ['A', '2', '3', '4', '5', '6', '7', '8', '9', '10', 'J', 'Q', 'K'];
 const SUITS: Array<'spades' | 'hearts' | 'clubs' | 'diamonds'> = [
@@ -34,8 +34,6 @@ export class CardRenderer {
 
   generateAllTextures(): void {
     if (this.texturesGenerated) return;
-
-    const { cw, ch } = this.metrics;
 
     // Generate textures for each rank/suit combination
     for (const suit of SUITS) {

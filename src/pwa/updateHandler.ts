@@ -4,7 +4,7 @@
  */
 
 import { registerSW } from 'virtual:pwa-register';
-import { saveGame, loadGame } from '../services/SaveService';
+import { saveGame } from '../services/SaveService';
 import { getGameManager } from '../presentation/GameManager';
 
 let updateCheckInProgress = false;

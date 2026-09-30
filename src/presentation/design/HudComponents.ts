@@ -160,7 +160,6 @@ export class HPBar {
     // HP fill gradient
     this.fillGraphics.clear();
     if (fillWidth > 0) {
-      const fillColor = this.isPlayer ? colors.playerHp : colors.hpFill;
       const fillColorHi = this.isPlayer ? 0xffa0b8 : colors.hpFillHi;
       const fillColorLo = this.isPlayer ? 0xd02060 : colors.hpFillLo;
 
@@ -341,7 +340,6 @@ export class ComboBanner {
       const tierThreshold = comboTiers[i];
       const x = startX + i * (indicatorWidth + indicatorGap);
       const isFilled = chainLength >= tierThreshold.min;
-      const isPartial = chainLength >= tierThreshold.min - 1 && chainLength < tierThreshold.min;
 
       this.tierIndicators.fillStyle(isFilled ? tierThreshold.color : 0x1b1030, isFilled ? 1 : 0.3);
       this.tierIndicators.fillRoundedRect(x, indicatorY, indicatorWidth, 10, 3);

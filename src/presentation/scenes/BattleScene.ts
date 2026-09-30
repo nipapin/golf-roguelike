@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { getGameManager, setTestHook } from '../GameManager';
-import { colors, getLayoutMetrics, getCardMetrics, getComboTier } from '../design/tokens';
+import { colors, getLayoutMetrics, getCardMetrics } from '../design/tokens';
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
 import { HPBar, ComboBanner, createIntentBubble, createChip } from '../design/HudComponents';
 import { CardVisual, createCardBack } from '../design/CardVisual';
 import { SettingsModal } from '../design/SettingsModal';
 import { isPlayable } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
-import type { RunState, Card, BattleState, PowerType } from '../../core/types';
+import type { RunState, Card, BattleState } from '../../core/types';
 
 export class BattleScene extends Phaser.Scene {
   private layout!: ReturnType<typeof getLayoutMetrics>;
@@ -37,6 +37,8 @@ export class BattleScene extends Phaser.Scene {
 
   // State
   private currentState: RunState | null = null;
+  private renderedEnemyId: string | null = null;
+  private renderedIntentKey: string | null = null;
   
   // UI
   private settingsModal: SettingsModal | null = null;
@@ -105,6 +107,7 @@ export class BattleScene extends Phaser.Scene {
 
     // Set up test hook for automated testing
     this.setupTestHook();
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
   private setupTestHook(): void {
@@ -276,7 +279,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTableBackground(): void {
-    const { tableTop, tableHeight, safeBottom } = this.layout;
+    const { tableTop, safeBottom } = this.layout;
     const width = this.scale.width;
     const height = this.scale.height;
 
@@ -390,12 +393,13 @@ export class BattleScene extends Phaser.Scene {
     const state = manager.getState();
     if (!state) return;
 
+    const previousState = this.currentState;
     this.currentState = state;
 
     // Update arena background based on enemy
     if (state.battle) {
       const encounter = getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
-      this.arenaBackground.draw(
+      if (!previousState?.battle || previousState.battle.enemy.id !== state.battle.enemy.id) this.arenaBackground.draw(
         this.scale.width,
         this.layout.arenaTop,
         this.layout.arenaHeight,
@@ -418,6 +422,17 @@ export class BattleScene extends Phaser.Scene {
     const { arenaTop, arenaHeight } = this.layout;
 
     const enemy = battle.enemy;
+    const intent = enemy.intents[enemy.currentIntentIndex];
+    const intentKey = `${intent?.type}:${intent?.value}`;
+    if (this.renderedEnemyId === enemy.id) {
+      this.enemyHPBar.setHp(enemy.hp, enemy.maxHp);
+      this.enemyHPBar.setPendingDamage(battle.accumulatedDamage);
+      if (this.renderedIntentKey !== intentKey) {
+        this.updateIntent(battle);
+      }
+      return;
+    }
+    this.renderedEnemyId = enemy.id;
     const enemyX = width / 2;
     const enemyY = arenaTop + arenaHeight - 70;
 
@@ -513,66 +528,49 @@ export class BattleScene extends Phaser.Scene {
     this.enemyHPBar.setPendingDamage(battle.accumulatedDamage);
     this.enemyHPBar.setDepth(30);
 
-    // Intent bubble
-    if (this.intentBubble) this.intentBubble.destroy();
+    this.updateIntent(battle);
+  }
 
-    const intent = enemy.intents[enemy.currentIntentIndex];
+  private updateIntent(battle: BattleState): void {
+    const intent = battle.enemy.intents[battle.enemy.currentIntentIndex];
+    this.renderedIntentKey = `${intent?.type}:${intent?.value}`;
+    this.intentBubble?.destroy();
+    this.intentBubble = null;
     if (intent) {
       this.intentBubble = createIntentBubble(
-        this,
-        width / 2 + 80,
-        arenaTop + arenaHeight * 0.2,
-        intent.type as 'attack' | 'defend' | 'buff' | 'debuff',
-        intent.value
+        this, this.scale.width / 2 + 80,
+        this.layout.arenaTop + this.layout.arenaHeight * 0.2,
+        intent.type, intent.value
       );
       this.intentBubble.setDepth(25);
     }
   }
 
   private renderTableau(battle: BattleState): void {
-    // Clear existing cards
-    this.cardVisuals.forEach((cv) => cv.destroy());
-    this.cardVisuals = [];
-
+    const existing = new Map(this.cardVisuals.map((visual) => [visual.getCard().id, visual]));
+    const next: CardVisual[] = [];
     const { tableauTop, cw, strip, side, gap } = this.layout;
+    const powers = new Map(battle.powerCards.map((power) => [power.cardId, power.type]));
 
-    const tableauX = side;
-    const tableauY = tableauTop + 20;
-
-    // Get power cards mapping
-    const powerCards = new Map<string, PowerType>();
-    battle.powerCards.forEach((pc) => powerCards.set(pc.cardId, pc.type));
-
-    // Render each column
     battle.tableau.forEach((column, colIndex) => {
-      const x = tableauX + colIndex * (cw + gap);
-
       column.cards.forEach((card, cardIndex) => {
-        const isTop = cardIndex === column.cards.length - 1;
-        const y = tableauY + cardIndex * strip;
-
-        const powerType = powerCards.get(card.id) || null;
-        const cardVisual = new CardVisual(this, x, y, card, powerType);
-
-        // Determine state
-        let state: 'normal' | 'covered' | 'playable' | 'disabled' = 'normal';
-        if (!isTop) {
-          state = 'covered';
-        } else if (this.canPlayCard(card, battle)) {
-          state = 'playable';
-          cardVisual.setInteractive(() => this.onCardClick(card.id));
-        } else {
-          state = 'disabled';
-        }
-
-        cardVisual.setState(state);
-        // Playable cards need higher depth than draw pile (55) and active card (55)
-        // to receive clicks. Non-playable cards stay at lower depth.
-        const baseDepth = state === 'playable' ? 60 : 15;
-        cardVisual.setDepth(baseDepth + cardIndex);
-        this.cardVisuals.push(cardVisual);
+        const x = side + colIndex * (cw + gap);
+        const y = tableauTop + 20 + cardIndex * strip;
+        const visual = existing.get(card.id) ?? new CardVisual(this, x, y, card, powers.get(card.id) ?? null);
+        existing.delete(card.id);
+        const exposed = cardIndex === column.cards.length - 1;
+        const playable = exposed && this.canPlayCard(card, battle);
+        visual.setPosition(x, y);
+        const state = !exposed ? 'covered' : playable ? 'playable' : 'disabled';
+        if (visual.getState() !== state) visual.setState(state);
+        if (playable) visual.setInteractive(() => this.onCardClick(card.id));
+        else visual.disableInteractive();
+        visual.setDepth((playable ? 60 : 15) + cardIndex);
+        next.push(visual);
       });
     });
+    existing.forEach((visual) => visual.destroy());
+    this.cardVisuals = next;
   }
 
   private canPlayCard(card: Card, battle: BattleState): boolean {
@@ -580,6 +578,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private renderActiveCard(battle: BattleState): void {
+    if (this.activeCardVisual?.getCard().id === battle.activeCard?.id) return;
     if (this.activeCardVisual) {
       this.activeCardVisual.destroy();
       this.activeCardVisual = null;
@@ -814,25 +813,26 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private handleResize(): void {
-    const width = this.scale.width;
-    const height = this.scale.height;
-
-    this.layout = getLayoutMetrics(width, height);
-    this.cardMetrics = getCardMetrics(width);
-
-    // Recreate table background
-    if (this.tableBackground) {
-      this.tableBackground.destroy();
-    }
-    this.createTableBackground();
-
-    // Refresh everything
-    this.refreshState();
+    // Dimensions change card geometry and hit zones; rebuild once for resize,
+    // never for a game action. Phaser tears down the old display list.
+    this.scene.restart();
   }
 
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this);
     setTestHook(null);
+    this.cardVisuals = [];
+    this.activeCardVisual = null;
+    this.activeLabel = null;
+    this.enemySprite = null;
+    this.enemyShadow = null;
+    this.crownSprite = null;
+    this.intentBubble = null;
+    this.armorChip = null;
+    this.currentState = null;
+    this.renderedEnemyId = null;
+    this.renderedIntentKey = null;
+    this.inputPaused = false;
     if (this.settingsModal) {
       this.settingsModal.destroy();
       this.settingsModal = null;

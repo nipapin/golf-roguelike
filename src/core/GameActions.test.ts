@@ -313,8 +313,6 @@ describe('drawCard', () => {
     }
 
     if (currentState.battle?.chain.length === 1) {
-      const initialEnemyHp = currentState.battle.enemy.hp;
-      const accumulated = currentState.battle.accumulatedDamage;
 
       const drawResult = drawCard(currentState, mockConfig);
 
