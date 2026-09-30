@@ -95,17 +95,23 @@ export function playCard(
     config,
   });
 
+  const oldMultiplier = battle.jokerMultiplier ?? 1;
+  const baseDamage = (battle.chainBaseDamage ?? battle.accumulatedDamage / oldMultiplier) + damageResult.totalDamage;
+  const jokerMultiplier = card.joker === 'black' ? oldMultiplier * 5 : oldMultiplier;
+  const lifestealMultiplier = card.joker === 'red' ? oldMultiplier : (battle.lifestealMultiplier ?? 0);
+  if (card.joker) events.push({ type: 'joker_activated', color: card.joker });
+
   events.push({
     type: 'card_played',
     card,
     chainPosition,
-    damage: damageResult.totalDamage,
+    damage: card.joker ? 0 : damageResult.totalDamage * jokerMultiplier,
   });
 
   // Handle immediate suit effects (hearts, clubs, diamonds)
   let newPlayer = state.player;
 
-  if (card.suit === 'hearts') {
+  if (!card.joker && card.suit === 'hearts') {
     let healAmount = config.combat.baseHeartHeal;
     const heartBonus = state.player.relics.find((r) => r.effect.type === 'heartHealBonus');
     if (heartBonus && typeof heartBonus.effect.value === 'number') {
@@ -123,7 +129,7 @@ export function playCard(
     events.push({ type: 'suit_effect', suit: 'hearts', value: healAmount });
   }
 
-  if (card.suit === 'clubs') {
+  if (!card.joker && card.suit === 'clubs') {
     let armorAmount = config.combat.baseClubArmor;
     const clubBonus = state.player.relics.find((r) => r.effect.type === 'clubArmorBonus');
     if (clubBonus && typeof clubBonus.effect.value === 'number') {
@@ -140,7 +146,7 @@ export function playCard(
     events.push({ type: 'suit_effect', suit: 'clubs', value: armorAmount });
   }
 
-  if (card.suit === 'diamonds') {
+  if (!card.joker && card.suit === 'diamonds') {
     let goldAmount = config.combat.baseDiamondGold;
     const diamondBonus = state.player.relics.find((r) => r.effect.type === 'diamondGoldBonus');
     if (diamondBonus && typeof diamondBonus.effect.value === 'number') {
@@ -181,14 +187,11 @@ export function playCard(
   // Handle power card effects
   if (powerType) {
     events.push({ type: 'power_activated', powerType, card });
-
-    if (powerType === 'WILD') {
-      events.push({ type: 'wild_activated' });
-    }
+    if (powerType === 'WILD') events.push({ type: 'wild_activated' });
   }
 
   // Update accumulated damage
-  const newAccumulatedDamage = battle.accumulatedDamage + damageResult.totalDamage;
+  const newAccumulatedDamage = Math.floor(baseDamage * jokerMultiplier);
 
   // Update battle state
   const newBattle: BattleState = {
@@ -199,6 +202,9 @@ export function playCard(
     chain: [...battle.chain, card],
     accumulatedDamage: newAccumulatedDamage,
     wildActive: powerType === 'WILD',
+    chainBaseDamage: baseDamage,
+    jokerMultiplier,
+    lifestealMultiplier,
   };
 
   const newState: RunState = {
@@ -284,6 +290,7 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
     ? [...newState.battle.discard, newState.battle.activeCard]
     : newState.battle.discard;
 
+  if (drawnCard.joker) events.push({ type: 'joker_activated', color: drawnCard.joker });
   const finalBattle: BattleState = {
     ...newState.battle,
     deck: newDeck,
@@ -292,6 +299,9 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
     chain: [],
     accumulatedDamage: 0,
     wildActive: false,
+    chainBaseDamage: 0,
+    jokerMultiplier: drawnCard.joker === 'black' ? 5 : 1,
+    lifestealMultiplier: drawnCard.joker === 'red' ? 1 : 0,
     isFirstChain: false,
     turnNumber: newState.battle.turnNumber + 1,
   };
@@ -318,6 +328,8 @@ function resolveChain(state: RunState, _config: GameConfig): ActionResult {
   const newEnemyHp = Math.max(0, state.battle.enemy.hp - damage);
   const newEnemy = { ...state.battle.enemy, hp: newEnemyHp };
 
+  // Red joker captures the multiplier at activation, preserving joker order.
+  const jokerHeal = Math.floor((state.battle.chainBaseDamage ?? damage) * (state.battle.lifestealMultiplier ?? 0) * .3);
   // Vampiric healing
   const vampiricRelic = state.player.relics.find((r) => r.effect.type === 'vampiric');
   let newPlayer = state.player;
@@ -332,10 +344,19 @@ function resolveChain(state: RunState, _config: GameConfig): ActionResult {
     }
   }
 
+  if (jokerHeal > 0) {
+    const actual = Math.min(jokerHeal, newPlayer.maxHp - newPlayer.hp);
+    newPlayer = { ...newPlayer, hp: newPlayer.hp + actual };
+    events.push({ type: 'player_healed', amount: actual });
+  }
+
   const newBattle: BattleState = {
     ...state.battle,
     enemy: newEnemy,
     accumulatedDamage: 0,
+    chainBaseDamage: 0,
+    jokerMultiplier: 1,
+    lifestealMultiplier: 0,
   };
 
   return {

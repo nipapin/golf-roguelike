@@ -1,4 +1,5 @@
 import { MusicSequencer, type MusicScene } from './MusicSequencer';
+import type { PowerType } from '../../core/types';
 
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
@@ -93,11 +94,11 @@ class AudioSystemClass {
   private async loadAllSounds(): Promise<void> {
     // Sound file mapping - Kenney.nl CC0 sounds
     const soundFiles: Record<SoundId, string> = {
-      card_play: 'foley-card-slide-1',
-      card_play_1: 'foley-card-slide-1',
-      card_play_2: 'foley-card-slide-2',
-      card_play_3: 'foley-card-slide-3',
-      card_draw: 'foley-card-shuffle',
+      card_play: 'card-tap-1',
+      card_play_1: 'card-tap-1',
+      card_play_2: 'card-tap-2',
+      card_play_3: 'card-tap-3',
+      card_draw: 'card-tap-2',
       invalid_tap: 'error',
       combo_up: 'combo-up',
       enemy_hit: 'hit-enemy',
@@ -130,11 +131,7 @@ class AudioSystemClass {
       }
     });
 
-    const themes: Record<MusicScene, string> = { menu: 'menu-fantasy', battle: 'battle-rock', victory: 'result-victory', defeat: 'result-defeat' };
-    await Promise.all([...loadPromises, ...Object.entries(themes).map(async ([scene, file]) => {
-      const buffer = await this.loadSound(`/audio/${file}`);
-      if (buffer) this.music?.setBuffer(scene as MusicScene, buffer);
-    })]);
+    await Promise.all([...loadPromises, this.loadSound('/audio/battle-orchestral').then(buffer => { if (buffer) this.music?.setBuffer(buffer); })]);
     this.initialized = true;
   }
 
@@ -237,6 +234,39 @@ class AudioSystemClass {
     const soundId = variants[Math.floor(Math.random() * variants.length)];
     const pitchShift = Math.min(comboCount * 0.008, 0.06);
     this.play(soundId, { pitchShift, volume: 1 });
+    this.playCombo(comboCount);
+  }
+
+  private tone(frequency: number, delay: number, duration: number, type: OscillatorType, volume: number): void {
+    if (!this.context || !this.unlocked || !this.settings.soundEnabled) return;
+    const at = this.context.currentTime + delay;
+    const oscillator = this.context.createOscillator();
+    const envelope = this.context.createGain();
+    oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, at);
+    envelope.gain.setValueAtTime(0, at); envelope.gain.linearRampToValueAtTime(volume, at + .008);
+    envelope.gain.exponentialRampToValueAtTime(.0001, at + duration);
+    oscillator.connect(envelope); envelope.connect(this.soundBus!);
+    oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
+    oscillator.start(at); oscillator.stop(at + duration + .01);
+  }
+
+  playCombo(count: number): void {
+    // A semitone step per card: rising energy without stretching the card sample.
+    const root = 220 * 2 ** (Math.min(count - 1, 18) / 12);
+    this.tone(root, .02, .12, 'triangle', .3);
+    this.tone(root * 2, .025, .08, 'sine', .13);
+  }
+
+  playPower(power: PowerType | 'RED_JOKER' | 'BLACK_JOKER'): void {
+    const phrases: Record<PowerType | 'RED_JOKER' | 'BLACK_JOKER', [number[], OscillatorType, number]> = {
+      CRIT: [[130, 520], 'sawtooth', .09], HEAL: [[523, 659, 784], 'sine', .22],
+      GUARD: [[180, 270, 360], 'triangle', .15], GOLD: [[1046, 1318], 'sine', .18],
+      BOMB: [[90, 55, 35], 'sawtooth', .16], WILD: [[330, 660, 990], 'triangle', .12],
+      ECHO: [[440, 440, 440], 'sine', .13], RED_JOKER: [[392, 523, 659, 784], 'sine', .2],
+      BLACK_JOKER: [[110, 220, 880], 'sawtooth', .15],
+    };
+    const [notes, type, duration] = phrases[power];
+    notes.forEach((note, i) => this.tone(note, i * .055, duration, type, power === 'BOMB' ? .28 : .18));
   }
 
   private clampVolume(value: unknown, fallback: number): number {

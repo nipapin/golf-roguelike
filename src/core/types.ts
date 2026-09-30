@@ -2,6 +2,7 @@ export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs';
 export type PowerType = 'CRIT' | 'HEAL' | 'GUARD' | 'GOLD' | 'BOMB' | 'WILD' | 'ECHO';
 
 export interface Card {
+  readonly joker?: 'red' | 'black';
   readonly rank: number; // 1-13 (Ace=1, King=13)
   readonly suit: Suit;
   readonly id: string; // unique identifier
@@ -58,6 +59,9 @@ export interface BattleState {
   readonly activeCard: Card | null;
   readonly chain: Card[];
   readonly accumulatedDamage: number;
+  readonly chainBaseDamage?: number;
+  readonly jokerMultiplier?: number;
+  readonly lifestealMultiplier?: number;
   readonly enemy: Enemy;
   readonly powerCards: PowerCard[];
   readonly wildActive: boolean;
@@ -138,6 +142,7 @@ export type GameEvent =
   | { type: 'tableau_cleared'; bonusReward: boolean }
   | { type: 'deck_reshuffled' }
   | { type: 'wild_activated' }
+  | { type: 'joker_activated'; color: 'red' | 'black' }
   | { type: 'battle_won' }
   | { type: 'battle_lost' }
   | { type: 'run_won' }

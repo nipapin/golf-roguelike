@@ -27,7 +27,7 @@ export function calculateCardDamage(ctx: DamageContext): DamageResult {
   const { chainPosition, card, powerType, relics, config } = ctx;
 
   // Base damage = position in chain
-  const baseDamage = chainPosition;
+  const baseDamage = card.joker ? 0 : chainPosition;
 
   // Apply first chain bonus from relics
   const firstChainBonus = relics.find((r) => r.effect.type === 'firstChainBonus');
@@ -37,7 +37,7 @@ export function calculateCardDamage(ctx: DamageContext): DamageResult {
 
   // Suit bonus (spades only add to damage)
   let suitBonus = 0;
-  if (card.suit === 'spades') {
+  if (!card.joker && card.suit === 'spades') {
     suitBonus = config.combat.baseSpadeDamageBonus;
     const spadeBonusRelic = relics.find((r) => r.effect.type === 'spadeDamageBonus');
     if (spadeBonusRelic && typeof spadeBonusRelic.effect.value === 'number') {
@@ -107,6 +107,7 @@ export function calculateChainDamage(
   startPosition: number = 1
 ): number {
   let total = 0;
+  let jokerMultiplier = 1;
   let position = startPosition;
 
   for (const card of chain) {
@@ -126,8 +127,9 @@ export function calculateChainDamage(
     });
 
     total += result.totalDamage;
+    if (card.joker === 'black') jokerMultiplier *= 5;
     position++;
   }
 
-  return total;
+  return Math.floor(total * jokerMultiplier);
 }

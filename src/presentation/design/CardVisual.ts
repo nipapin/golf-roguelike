@@ -75,14 +75,14 @@ export class CardVisual {
     }
 
     // Rank text
-    const rankDisplay = RANK_DISPLAY[card.rank] || card.rank.toString();
+    const rankDisplay = card.joker ? 'J★' : RANK_DISPLAY[card.rank] || card.rank.toString();
     const fontSize = card.rank === 10 ? this.metrics.rankSize10 : this.metrics.rankSize;
     const textColor = card.suit === 'diamonds' ? colors.diamondTxt : suitColor;
 
     this.rankText = scene.add
       .text(cw * 0.09, cw * 0.06, rankDisplay, {
         fontFamily: 'Lilita One',
-        fontSize: `${fontSize}px`,
+        fontSize: `${card.joker ? cw * .4 : fontSize}px`,
         color: powerType ? '#1B1030' : this.hexToString(textColor),
       })
       .setOrigin(0, 0);
@@ -93,7 +93,7 @@ export class CardVisual {
 
     // Pip (small suit symbol)
     this.pipText = scene.add
-      .text(cw - cw * 0.07, cw * 0.1, SUIT_SYMBOLS[card.suit], {
+      .text(cw - cw * 0.07, cw * 0.1, card.joker ? '' : SUIT_SYMBOLS[card.suit], {
         fontFamily: 'Arial',
         fontSize: `${cw * 0.22}px`,
         color: this.hexToString(suitColor),
@@ -106,7 +106,7 @@ export class CardVisual {
 
     // Big suit symbol
     this.bigSuitText = scene.add
-      .text(cw / 2, ch - cw * 0.35, SUIT_SYMBOLS[card.suit], {
+      .text(cw / 2, ch - cw * 0.35, card.joker ? '♛' : SUIT_SYMBOLS[card.suit], {
         fontFamily: 'Arial',
         fontSize: `${cw * 0.45}px`,
         color: this.hexToString(suitColor),
@@ -120,6 +120,15 @@ export class CardVisual {
       this.createPowerRibbon(powerType);
     }
 
+    if (card.joker) {
+      const border = scene.add.graphics().lineStyle(3, card.joker === 'red' ? 0xff486c : 0x7048be);
+      border.strokeRoundedRect(1, 1, cw - 2, ch - 2, this.metrics.radius);
+      this.container.add(border);
+      this.powerRibbon = scene.add.container(cw / 2, ch - 10);
+      const badge = scene.add.rectangle(0, 0, cw - 8, 14, card.joker === 'red' ? 0xc62951 : 0x322149);
+      const label = scene.add.text(0, 0, card.joker === 'red' ? 'VAMP 30%' : 'CRIT ×5', { fontFamily: 'Lilita One', fontSize: `${cw * .16}px`, color: '#fff5df' }).setOrigin(.5);
+      this.powerRibbon.add([badge, label]); this.container.add(this.powerRibbon);
+    }
     this.updateOutline();
   }
 

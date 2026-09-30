@@ -58,7 +58,7 @@ export class CreditsScene extends Phaser.Scene {
       { text: 'Google Fonts • SIL OFL 1.1', style: 'normal' },
       { text: '', style: 'spacer' },
       { text: 'Audio', style: 'header' },
-      { text: 'Kenney · HydroGene · RandomMind', style: 'name' },
+      { text: 'Kenney · request (Heartfelt Battle)', style: 'name' },
       { text: 'CC0 Public Domain', style: 'normal' },
     ];
 

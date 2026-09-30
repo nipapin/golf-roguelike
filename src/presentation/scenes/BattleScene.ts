@@ -9,7 +9,7 @@ import { SettingsModal } from '../design/SettingsModal';
 import { showRules, hasSeenRules } from '../design/RulesPopup';
 import { isPlayable, MIN_ATTACK_CHAIN } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
-import type { RunState, Card, BattleState } from '../../core/types';
+import type { RunState, Card, BattleState, PowerType } from '../../core/types';
 
 export class BattleScene extends Phaser.Scene {
   private layout!: ReturnType<typeof getLayoutMetrics>;
@@ -171,13 +171,14 @@ export class BattleScene extends Phaser.Scene {
     const progress = this.add.text(16, hudHeight / 2, `FIGHT ${manager.getCurrentFightNumber()} / ${manager.getTotalFights()}`, {
       fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
     }).setOrigin(0, 0.5);
-    this.goldText = this.add.text(width * 0.58, hudHeight / 2, '♦ 0', {
+    const coin = this.add.image(width * 0.58 - 20, hudHeight / 2, 'coin').setDisplaySize(24, 24);
+    this.goldText = this.add.text(width * 0.58 + 6, hudHeight / 2, '0', {
       fontFamily: 'Fredoka', fontSize: '16px', color: '#ffd267',
     }).setOrigin(0.5);
     const settings = this.add.rectangle(width - 30, hudHeight / 2, 40, 36, 0x3d2c66).setInteractive();
     settings.on('pointerup', () => { AudioSystem.unlock(); this.openSettings(); });
     const gear = this.add.text(width - 30, hudHeight / 2, '⚙', { fontSize: '22px', color: '#fff' }).setOrigin(0.5);
-    this.topHUD.add([bg, progress, this.goldText, settings, gear]);
+    this.topHUD.add([bg, progress, coin, this.goldText, settings, gear]);
     const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100).setInteractive();
     this.buildText = this.add.text(width / 2, build.y, 'BUILD · CHOOSE A RELIC', {
       fontFamily: 'Fredoka', fontSize: '12px', color: '#dac6ff',
@@ -496,7 +497,7 @@ export class BattleScene extends Phaser.Scene {
     // Active rule hint — power state overrides base rank rule.
     const labelY = activeY + activeH / 2 + 12;
     this.activeLabel = this.add
-      .text(activeX, labelY, battle.wildActive ? 'WILD · ANY RANK' : 'ACTIVE · ±1', {
+      .text(activeX, labelY, battle.wildActive ? 'WILD · ANY CARD' : battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1', {
         fontFamily: 'Fredoka',
         fontSize: '11px',
         color: '#9a8aba',
@@ -514,7 +515,7 @@ export class BattleScene extends Phaser.Scene {
     } else {
       this.comboBanner.update(0, 0);
     }
-    this.activeLabel?.setText(battle.wildActive ? 'WILD · ANY RANK' : 'ACTIVE · ±1');
+    this.activeLabel?.setText(battle.wildActive ? 'WILD · ANY CARD' : battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1');
   }
 
   private updateDrawPile(battle: BattleState): void {
@@ -527,7 +528,7 @@ export class BattleScene extends Phaser.Scene {
 
   private updatePlayerHUD(state: RunState): void {
     this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
-    this.goldText.setText(`♦ ${state.player.gold}`);
+    this.goldText.setText(`${state.player.gold}`);
     this.armorText.setText(`ARMOR ${state.player.armor}`);
     const relics = state.player.relics;
     this.buildText.setText(relics.length ? `BUILD · ${relics.length} RELICS · TAP TO VIEW` : 'BUILD · RELICS AFTER EACH VICTORY');
@@ -612,6 +613,14 @@ export class BattleScene extends Phaser.Scene {
           this.playDamageAnimation(event.totalDamage as number);
           AudioSystem.play('enemy_hit');
           break;
+        case 'power_activated':
+          AudioSystem.playPower(event.powerType as PowerType);
+          this.playPowerEffect(event.powerType as PowerType);
+          break;
+        case 'joker_activated':
+          AudioSystem.playPower(event.color === 'red' ? 'RED_JOKER' : 'BLACK_JOKER');
+          this.playPowerEffect(event.color === 'red' ? 'RED_JOKER' : 'BLACK_JOKER');
+          break;
         case 'armor_gained':
           AudioSystem.play('shield');
           break;
@@ -678,6 +687,54 @@ export class BattleScene extends Phaser.Scene {
       const spark = this.add.star(x, y, 4, 2, 5, color).setDepth(180);
       this.tweens.add({ targets: spark, x: x + Math.cos(angle) * 30, y: y + Math.sin(angle) * 25, alpha: 0, scale: .1, angle: 90, duration: 270, onComplete: () => spark.destroy() });
     }
+  }
+
+  private playPowerEffect(power: PowerType | 'RED_JOKER' | 'BLACK_JOKER'): void {
+    const x = this.scale.width / 2;
+    const y = this.enemyBaseY - this.layout.enemyHeight * .5;
+    const themes: Record<typeof power, { color: number; symbol: string; text: string }> = {
+      CRIT: { color: 0xff6633, symbol: '⚔', text: 'CRITICAL ×3' },
+      HEAL: { color: 0x3aef98, symbol: '♥', text: 'HEAL' },
+      GUARD: { color: 0x50bfff, symbol: '⬡', text: 'GUARD' },
+      GOLD: { color: 0xffd34a, symbol: '🪙', text: 'GOLD' },
+      BOMB: { color: 0xff9a30, symbol: '✹', text: 'BOMB' },
+      WILD: { color: 0x80eaff, symbol: '🃏', text: 'WILD · ANY CARD' },
+      ECHO: { color: 0xc58aff, symbol: '◎', text: 'ECHO +2' },
+      RED_JOKER: { color: 0xff557c, symbol: '♥', text: 'LIFESTEAL 30%' },
+      BLACK_JOKER: { color: 0xb795ff, symbol: '♛', text: 'CHAIN CRIT ×5' },
+    };
+    const theme = themes[power];
+    const hex = '#' + theme.color.toString(16).padStart(6, '0');
+    const label = this.add.text(x, this.layout.arenaTop + 70, theme.text, { fontFamily: 'Lilita One', fontSize: '23px', color: hex }).setOrigin(.5).setStroke('#1b1030', 5).setDepth(190);
+    label.setScale(.6);
+    this.tweens.add({ targets: label, scale: 1, duration: 170, ease: 'Back.out' });
+    this.tweens.add({ targets: label, y: label.y - 20, alpha: 0, delay: 450, duration: 300, onComplete: () => label.destroy() });
+    if (power === 'CRIT' || power === 'BLACK_JOKER') {
+      [-1, 1].forEach(direction => {
+        const slash = this.add.rectangle(x, y, 7, this.layout.enemyHeight * .7, theme.color).setRotation(direction * .75).setDepth(180);
+        this.tweens.add({ targets: slash, scaleY: 1.4, scaleX: 0, alpha: 0, duration: 240, onComplete: () => slash.destroy() });
+      });
+    } else if (power === 'BOMB' || power === 'ECHO') {
+      for (let i = 0; i < 3; i++) {
+        const ring = this.add.circle(x, y, 12, theme.color, .12).setStrokeStyle(3, theme.color).setDepth(180);
+        this.tweens.add({ targets: ring, scale: power === 'BOMB' ? 5 : 4, alpha: 0, duration: 420, delay: i * 75, onComplete: () => ring.destroy() });
+      }
+      if (power === 'BOMB') this.cameras.main.shake(140, .004);
+    } else if (power === 'WILD') {
+      const bolt = this.add.graphics().lineStyle(5, theme.color).setDepth(180);
+      bolt.beginPath(); bolt.moveTo(x + 12, y - 40); bolt.lineTo(x - 12, y); bolt.lineTo(x + 12, y); bolt.lineTo(x - 12, y + 40); bolt.strokePath();
+      this.tweens.add({ targets: bolt, alpha: 0, duration: 380, onComplete: () => bolt.destroy() });
+    } else {
+      for (let i = 0; i < 5; i++) {
+        const icon = power === 'GOLD'
+          ? this.add.image(x + (i - 2) * 14, y, 'coin').setDisplaySize(20, 20)
+          : this.add.text(x + (i - 2) * 14, y, theme.symbol, { fontSize: '24px', color: hex }).setOrigin(.5);
+        icon.setDepth(180);
+        const destinationX = power === 'GOLD' ? this.scale.width * .58 : power === 'GUARD' ? this.scale.width - 30 : 76;
+        this.tweens.add({ targets: icon, x: destinationX, y: this.layout.playerHudTop + 15, alpha: 0, delay: i * 40, duration: 500, ease: 'Cubic.in', onComplete: () => icon.destroy() });
+      }
+    }
+    this.cardBurst(x, y, theme.color);
   }
 
   private playDamageAnimation(damage: number): void {

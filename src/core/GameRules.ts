@@ -160,7 +160,7 @@ export function getSuitSymbol(suit: string): string {
  * Format card as display string
  */
 export function formatCard(card: Card): string {
-  return getRankDisplay(card.rank) + getSuitSymbol(card.suit);
+  return card.joker ? `${card.joker.toUpperCase()} JOKER` : getRankDisplay(card.rank) + getSuitSymbol(card.suit);
 }
 
 /** Cards needed to prevent the enemy response when banking a turn. */
