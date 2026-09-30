@@ -1,3 +1,4 @@
+import { MIN_ATTACK_CHAIN } from './GameRules';
 import {
   Relic,
   BattleState,
@@ -239,8 +240,9 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
     }
   }
 
-  // Enemy attacks if alive
-  if (newState.battle && newState.battle.enemy.hp > 0) {
+  // A successful player turn staggers the enemy. Short/empty chains expose the player.
+  if (battle.chain.length >= MIN_ATTACK_CHAIN) events.push({ type: 'enemy_staggered', chainLength: battle.chain.length });
+  if (battle.chain.length < MIN_ATTACK_CHAIN && newState.battle && newState.battle.enemy.hp > 0) {
     const attackResult = enemyAttack(newState, config);
     newState = attackResult.state;
     events.push(...attackResult.events);
@@ -267,15 +269,7 @@ export function drawCard(state: RunState, config: GameConfig): ActionResult {
   if (!newState.battle || newState.battle.deck.length === 0) {
     // Still no cards, check again for moves
     if (newState.battle && !hasLegalMoves(newState.battle)) {
-      // Enemy attacks again, then reshuffle
-      const attackResult2 = enemyAttack(newState, config);
-      newState = attackResult2.state;
-      events.push(...attackResult2.events);
-
-      if (newState.player.hp <= 0) {
-        return handlePlayerDeath(newState, events);
-      }
-
+      // Do not deal a second enemy hit merely because the deck is exhausted.
       const reshuffleResult2 = reshuffleDeck(newState, config);
       newState = reshuffleResult2.state;
       events.push(...reshuffleResult2.events);

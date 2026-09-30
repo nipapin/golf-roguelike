@@ -47,6 +47,7 @@ interface RendererHarness {
     arenaTop: number;
     arenaHeight: number;
   };
+  dealt: boolean;
   cardVisuals: InstanceType<typeof Visual>[];
   scale: { width: number; height: number };
   renderTableau: (battle: BattleState) => void;
@@ -68,6 +69,7 @@ beforeEach(() => {
     arenaTop: 50,
     arenaHeight: 180,
   };
+  scene.dealt = true; // These retention tests isolate action rendering from initial dealing.
   scene.scale = { width: 390, height: 844 };
 });
 
@@ -99,8 +101,8 @@ it('updates input eligibility without rebuilding cards on draw', () => {
   const playable = new Set(getPlayableCards(changed).map((card) => card.id));
   for (const visual of scene.cardVisuals) {
     expect(visual.getState() === 'playable').toBe(playable.has(visual.card.id));
-    if (playable.has(visual.card.id)) expect(visual.setInteractive).toHaveBeenCalled();
-    else expect(visual.disableInteractive).toHaveBeenCalled();
+    // Invalid cards also receive taps so the scene can explain and shake the rejected move.
+    expect(visual.setInteractive).toHaveBeenCalled();
   }
 });
 

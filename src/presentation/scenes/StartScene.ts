@@ -1,3 +1,5 @@
+import { showRules } from '../design/RulesPopup';
+import { AudioSystem } from '../audio/AudioSystem';
 import { SettingsModal } from '../design/SettingsModal';
 import Phaser from 'phaser';
 import { getGameManager } from '../GameManager';
@@ -10,6 +12,7 @@ export class StartScene extends Phaser.Scene {
   }
 
   create(): void {
+    AudioSystem.setMusicScene('menu');
     const width = this.scale.width;
     const height = this.scale.height;
     const cx = width / 2;
@@ -123,6 +126,8 @@ export class StartScene extends Phaser.Scene {
     this.createSecondaryButton(cx + 60, bottomY, 'CREDITS', colors.blue, colors.blueLo, () => {
       this.scene.start('CreditsScene');
     });
+
+    this.add.text(cx, height - 40, 'HOW TO PLAY', { fontFamily: 'Lilita One', fontSize: '15px', color: '#ffe35a' }).setOrigin(.5).setInteractive().on('pointerup', () => showRules(this));
 
     // Mascot (small slime in corner)
     if (this.textures.exists('enemy-slime')) {
@@ -318,6 +323,7 @@ export class StartScene extends Phaser.Scene {
     );
 
     container.on('pointerdown', () => {
+      AudioSystem.unlock();
       this.tweens.killTweensOf(container);
       container.setScale(0.95);
 

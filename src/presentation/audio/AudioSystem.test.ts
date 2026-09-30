@@ -34,7 +34,7 @@ class ContextStub {
   createOscillator() { const node = new AudioNodeStub(); this.voices.push(node); return node; }
   createBufferSource() { const node = new AudioNodeStub(); this.sources.push(node); return node; }
   createBuffer() { return {}; }
-  decodeAudioData = vi.fn(async () => ({}));
+  decodeAudioData = vi.fn(async () => ({ duration: 114 }));
 }
 
 beforeEach(() => {
@@ -57,13 +57,13 @@ it('mixes quieter SFX and actually starts one music loop after a gesture', async
   const context = ContextStub.instances[0];
   expect(context.gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.22, 0, 0.04);
   expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.18, 0, 0.08);
-  expect(context.voices.length).toBeGreaterThan(0);
-  expect(vi.getTimerCount()).toBe(1);
+  expect(context.sources.filter(source => (source as AudioNodeStub & {loop?: boolean}).loop)).toHaveLength(1);
+  expect(context.voices).toHaveLength(0);
   AudioSystem.play('card_play');
   expect(context.sources.at(-1)!.connect).toHaveBeenCalled();
   AudioSystem.isMusicEnabled = false;
   expect(vi.getTimerCount()).toBe(0);
-  expect(context.voices.every((voice) => voice.stop.mock.calls.length >= 1)).toBe(true);
+  expect(context.sources.find(source => (source as AudioNodeStub & {loop?: boolean}).loop)!.stop).toHaveBeenCalledOnce();
   expect(AudioSystem.isSoundEnabled).toBe(true);
 });
 
@@ -83,4 +83,23 @@ it('persists independent volumes and resumes a suspended context on a new gestur
   await Promise.resolve();
   expect(context.resume).toHaveBeenCalledOnce();
   expect(context.state).toBe('running');
+});
+
+it('switches recorded themes without overlapping loops and plays results once', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init(); AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const menu = context.sources.find(source => (source as AudioNodeStub & { loop?: boolean }).loop)!;
+  AudioSystem.setMusicScene('battle');
+  expect(menu.stop).toHaveBeenCalledOnce();
+  const battle = context.sources.at(-1)!;
+  expect((battle as AudioNodeStub & { loop?: boolean }).loop).toBe(true);
+  AudioSystem.setMusicScene('defeat');
+  expect(battle.stop).toHaveBeenCalledOnce();
+  const result = context.sources.at(-1)!;
+  expect((result as AudioNodeStub & { loop?: boolean }).loop).toBe(false);
+  result.onended?.();
+  AudioSystem.unlock();
+  expect(context.sources.at(-1)).not.toBe(result); // Only the silent unlock buffer was created.
+  expect(context.sources.filter(source => source.buffer === result.buffer && source !== result && !(source as AudioNodeStub & { loop?: boolean }).loop)).toHaveLength(0);
 });

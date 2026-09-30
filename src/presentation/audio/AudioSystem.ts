@@ -1,4 +1,4 @@
-import { MusicSequencer } from './MusicSequencer';
+import { MusicSequencer, type MusicScene } from './MusicSequencer';
 
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
@@ -45,6 +45,7 @@ class AudioSystemClass {
   private soundBus: GainNode | null = null;
   private musicBus: GainNode | null = null;
   private music: MusicSequencer | null = null;
+  private musicScene: MusicScene = 'menu';
   private unlocked: boolean = false;
   private loadPromise: Promise<void> | null = null;
   private initialized: boolean = false;
@@ -92,11 +93,11 @@ class AudioSystemClass {
   private async loadAllSounds(): Promise<void> {
     // Sound file mapping - Kenney.nl CC0 sounds
     const soundFiles: Record<SoundId, string> = {
-      card_play: 'card-place-1',
-      card_play_1: 'card-place-1',
-      card_play_2: 'card-place-2',
-      card_play_3: 'card-place-3',
-      card_draw: 'card-slide',
+      card_play: 'foley-card-slide-1',
+      card_play_1: 'foley-card-slide-1',
+      card_play_2: 'foley-card-slide-2',
+      card_play_3: 'foley-card-slide-3',
+      card_draw: 'foley-card-shuffle',
       invalid_tap: 'error',
       combo_up: 'combo-up',
       enemy_hit: 'hit-enemy',
@@ -129,7 +130,11 @@ class AudioSystemClass {
       }
     });
 
-    await Promise.all(loadPromises);
+    const themes: Record<MusicScene, string> = { menu: 'menu-fantasy', battle: 'battle-rock', victory: 'result-victory', defeat: 'result-defeat' };
+    await Promise.all([...loadPromises, ...Object.entries(themes).map(async ([scene, file]) => {
+      const buffer = await this.loadSound(`/audio/${file}`);
+      if (buffer) this.music?.setBuffer(scene as MusicScene, buffer);
+    })]);
     this.initialized = true;
   }
 
@@ -137,7 +142,7 @@ class AudioSystemClass {
     if (!this.context) return null;
 
     // Try .ogg first (smaller, better quality), then .mp3 (Safari fallback)
-    const extensions = ['.ogg', '.mp3'];
+    const extensions = ['.mp3', '.ogg'];
     
     for (const ext of extensions) {
       try {
@@ -230,8 +235,8 @@ class AudioSystemClass {
   playCardSound(comboCount: number): void {
     const variants: SoundId[] = ['card_play_1', 'card_play_2', 'card_play_3'];
     const soundId = variants[Math.floor(Math.random() * variants.length)];
-    const pitchShift = Math.min(comboCount * 0.05, 0.4);
-    this.play(soundId, { pitchShift, volume: 0.6 });
+    const pitchShift = Math.min(comboCount * 0.008, 0.06);
+    this.play(soundId, { pitchShift, volume: 1 });
   }
 
   private clampVolume(value: unknown, fallback: number): number {
@@ -248,6 +253,7 @@ class AudioSystemClass {
     this.soundBus.connect(this.context.destination);
     this.musicBus.connect(this.context.destination);
     this.music = new MusicSequencer(this.context, this.musicBus);
+    this.music.setScene(this.musicScene);
     this.updateMix();
   }
 
@@ -258,6 +264,8 @@ class AudioSystemClass {
     if (this.unlocked && this.settings.musicEnabled && !document.hidden) this.music?.start();
     else this.music?.stop();
   }
+
+  setMusicScene(scene: MusicScene): void { this.musicScene = scene; this.music?.setScene(scene); this.updateMix(); }
 
   get soundVolume(): number { return this.settings.soundVolume; }
   set soundVolume(value: number) {
