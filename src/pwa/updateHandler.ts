@@ -17,6 +17,9 @@ export function initPWAUpdateHandler(): void {
     onRegisteredSW(swUrl, registration) {
       if (!registration) return;
 
+      // Check on launch too, so returning PWA players see new audio without a minute of old code.
+      checkForUpdate(registration);
+
       // Check for updates every 60 seconds
       setInterval(() => {
         checkForUpdate(registration);
@@ -55,7 +58,8 @@ function checkForUpdate(registration: ServiceWorkerRegistration): void {
   if (!navigator.onLine) return;
 
   updateCheckInProgress = true;
-  registration.update()
+  registration
+    .update()
     .catch(() => {
       // Silently ignore update check errors (offline, network issues)
     })

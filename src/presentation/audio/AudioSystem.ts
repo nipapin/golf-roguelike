@@ -7,6 +7,15 @@ import type { PowerType } from '../../core/types';
  */
 
 export type SoundId =
+  | 'power_crit'
+  | 'power_heal'
+  | 'power_guard'
+  | 'power_gold'
+  | 'power_bomb'
+  | 'power_wild'
+  | 'power_echo'
+  | 'power_red_joker'
+  | 'power_black_joker'
   | 'card_shuffle'
   | 'footstep_1'
   | 'footstep_2'
@@ -104,30 +113,39 @@ class AudioSystemClass {
   private async loadAllSounds(): Promise<void> {
     // Sound file mapping - Kenney.nl CC0 sounds
     const soundFiles: Record<SoundId, string> = {
+      power_crit: 'hd-v3/crit',
+      power_heal: 'hd-v3/heal',
+      power_guard: 'hd-v3/armor',
+      power_gold: 'hd-v3/coin',
+      power_bomb: 'hd-v3/bomb',
+      power_wild: 'hd-v3/wild',
+      power_echo: 'hd-v3/echo',
+      power_red_joker: 'hd-v3/heal',
+      power_black_joker: 'hd-v3/crit',
       card_shuffle: 'kenney-card-shuffle',
       footstep_1: 'kenney-step-1',
       footstep_2: 'kenney-step-2',
       orc_growl: 'orc-growl',
       orc_hit: 'orc-hit',
       orc_death: 'orc-death',
-      turret_shot: 'turret-shot',
-      mortar_shot: 'mortar-shot',
-      laser_blast: 'laser-blast',
-      card_play: 'kenney-card-slide-1',
-      card_play_1: 'kenney-card-slide-1',
-      card_play_2: 'kenney-card-slide-2',
-      card_play_3: 'kenney-card-slide-3',
-      card_draw: 'kenney-card-slide-2',
-      invalid_tap: 'error',
-      combo_up: 'combo-up',
-      enemy_hit: 'hit-enemy',
-      player_hit: 'hit-player',
-      shield: 'shield',
-      enemy_death: 'death',
-      victory: 'victory',
-      defeat: 'defeat',
-      button_tap: 'click',
-      reward_pick: 'reward',
+      turret_shot: 'hd-v3/gun',
+      mortar_shot: 'hd-v3/bomb',
+      laser_blast: 'hd-v3/laser',
+      card_play: 'hd-v3/card-1',
+      card_play_1: 'hd-v3/card-1',
+      card_play_2: 'hd-v3/card-2',
+      card_play_3: 'hd-v3/card-3',
+      card_draw: 'hd-v3/card-2',
+      invalid_tap: 'hd-v3/invalid',
+      combo_up: 'hd-v3/combo',
+      enemy_hit: 'hd-v3/strike',
+      player_hit: 'hd-v3/wall-hit',
+      shield: 'hd-v3/armor',
+      enemy_death: 'orc-death',
+      victory: 'hd-v3/win',
+      defeat: 'hd-v3/lose',
+      button_tap: 'hd-v3/click',
+      reward_pick: 'hd-v3/coin',
     };
 
     // Try to create audio context
@@ -152,7 +170,7 @@ class AudioSystemClass {
 
     await Promise.all([
       ...loadPromises,
-      this.loadSound('/audio/heartfelt-battle').then((buffer) => {
+      this.loadSound('/audio/hd-v3/hope-battle').then((buffer) => {
         if (buffer) this.music?.setBuffer(buffer);
       }),
     ]);
@@ -233,9 +251,7 @@ class AudioSystemClass {
       source.buffer = buffer;
 
       // Apply pitch shift if specified
-      if (options?.pitchShift) {
-        source.playbackRate.value = 1 + options.pitchShift;
-      }
+      source.playbackRate.value = 1 + (options?.pitchShift ?? 0);
 
       // Apply volume
       const gainNode = this.context.createGain();
@@ -265,58 +281,30 @@ class AudioSystemClass {
     this.playCombo(comboCount);
   }
 
-  private tone(
-    frequency: number,
-    delay: number,
-    duration: number,
-    type: OscillatorType,
-    volume: number
-  ): void {
-    if (!this.context || !this.unlocked || !this.settings.soundEnabled) return;
-    const at = this.context.currentTime + delay;
-    const oscillator = this.context.createOscillator();
-    const envelope = this.context.createGain();
-    oscillator.type = type;
-    oscillator.frequency.setValueAtTime(frequency, at);
-    envelope.gain.setValueAtTime(0, at);
-    envelope.gain.linearRampToValueAtTime(volume, at + 0.008);
-    envelope.gain.exponentialRampToValueAtTime(0.0001, at + duration);
-    oscillator.connect(envelope);
-    envelope.connect(this.soundBus!);
-    oscillator.onended = () => {
-      oscillator.disconnect();
-      envelope.disconnect();
-    };
-    oscillator.start(at);
-    oscillator.stop(at + duration + 0.01);
-  }
-
   playCombo(count: number): void {
-    // A semitone step per card: rising energy without stretching the card sample.
-    const root = 220 * 2 ** (Math.min(count - 1, 18) / 12);
-    this.tone(root, 0.02, 0.12, 'triangle', 0.12);
-    this.tone(root * 2, 0.025, 0.08, 'sine', 0.05);
+    // Pitch rises on a recorded metallic resonance; no oscillator / chiptune layer.
+    this.play('combo_up', {
+      pitchShift: 2 ** (Math.min(Math.max(0, count - 1), 14) / 24) - 1,
+      volume: 0.5,
+    });
   }
 
   playPower(power: PowerType | 'RED_JOKER' | 'BLACK_JOKER'): void {
-    const phrases: Record<
-      PowerType | 'RED_JOKER' | 'BLACK_JOKER',
-      [number[], OscillatorType, number]
-    > = {
-      CRIT: [[130, 520], 'sawtooth', 0.09],
-      HEAL: [[523, 659, 784], 'sine', 0.22],
-      GUARD: [[180, 270, 360], 'triangle', 0.15],
-      GOLD: [[1046, 1318], 'sine', 0.18],
-      BOMB: [[90, 55, 35], 'sawtooth', 0.16],
-      WILD: [[330, 660, 990], 'triangle', 0.12],
-      ECHO: [[440, 440, 440], 'sine', 0.05],
-      RED_JOKER: [[392, 523, 659, 784], 'sine', 0.2],
-      BLACK_JOKER: [[110, 220, 880], 'sawtooth', 0.15],
+    const samples: Record<PowerType | 'RED_JOKER' | 'BLACK_JOKER', SoundId> = {
+      CRIT: 'power_crit',
+      HEAL: 'power_heal',
+      GUARD: 'power_guard',
+      GOLD: 'power_gold',
+      BOMB: 'power_bomb',
+      WILD: 'power_wild',
+      ECHO: 'power_echo',
+      RED_JOKER: 'power_red_joker',
+      BLACK_JOKER: 'power_black_joker',
     };
-    const [notes, type, duration] = phrases[power];
-    notes.forEach((note, i) =>
-      this.tone(note, i * 0.055, duration, type, power === 'BOMB' ? 0.28 : 0.18)
-    );
+    this.play(samples[power], {
+      volume: power === 'BOMB' || power === 'BLACK_JOKER' ? 0.95 : 0.8,
+      pitchShift: power === 'RED_JOKER' ? -0.12 : power === 'BLACK_JOKER' ? -0.18 : 0,
+    });
   }
 
   private clampVolume(value: unknown, fallback: number): number {

@@ -30,13 +30,35 @@ class ContextStub {
   voices: AudioNodeStub[] = [];
   filters: AudioNodeStub[] = [];
   sources: AudioNodeStub[] = [];
-  resume = vi.fn(async () => { this.state = 'running'; });
-  constructor() { ContextStub.instances.push(this); }
-  createGain() { const node = new AudioNodeStub(); this.gains.push(node); return node; }
-  createBiquadFilter() { const node = new AudioNodeStub(); this.filters.push(node); return node; }
-  createOscillator() { const node = new AudioNodeStub(); this.voices.push(node); return node; }
-  createBufferSource() { const node = new AudioNodeStub(); this.sources.push(node); return node; }
-  createBuffer() { return {}; }
+  resume = vi.fn(async () => {
+    this.state = 'running';
+  });
+  constructor() {
+    ContextStub.instances.push(this);
+  }
+  createGain() {
+    const node = new AudioNodeStub();
+    this.gains.push(node);
+    return node;
+  }
+  createBiquadFilter() {
+    const node = new AudioNodeStub();
+    this.filters.push(node);
+    return node;
+  }
+  createOscillator() {
+    const node = new AudioNodeStub();
+    this.voices.push(node);
+    return node;
+  }
+  createBufferSource() {
+    const node = new AudioNodeStub();
+    this.sources.push(node);
+    return node;
+  }
+  createBuffer() {
+    return {};
+  }
   decodeAudioData = vi.fn(async () => ({ duration: 114 }));
 }
 
@@ -47,9 +69,16 @@ beforeEach(() => {
   vi.stubGlobal('localStorage', memoryStorage());
   vi.stubGlobal('window', { AudioContext: ContextStub });
   vi.stubGlobal('document', { hidden: false, addEventListener: vi.fn() });
-  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) })));
+  vi.stubGlobal(
+    'fetch',
+    vi.fn(async () => ({ ok: true, arrayBuffer: async () => new ArrayBuffer(0) }))
+  );
 });
-afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); vi.unstubAllGlobals(); });
+afterEach(() => {
+  vi.clearAllTimers();
+  vi.useRealTimers();
+  vi.unstubAllGlobals();
+});
 
 it('mixes quieter SFX and actually starts one music loop after a gesture', async () => {
   const { AudioSystem } = await import('./AudioSystem');
@@ -60,13 +89,17 @@ it('mixes quieter SFX and actually starts one music loop after a gesture', async
   const context = ContextStub.instances[0];
   expect(context.gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.22, 0, 0.04);
   expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.18, 0, 0.08);
-  expect(context.sources.filter(source => (source as AudioNodeStub & {loop?: boolean}).loop)).toHaveLength(1);
+  expect(
+    context.sources.filter((source) => (source as AudioNodeStub & { loop?: boolean }).loop)
+  ).toHaveLength(1);
   expect(context.voices).toHaveLength(0);
   AudioSystem.play('card_play');
   expect(context.sources.at(-1)!.connect).toHaveBeenCalled();
   AudioSystem.isMusicEnabled = false;
   expect(vi.getTimerCount()).toBe(0);
-  expect(context.sources.find(source => (source as AudioNodeStub & {loop?: boolean}).loop)!.stop).toHaveBeenCalledOnce();
+  expect(
+    context.sources.find((source) => (source as AudioNodeStub & { loop?: boolean }).loop)!.stop
+  ).toHaveBeenCalledOnce();
   expect(AudioSystem.isSoundEnabled).toBe(true);
 });
 
@@ -90,27 +123,47 @@ it('persists independent volumes and resumes a suspended context on a new gestur
 
 it('keeps one soundtrack playing and filters it outside battle', async () => {
   const { AudioSystem } = await import('./AudioSystem');
-  await AudioSystem.init(); AudioSystem.unlock();
+  await AudioSystem.init();
+  AudioSystem.unlock();
   const context = ContextStub.instances[0];
-  const music = context.sources.find(source => (source as AudioNodeStub & { loop?: boolean }).loop)!;
+  const music = context.sources.find(
+    (source) => (source as AudioNodeStub & { loop?: boolean }).loop
+  )!;
   const filter = context.filters[0];
   AudioSystem.setMusicScene('battle');
-  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(18000, 0, .25);
+  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(18000, 0, 0.25);
   AudioSystem.setMusicScene('defeat');
-  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(650, 0, .25);
+  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(650, 0, 0.25);
   AudioSystem.setMusicScene('menu');
   expect(music.stop).not.toHaveBeenCalled();
-  expect(context.sources.filter(source => (source as AudioNodeStub & { loop?: boolean }).loop)).toHaveLength(1);
+  expect(
+    context.sources.filter((source) => (source as AudioNodeStub & { loop?: boolean }).loop)
+  ).toHaveLength(1);
 });
 
-it('uses rising combo pitches and distinct short power phrases', async () => {
+it('uses recorded rising combo and distinct power buffers without oscillators', async () => {
   const { AudioSystem } = await import('./AudioSystem');
-  await AudioSystem.init(); AudioSystem.unlock();
+  await AudioSystem.init();
+  AudioSystem.unlock();
   const context = ContextStub.instances[0];
-  AudioSystem.playCombo(1); const first = context.voices.at(-2)!.frequency.setValueAtTime.mock.calls[0][0];
-  AudioSystem.playCombo(6); const sixth = context.voices.at(-2)!.frequency.setValueAtTime.mock.calls[0][0];
+  AudioSystem.playCombo(1);
+  const first = context.sources.at(-1)!.playbackRate.value;
+  AudioSystem.playCombo(6);
+  const sixth = context.sources.at(-1)!.playbackRate.value;
   expect(sixth).toBeGreaterThan(first);
-  AudioSystem.playPower('HEAL'); const heal = context.voices.at(-1)!.frequency.setValueAtTime.mock.calls[0][0];
-  AudioSystem.playPower('BOMB'); const bomb = context.voices.at(-1)!.frequency.setValueAtTime.mock.calls[0][0];
+  AudioSystem.playPower('HEAL');
+  const heal = context.sources.at(-1)!.buffer;
+  AudioSystem.playPower('BOMB');
+  const bomb = context.sources.at(-1)!.buffer;
   expect(heal).not.toBe(bomb);
+  expect(context.voices).toHaveLength(0);
+});
+it('loads the replacement music and versioned recorded cues instead of cached legacy beeps', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]));
+  expect(urls).toContain('/audio/hd-v3/hope-battle.mp3');
+  expect(urls).toContain('/audio/hd-v3/card-1.mp3');
+  expect(urls).not.toContain('/audio/heartfelt-battle.mp3');
+  expect(urls).not.toContain('/audio/combo-up.mp3');
 });
