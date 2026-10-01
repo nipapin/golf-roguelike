@@ -7,8 +7,8 @@ import { getSafeInsets, type SafeInsets } from './viewport';
 
 export const colors = {
   // Ink & neutrals
-  ink: 0x1b1030,
-  ink2: 0x2e1f52,
+  ink: 0x19313c,
+  ink2: 0x31535e,
   white: 0xffffff,
 
   // Card face
@@ -43,9 +43,9 @@ export const colors = {
   violet: 0x7b4dff,
 
   // Table
-  felt: 0x3a2a96,
-  feltHi: 0x5140c0,
-  feltLo: 0x22176a,
+  felt: 0x315c63,
+  feltHi: 0x44747c,
+  feltLo: 0x213e48,
   rim: 0x8c4a22,
   rimHi: 0xd2803c,
 
@@ -66,8 +66,8 @@ export const colors = {
   playerHp: 0xff3d7f,
 
   // Card back
-  backHi: 0x8a4dff,
-  backLo: 0x4420a8,
+  backHi: 0x5288ba,
+  backLo: 0x29536f,
   backGold: 0xffd34a,
 
   // Arena (goblin camp sunset)
@@ -110,7 +110,7 @@ export function getCardMetrics(screenWidth: number) {
   const side = 8;
   const gap = 4;
   const cw = Math.min((screenWidth - 2 * side - 6 * gap) / 7, 56);
-  const ch = cw * 1.4;
+  const ch = cw * 1.65;
   const strip = cw * 0.58;
   const r = cw * 0.16;
 
@@ -138,7 +138,11 @@ export function getCardMetrics(screenWidth: number) {
  * - 375×667: HUD 40, Arena 260, Banner 50, Tableau 188, Tray 109
  * - 430×932: HUD 44, Arena 391, Banner 56, Tableau 221, Tray 145
  */
-export function getLayoutMetrics(width: number, height: number, insets: SafeInsets = getSafeInsets()) {
+export function getLayoutMetrics(
+  width: number,
+  height: number,
+  insets: SafeInsets = getSafeInsets()
+) {
   const metrics = getCardMetrics(width);
   // The canvas covers the full screen; backgrounds paint from y=0 to height,
   // interactive UI starts below the notch and ends above the home indicator.
@@ -166,13 +170,33 @@ export function getLayoutMetrics(width: number, height: number, insets: SafeInse
   const bannerTop = tableTop - bannerHeight - 6;
   const arenaHeight = Math.max(60, bannerTop - arenaTop - 6);
   return {
-    ...metrics, strip,
-    insetTop, insetBottom, safeTop, safeBottom, hudHeight, hudTop, playerHudTop, playerHudHeight,
-    relicTop, relicHeight, arenaTop, arenaHeight, bannerTop, bannerHeight,
-    tableTop, tableHeight: height - safeBottom - tableTop,
-    tableauTop, tableauHeight, trayTop, trayHeight,
+    ...metrics,
+    strip,
+    insetTop,
+    insetBottom,
+    safeTop,
+    safeBottom,
+    hudHeight,
+    hudTop,
+    playerHudTop,
+    playerHudHeight,
+    relicTop,
+    relicHeight,
+    arenaTop,
+    arenaHeight,
+    bannerTop,
+    bannerHeight,
+    tableTop,
+    tableHeight: height - safeBottom - tableTop,
+    tableauTop,
+    tableauHeight,
+    trayTop,
+    trayHeight,
     enemyHeight: Math.max(40, Math.min(arenaHeight - 66, 185)),
-    activeScale, activeW, activeH, isCompact: height <= 760,
+    activeScale,
+    activeW,
+    activeH,
+    isCompact: height <= 760,
   };
 }
 
@@ -200,3 +224,21 @@ export const suitColors = {
 } as const;
 
 export type Suit = keyof typeof suitColors;
+
+/** Compact siege arena; reclaim excess sky for readable, less overlapped cards. */
+export function getCastleLayoutMetrics(width: number, height: number, insets?: SafeInsets) {
+  const base = getLayoutMetrics(width, height, insets);
+  const extra = Math.max(0, base.arenaHeight - Math.min(200, width * 0.48));
+  const strip = Math.min(base.ch * 0.95, base.strip + extra / 4);
+  const shift = (strip - base.strip) * 4;
+  return {
+    ...base,
+    strip,
+    arenaHeight: base.arenaHeight - shift,
+    tableauHeight: base.tableauHeight + shift,
+    tableauTop: base.tableauTop - shift,
+    tableTop: base.tableTop - shift,
+    tableHeight: base.tableHeight + shift,
+    bannerTop: base.bannerTop - shift,
+  };
+}

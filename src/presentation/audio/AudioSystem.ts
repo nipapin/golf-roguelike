@@ -7,6 +7,15 @@ import type { PowerType } from '../../core/types';
  */
 
 export type SoundId =
+  | 'card_shuffle'
+  | 'footstep_1'
+  | 'footstep_2'
+  | 'orc_growl'
+  | 'orc_hit'
+  | 'orc_death'
+  | 'turret_shot'
+  | 'mortar_shot'
+  | 'laser_blast'
   | 'card_play'
   | 'card_play_1'
   | 'card_play_2'
@@ -53,10 +62,11 @@ class AudioSystemClass {
 
   constructor() {
     this.loadSettings();
-    if (typeof document !== 'undefined') document.addEventListener('visibilitychange', () => {
-      if (document.hidden) this.music?.stop();
-      else this.updateMix();
-    });
+    if (typeof document !== 'undefined')
+      document.addEventListener('visibilitychange', () => {
+        if (document.hidden) this.music?.stop();
+        else this.updateMix();
+      });
   }
 
   private loadSettings(): void {
@@ -86,7 +96,7 @@ class AudioSystemClass {
 
   async init(): Promise<void> {
     if (this.loadPromise) return this.loadPromise;
-    
+
     this.loadPromise = this.loadAllSounds();
     return this.loadPromise;
   }
@@ -94,11 +104,20 @@ class AudioSystemClass {
   private async loadAllSounds(): Promise<void> {
     // Sound file mapping - Kenney.nl CC0 sounds
     const soundFiles: Record<SoundId, string> = {
-      card_play: 'card-tap-1',
-      card_play_1: 'card-tap-1',
-      card_play_2: 'card-tap-2',
-      card_play_3: 'card-tap-3',
-      card_draw: 'card-tap-2',
+      card_shuffle: 'kenney-card-shuffle',
+      footstep_1: 'kenney-step-1',
+      footstep_2: 'kenney-step-2',
+      orc_growl: 'orc-growl',
+      orc_hit: 'orc-hit',
+      orc_death: 'orc-death',
+      turret_shot: 'turret-shot',
+      mortar_shot: 'mortar-shot',
+      laser_blast: 'laser-blast',
+      card_play: 'kenney-card-slide-1',
+      card_play_1: 'kenney-card-slide-1',
+      card_play_2: 'kenney-card-slide-2',
+      card_play_3: 'kenney-card-slide-3',
+      card_draw: 'kenney-card-slide-2',
       invalid_tap: 'error',
       combo_up: 'combo-up',
       enemy_hit: 'hit-enemy',
@@ -131,7 +150,12 @@ class AudioSystemClass {
       }
     });
 
-    await Promise.all([...loadPromises, this.loadSound('/audio/battle-orchestral').then(buffer => { if (buffer) this.music?.setBuffer(buffer); })]);
+    await Promise.all([
+      ...loadPromises,
+      this.loadSound('/audio/heartfelt-battle').then((buffer) => {
+        if (buffer) this.music?.setBuffer(buffer);
+      }),
+    ]);
     this.initialized = true;
   }
 
@@ -140,12 +164,12 @@ class AudioSystemClass {
 
     // Try .ogg first (smaller, better quality), then .mp3 (Safari fallback)
     const extensions = ['.mp3', '.ogg'];
-    
+
     for (const ext of extensions) {
       try {
         const response = await fetch(basePath + ext);
         if (!response.ok) continue;
-        
+
         const arrayBuffer = await response.arrayBuffer();
         const audioBuffer = await this.context.decodeAudioData(arrayBuffer);
         return audioBuffer;
@@ -161,8 +185,6 @@ class AudioSystemClass {
    * Unlock audio on first user interaction (required for iOS Safari)
    */
   unlock(): void {
-
-    
     // Create context if not yet created
     if (!this.context) {
       try {
@@ -175,7 +197,10 @@ class AudioSystemClass {
     if (!this.context) return;
     // iOS can suspend the context again after backgrounding. Retry on each gesture.
     if (this.context.state === 'suspended') {
-      void this.context.resume().then(() => this.updateMix()).catch(() => {});
+      void this.context
+        .resume()
+        .then(() => this.updateMix())
+        .catch(() => {});
     }
 
     // Play a silent buffer to unlock
@@ -187,7 +212,7 @@ class AudioSystemClass {
 
     this.unlocked = true;
     this.updateMix();
-    
+
     // Load sounds if not already done
     if (!this.initialized) {
       this.init();
@@ -218,7 +243,10 @@ class AudioSystemClass {
 
       source.connect(gainNode);
       gainNode.connect(this.soundBus!);
-      source.onended = () => { source.disconnect(); gainNode.disconnect(); };
+      source.onended = () => {
+        source.disconnect();
+        gainNode.disconnect();
+      };
       source.start(0);
     } catch (err) {
       console.warn('Error playing sound:', err);
@@ -237,45 +265,71 @@ class AudioSystemClass {
     this.playCombo(comboCount);
   }
 
-  private tone(frequency: number, delay: number, duration: number, type: OscillatorType, volume: number): void {
+  private tone(
+    frequency: number,
+    delay: number,
+    duration: number,
+    type: OscillatorType,
+    volume: number
+  ): void {
     if (!this.context || !this.unlocked || !this.settings.soundEnabled) return;
     const at = this.context.currentTime + delay;
     const oscillator = this.context.createOscillator();
     const envelope = this.context.createGain();
-    oscillator.type = type; oscillator.frequency.setValueAtTime(frequency, at);
-    envelope.gain.setValueAtTime(0, at); envelope.gain.linearRampToValueAtTime(volume, at + .008);
-    envelope.gain.exponentialRampToValueAtTime(.0001, at + duration);
-    oscillator.connect(envelope); envelope.connect(this.soundBus!);
-    oscillator.onended = () => { oscillator.disconnect(); envelope.disconnect(); };
-    oscillator.start(at); oscillator.stop(at + duration + .01);
+    oscillator.type = type;
+    oscillator.frequency.setValueAtTime(frequency, at);
+    envelope.gain.setValueAtTime(0, at);
+    envelope.gain.linearRampToValueAtTime(volume, at + 0.008);
+    envelope.gain.exponentialRampToValueAtTime(0.0001, at + duration);
+    oscillator.connect(envelope);
+    envelope.connect(this.soundBus!);
+    oscillator.onended = () => {
+      oscillator.disconnect();
+      envelope.disconnect();
+    };
+    oscillator.start(at);
+    oscillator.stop(at + duration + 0.01);
   }
 
   playCombo(count: number): void {
     // A semitone step per card: rising energy without stretching the card sample.
     const root = 220 * 2 ** (Math.min(count - 1, 18) / 12);
-    this.tone(root, .02, .12, 'triangle', .3);
-    this.tone(root * 2, .025, .08, 'sine', .13);
+    this.tone(root, 0.02, 0.12, 'triangle', 0.12);
+    this.tone(root * 2, 0.025, 0.08, 'sine', 0.05);
   }
 
   playPower(power: PowerType | 'RED_JOKER' | 'BLACK_JOKER'): void {
-    const phrases: Record<PowerType | 'RED_JOKER' | 'BLACK_JOKER', [number[], OscillatorType, number]> = {
-      CRIT: [[130, 520], 'sawtooth', .09], HEAL: [[523, 659, 784], 'sine', .22],
-      GUARD: [[180, 270, 360], 'triangle', .15], GOLD: [[1046, 1318], 'sine', .18],
-      BOMB: [[90, 55, 35], 'sawtooth', .16], WILD: [[330, 660, 990], 'triangle', .12],
-      ECHO: [[440, 440, 440], 'sine', .13], RED_JOKER: [[392, 523, 659, 784], 'sine', .2],
-      BLACK_JOKER: [[110, 220, 880], 'sawtooth', .15],
+    const phrases: Record<
+      PowerType | 'RED_JOKER' | 'BLACK_JOKER',
+      [number[], OscillatorType, number]
+    > = {
+      CRIT: [[130, 520], 'sawtooth', 0.09],
+      HEAL: [[523, 659, 784], 'sine', 0.22],
+      GUARD: [[180, 270, 360], 'triangle', 0.15],
+      GOLD: [[1046, 1318], 'sine', 0.18],
+      BOMB: [[90, 55, 35], 'sawtooth', 0.16],
+      WILD: [[330, 660, 990], 'triangle', 0.12],
+      ECHO: [[440, 440, 440], 'sine', 0.05],
+      RED_JOKER: [[392, 523, 659, 784], 'sine', 0.2],
+      BLACK_JOKER: [[110, 220, 880], 'sawtooth', 0.15],
     };
     const [notes, type, duration] = phrases[power];
-    notes.forEach((note, i) => this.tone(note, i * .055, duration, type, power === 'BOMB' ? .28 : .18));
+    notes.forEach((note, i) =>
+      this.tone(note, i * 0.055, duration, type, power === 'BOMB' ? 0.28 : 0.18)
+    );
   }
 
   private clampVolume(value: unknown, fallback: number): number {
-    return typeof value === 'number' && Number.isFinite(value) ? Math.max(0, Math.min(1, value)) : fallback;
+    return typeof value === 'number' && Number.isFinite(value)
+      ? Math.max(0, Math.min(1, value))
+      : fallback;
   }
 
   private ensureContext(): void {
     if (this.context) return;
-    const Audio = window.AudioContext || (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
+    const Audio =
+      window.AudioContext ||
+      (window as Window & { webkitAudioContext?: typeof AudioContext }).webkitAudioContext;
     if (!Audio) throw new Error('Web Audio unavailable');
     this.context = new Audio();
     this.soundBus = this.context.createGain();
@@ -289,23 +343,41 @@ class AudioSystemClass {
 
   private updateMix(): void {
     if (!this.context || !this.soundBus || !this.musicBus) return;
-    this.soundBus.gain.setTargetAtTime(this.settings.soundEnabled ? this.settings.soundVolume : 0, this.context.currentTime, 0.04);
-    this.musicBus.gain.setTargetAtTime(this.settings.musicEnabled ? this.settings.musicVolume : 0, this.context.currentTime, 0.08);
+    this.soundBus.gain.setTargetAtTime(
+      this.settings.soundEnabled ? this.settings.soundVolume : 0,
+      this.context.currentTime,
+      0.04
+    );
+    this.musicBus.gain.setTargetAtTime(
+      this.settings.musicEnabled ? this.settings.musicVolume : 0,
+      this.context.currentTime,
+      0.08
+    );
     if (this.unlocked && this.settings.musicEnabled && !document.hidden) this.music?.start();
     else this.music?.stop();
   }
 
-  setMusicScene(scene: MusicScene): void { this.musicScene = scene; this.music?.setScene(scene); this.updateMix(); }
+  setMusicScene(scene: MusicScene): void {
+    this.musicScene = scene;
+    this.music?.setScene(scene);
+    this.updateMix();
+  }
 
-  get soundVolume(): number { return this.settings.soundVolume; }
+  get soundVolume(): number {
+    return this.settings.soundVolume;
+  }
   set soundVolume(value: number) {
     this.settings.soundVolume = this.clampVolume(value, DEFAULT_SETTINGS.soundVolume);
-    this.updateMix(); this.saveSettings();
+    this.updateMix();
+    this.saveSettings();
   }
-  get musicVolume(): number { return this.settings.musicVolume; }
+  get musicVolume(): number {
+    return this.settings.musicVolume;
+  }
   set musicVolume(value: number) {
     this.settings.musicVolume = this.clampVolume(value, DEFAULT_SETTINGS.musicVolume);
-    this.updateMix(); this.saveSettings();
+    this.updateMix();
+    this.saveSettings();
   }
 
   // Settings getters/setters

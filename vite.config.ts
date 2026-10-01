@@ -11,8 +11,8 @@ export default defineConfig({
         description: 'Build chains, deploy defenders and protect your castle with one solitaire.',
         start_url: '/',
         display: 'standalone',
-        background_color: '#140A2A',
-        theme_color: '#140A2A',
+        background_color: '#213E48',
+        theme_color: '#213E48',
         orientation: 'portrait',
         icons: [
           { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },

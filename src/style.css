@@ -14,7 +14,7 @@ html, body {
   width: 100%;
   height: var(--viewport-height, 100dvh);
   overflow: hidden;
-  background: #140A2A;
+  background: #213E48;
 }
 
 body {
@@ -36,7 +36,7 @@ body {
   max-width: 480px;
   margin-inline: auto;
   overflow: hidden;
-  background: #140A2A;
+  background: #213E48;
 }
 
 canvas {

@@ -20,6 +20,8 @@ export interface CastleMeta {
   bestKills: number;
   victories: number;
   siegesStarted: number;
+  currentStreak: number;
+  bestSiege: number;
 }
 const fresh = (): CastleMeta => ({
   version: 1,
@@ -29,6 +31,8 @@ const fresh = (): CastleMeta => ({
   bestKills: 0,
   victories: 0,
   siegesStarted: 0,
+  currentStreak: 0,
+  bestSiege: 0,
 });
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -59,6 +63,11 @@ function validRun(v: unknown): v is CastleRun {
       phase: 'battle',
       player: { ...v.run.player, hp: Math.max(1, Number(v.run.player.hp)) },
     })
+  )
+    return false;
+  if (
+    v.usedPowers !== undefined &&
+    (!Array.isArray(v.usedPowers) || !v.usedPowers.every((id) => typeof id === 'string'))
   )
     return false;
   const s = v.siege;
@@ -119,6 +128,12 @@ export class CastleService {
         return {
           ...v,
           siegesStarted: integer(v.siegesStarted) ? v.siegesStarted : v.claimed.length,
+          currentStreak: integer(v.currentStreak) ? v.currentStreak : 0,
+          bestSiege: integer(v.bestSiege)
+            ? v.bestSiege
+            : integer(v.siegesStarted)
+              ? v.siegesStarted
+              : 0,
         } as unknown as CastleMeta;
     } catch {
       /* A damaged wallet never blocks a new game. */
@@ -128,6 +143,8 @@ export class CastleService {
   beginSiege(): CastleMeta {
     const meta = this.readMeta();
     meta.siegesStarted++;
+    meta.currentStreak++;
+    meta.bestSiege = Math.max(meta.bestSiege, meta.currentStreak);
     try {
       this.storage.setItem(META_KEY, JSON.stringify(meta));
     } catch {
@@ -154,7 +171,12 @@ export class CastleService {
     if (meta.claimed.includes(state.id)) return true;
     meta.coins += earnedCoins(state);
     meta.bestKills = Math.max(meta.bestKills, state.siege.kills);
-    if (state.run.phase === 'victory') meta.victories++;
+    meta.bestSiege = Math.max(meta.bestSiege, state.siegeNumber);
+    if (state.run.phase === 'defeat') meta.currentStreak = 0;
+    if (state.run.phase === 'victory') {
+      meta.victories++;
+      meta.currentStreak = state.siegeNumber;
+    }
     meta.claimed = [...meta.claimed, state.id].slice(-100);
     try {
       this.storage.setItem(META_KEY, JSON.stringify(meta));

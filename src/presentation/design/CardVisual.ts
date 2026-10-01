@@ -40,6 +40,7 @@ export class CardVisual {
   private powerRibbon: Phaser.GameObjects.Container | null = null;
   private hitZone: Phaser.GameObjects.Zone | null = null;
   private played: boolean = false;
+  private jokerTween: Phaser.Tweens.Tween | null = null;
   private pulseTween: Phaser.Tweens.Tween | null = null;
 
   private card: Card;
@@ -47,7 +48,13 @@ export class CardVisual {
   private state: CardState = 'normal';
   private powerType: PowerType | null = null;
 
-  constructor(scene: Phaser.Scene, x: number, y: number, card: Card, powerType: PowerType | null = null) {
+  constructor(
+    scene: Phaser.Scene,
+    x: number,
+    y: number,
+    card: Card,
+    powerType: PowerType | null = null
+  ) {
     this.scene = scene;
     this.card = card;
     this.powerType = powerType;
@@ -78,14 +85,15 @@ export class CardVisual {
     }
 
     // Rank text
-    const rankDisplay = card.joker ? 'J★' : RANK_DISPLAY[card.rank] || card.rank.toString();
+    const rankDisplay = card.joker ? '★' : RANK_DISPLAY[card.rank] || card.rank.toString();
     const fontSize = card.rank === 10 ? this.metrics.rankSize10 : this.metrics.rankSize;
     const textColor = card.suit === 'diamonds' ? colors.diamondTxt : suitColor;
 
     this.rankText = scene.add
       .text(cw * 0.09, cw * 0.06, rankDisplay, {
-        resolution: getRenderDensity(), fontFamily: 'Lilita One',
-        fontSize: `${card.joker ? cw * .4 : fontSize}px`,
+        resolution: getRenderDensity(),
+        fontFamily: 'Lilita One',
+        fontSize: `${card.joker ? cw * 0.4 : fontSize}px`,
         color: powerType ? '#1B1030' : this.hexToString(textColor),
       })
       .setOrigin(0, 0);
@@ -97,7 +105,8 @@ export class CardVisual {
     // Pip (small suit symbol)
     this.pipText = scene.add
       .text(cw - cw * 0.07, cw * 0.1, card.joker ? '' : SUIT_SYMBOLS[card.suit], {
-        resolution: getRenderDensity(), fontFamily: 'Arial',
+        resolution: getRenderDensity(),
+        fontFamily: 'Arial',
         fontSize: `${cw * 0.22}px`,
         color: this.hexToString(suitColor),
       })
@@ -109,9 +118,10 @@ export class CardVisual {
 
     // Big suit symbol
     this.bigSuitText = scene.add
-      .text(cw / 2, ch - cw * 0.35, card.joker ? '♛' : SUIT_SYMBOLS[card.suit], {
-        resolution: getRenderDensity(), fontFamily: 'Arial',
-        fontSize: `${cw * 0.45}px`,
+      .text(cw / 2, ch - cw * 0.43, card.joker ? '★' : SUIT_SYMBOLS[card.suit], {
+        resolution: getRenderDensity(),
+        fontFamily: 'Arial',
+        fontSize: `${cw * (card.joker ? 0.85 : 0.7)}px`,
         color: this.hexToString(suitColor),
       })
       .setOrigin(0.5);
@@ -127,10 +137,31 @@ export class CardVisual {
       const border = scene.add.graphics().lineStyle(3, card.joker === 'red' ? 0xff486c : 0x7048be);
       border.strokeRoundedRect(1, 1, cw - 2, ch - 2, this.metrics.radius);
       this.container.add(border);
-      this.powerRibbon = scene.add.container(cw / 2, ch - 10);
-      const badge = scene.add.rectangle(0, 0, cw - 8, 14, card.joker === 'red' ? 0xc62951 : 0x322149);
-      const label = scene.add.text(0, 0, card.joker === 'red' ? 'VAMP 30%' : 'CRIT ×5', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: `${cw * .16}px`, color: '#fff5df' }).setOrigin(.5);
-      this.powerRibbon.add([badge, label]); this.container.add(this.powerRibbon);
+      const tint = card.joker === 'red' ? 0xff486c : 0x9462ef;
+      const aura = scene.add.graphics();
+      for (let ring = 1; ring <= 4; ring++)
+        aura
+          .lineStyle(3, tint, 0.22 / ring)
+          .strokeRoundedRect(
+            -ring * 2,
+            -ring * 2,
+            cw + ring * 4,
+            ch + ring * 4,
+            this.metrics.radius + ring
+          );
+      this.container.addAt(aura, 0);
+      this.rankText.setColor(this.hexToString(tint));
+      this.bigSuitText
+        .setColor(this.hexToString(tint))
+        .setShadow(0, 0, this.hexToString(tint), 7, false, true);
+      this.jokerTween = scene.tweens.add({
+        targets: aura,
+        alpha: 0.4,
+        duration: 850,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut',
+      });
     }
     this.updateOutline();
   }
@@ -139,6 +170,7 @@ export class CardVisual {
     const { cw, ch, radius, bevelHeight } = this.metrics;
 
     this.cardBg.clear();
+    this.cardBg.fillStyle(0x162a32, 0.3).fillRoundedRect(2, 5, cw, ch, radius);
     this.cardBg.fillStyle(colors.face, 1);
 
     if (this.powerType) {
@@ -148,8 +180,8 @@ export class CardVisual {
         this.cardBg.fillGradientStyle(
           this.blendColor(pc.pw2, colors.faceHi, 0.38),
           this.blendColor(pc.pw2, colors.faceHi, 0.38),
-          this.blendColor(pc.pw1, colors.faceLo, 0.30),
-          this.blendColor(pc.pw1, colors.faceLo, 0.30),
+          this.blendColor(pc.pw1, colors.faceLo, 0.3),
+          this.blendColor(pc.pw1, colors.faceLo, 0.3),
           1
         );
       }
@@ -164,7 +196,12 @@ export class CardVisual {
     // Bottom bevel
     this.cardBg.fillStyle(colors.bevel, 1);
     const bevelY = ch - bevelHeight;
-    this.cardBg.fillRoundedRect(0, bevelY, cw, bevelHeight, { bl: radius, br: radius, tl: 0, tr: 0 });
+    this.cardBg.fillRoundedRect(0, bevelY, cw, bevelHeight, {
+      bl: radius,
+      br: radius,
+      tl: 0,
+      tr: 0,
+    });
 
     // Top highlight
     this.cardBg.fillStyle(0xffffff, 0.5);
@@ -262,7 +299,8 @@ export class CardVisual {
 
     const text = this.scene.add
       .text(0, 0, powerType, {
-        resolution: getRenderDensity(), fontFamily: 'Lilita One',
+        resolution: getRenderDensity(),
+        fontFamily: 'Lilita One',
         fontSize: `${cw * 0.15}px`,
         color: '#ffffff',
       })
@@ -337,7 +375,12 @@ export class CardVisual {
         this.glowGfx.fillStyle(0x4632aa, 0.18);
         this.glowGfx.fillRoundedRect(0, 0, cw, ch * 0.5, { tl: radius, tr: radius, bl: 0, br: 0 });
         this.glowGfx.fillStyle(0x281478, 0.28);
-        this.glowGfx.fillRoundedRect(0, ch * 0.5, cw, ch * 0.5, { tl: 0, tr: 0, bl: radius, br: radius });
+        this.glowGfx.fillRoundedRect(0, ch * 0.5, cw, ch * 0.5, {
+          tl: 0,
+          tr: 0,
+          bl: radius,
+          br: radius,
+        });
         break;
 
       case 'covered':
@@ -384,7 +427,14 @@ export class CardVisual {
     if (this.state === 'playable') {
       if (this.pulseTween) return;
       this.glowGfx.setAlpha(1);
-      this.pulseTween = this.scene.tweens.add({ targets: this.glowGfx, alpha: JUICE.cards.glowAlphaMin, duration: JUICE.cards.glowPulseMs, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+      this.pulseTween = this.scene.tweens.add({
+        targets: this.glowGfx,
+        alpha: JUICE.cards.glowAlphaMin,
+        duration: JUICE.cards.glowPulseMs,
+        yoyo: true,
+        repeat: -1,
+        ease: 'Sine.inOut',
+      });
     } else if (this.pulseTween) {
       this.pulseTween.stop();
       this.pulseTween = null;
@@ -406,7 +456,7 @@ export class CardVisual {
 
   setInteractive(callback: () => void): void {
     const { cw, ch } = this.metrics;
-    
+
     // Use a Zone child for hit detection - Zones have origin 0.5 by default
     // Position at card center (cw/2, ch/2), size cw x ch
     if (!this.hitZone) {
@@ -456,6 +506,7 @@ export class CardVisual {
       this.hitZone = null;
     }
     this.scene.tweens.killTweensOf(this.container);
+    this.jokerTween?.stop();
     this.pulseTween?.stop();
     this.pulseTween = null;
     this.container.removeAllListeners();
@@ -485,7 +536,11 @@ export class CardVisual {
 /**
  * Create a card back visual
  */
-export function createCardBack(scene: Phaser.Scene, x: number, y: number): Phaser.GameObjects.Container {
+export function createCardBack(
+  scene: Phaser.Scene,
+  x: number,
+  y: number
+): Phaser.GameObjects.Container {
   const metrics = getCardMetrics(viewport(scene).width);
   const { cw, ch, radius } = metrics;
 

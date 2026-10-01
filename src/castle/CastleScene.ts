@@ -1,8 +1,7 @@
 import Phaser from 'phaser';
 import { viewport, configureViewport, getRenderDensity } from '../presentation/design/viewport';
-import { getLayoutMetrics } from '../presentation/design/tokens';
-import { ArenaBackground } from '../presentation/design/ArenaBackground';
-import { CardVisual } from '../presentation/design/CardVisual';
+import { getCastleLayoutMetrics } from '../presentation/design/tokens';
+import { CardVisual, createCardBack } from '../presentation/design/CardVisual';
 import { canConnect, getPowerType } from '../core/GameState';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { SettingsModal } from '../presentation/design/SettingsModal';
@@ -15,6 +14,7 @@ import { siegeRules } from './CastleMenuScene';
 import { gameConfig } from '../data/gameConfig';
 import {
   STEP,
+  nextCastleCard,
   earnedCoins,
   upgradeValue,
   type Invader,
@@ -37,9 +37,13 @@ interface UnitView {
 }
 const RULES_KEY = 'golf-castle-rules-v1';
 export class CastleScene extends Phaser.Scene {
-  private layout!: ReturnType<typeof getLayoutMetrics>;
+  private layout!: ReturnType<typeof getCastleLayoutMetrics>;
   private cards = new Map<string, CardVisual>();
   private active: CardVisual | null = null;
+  private nextCard: CardVisual | null = null;
+  private undoButton!: Phaser.GameObjects.Text;
+  private nextFootstep = 0;
+  private nextVoice = 0;
   private invaders = new Map<number, EnemyView>();
   private defenders = new Map<number, UnitView>();
   private castle!: Phaser.GameObjects.Container;
@@ -76,43 +80,41 @@ export class CastleScene extends Phaser.Scene {
     this.locked = false;
     this.ended = false;
     this.active = null;
+    this.nextCard = null;
+    this.nextFootstep = 0;
+    this.nextVoice = 0;
     this.nextShotSound = 0;
     this.nextHealEffect = 0;
     const { width: w, height: h } = viewport(this);
-    this.layout = getLayoutMetrics(w, h);
+    this.layout = getCastleLayoutMetrics(w, h);
     const { arenaTop, arenaHeight, tableTop, hudTop, bannerTop, relicTop } = this.layout;
-    const bg = new ArenaBackground(this);
-    bg.draw(w, arenaTop, arenaHeight, 'castle');
-    this.cameras.main.setBackgroundColor('#140a2a');
+    this.add
+      .image(w / 2, arenaTop + arenaHeight / 2, 'battlefield-kenney')
+      .setDisplaySize(w, arenaHeight);
+    this.cameras.main.setBackgroundColor('#213e48');
     const felt = this.add
       .graphics()
-      .fillStyle(0x392179)
+      .fillStyle(0x254650)
       .fillRect(0, tableTop, w, h - tableTop);
     felt.lineStyle(3, 0x9f673c).lineBetween(0, tableTop, w, tableTop).setDepth(0);
     const ground = this.groundY();
-    const road = this.add
-      .graphics()
-      .fillStyle(0xc1956a, 0.8)
-      .fillEllipse(w / 2, ground - 1, w * 1.2, 28);
-    road.lineStyle(2, 0xffdaa7, 0.6);
-    for (let x = 0; x < w * 0.73; x += 24) road.lineBetween(x, ground - 1, x + 10, ground - 1);
     this.castle = castleArt(
       this,
       w * 0.87,
       ground,
       Math.min(1.15, (arenaHeight - 20) / 158)
     ).setDepth(22);
-    this.add.rectangle(w / 2, hudTop + 20, w - 16, 40, 0x21163a).setStrokeStyle(2, 0x654581);
+    this.add.rectangle(w / 2, hudTop + 20, w - 16, 40, 0x254650).setStrokeStyle(2, 0x6d989e);
     this.text(17, hudTop + 20, `SIEGE #${manager.state!.siegeNumber}`, 16).setOrigin(0, 0.5);
     this.add.image(w * 0.62, hudTop + 20, 'coin').setDisplaySize(23, 23);
     this.coins = this.text(w * 0.69, hudTop + 20, '0', 17, '#ffe35a');
     const pause = this.add
-      .rectangle(w - 31, hudTop + 20, 44, 40, 0x443266)
-      .setStrokeStyle(1, 0x8563bd)
+      .rectangle(w - 31, hudTop + 20, 44, 40, 0x315d6a)
+      .setStrokeStyle(1, 0x6d989e)
       .setInteractive();
     this.text(w - 31, hudTop + 20, 'Ⅱ', 23);
     pause.on('pointerup', () => {
-      if (this.ended) return;
+      if (this.ended || this.locked) return;
       this.paused = true;
       manager.save();
       AudioSystem.setMusicScene('menu');
@@ -126,8 +128,8 @@ export class CastleScene extends Phaser.Scene {
     labels.forEach((label, i) => {
       const x = 8 + ((i + 0.5) * (w - 16)) / 5;
       const box = this.add
-        .rectangle(x, bannerTop + 17, (w - 20) / 5 - 3, 32, 0x25193e)
-        .setStrokeStyle(1, 0x8862ba)
+        .rectangle(x, bannerTop + 17, (w - 20) / 5 - 3, 32, 0x254650)
+        .setStrokeStyle(1, 0x6d989e)
         .setInteractive()
         .on('pointerup', () => this.rewardInfo(i));
       this.steps.push(box);
@@ -157,6 +159,14 @@ export class CastleScene extends Phaser.Scene {
         AudioSystem.unlock();
         const result = manager.draw();
         if (!result) return;
+        if (result.events.some((e) => e.type === 'draw' && e.recycled)) {
+          this.animateReshuffle(() => {
+            this.renderCards();
+            this.refreshHUD();
+            this.handleEvents(result.events);
+          });
+          return;
+        }
         this.renderCards();
         this.refreshHUD();
         this.handleEvents(result.events);
@@ -170,6 +180,25 @@ export class CastleScene extends Phaser.Scene {
           });
         }
       });
+    this.text(w * 0.63, this.layout.trayTop + 3, 'NEXT', 9, '#b5d9dd');
+    this.undoButton = this.text(
+      w * 0.81,
+      this.layout.trayTop - 5,
+      '↶ UNDO · −1 HP',
+      10,
+      '#ffe6a9'
+    ).setInteractive();
+    this.undoButton.on('pointerup', () => {
+      if (this.paused || this.locked || this.ended) return;
+      if (!manager.undo()) {
+        AudioSystem.play('invalid_tap');
+        return;
+      }
+      AudioSystem.play('card_draw');
+      this.renderCards();
+      this.refreshHUD();
+      this.number(this.castle.x, this.castle.y - 70, '−1 HP · UNDO', '#ffc28f');
+    });
     const target = this.activePosition();
     this.activeLabel = this.text(
       target.x + this.layout.cw / 2,
@@ -263,9 +292,21 @@ export class CastleScene extends Phaser.Scene {
       castleManager().save();
       this.saveTimer = 0;
     }
+    if (
+      this.time.now >= this.nextFootstep &&
+      castleManager().state!.siege.enemies.some((e) => e.progress < 0.94)
+    ) {
+      AudioSystem.play(Math.random() > 0.5 ? 'footstep_1' : 'footstep_2', {
+        volume: 0.18,
+        pitchShift: Math.random() * 0.1,
+      });
+      this.nextFootstep = this.time.now + 430;
+    }
     for (const unit of castleManager().state?.siege.units ?? []) {
       const view = this.defenders.get(unit.id);
       if (!view) continue;
+      if (view.body)
+        this.walkAnimation(view.body, unit.kind === 'knight' ? 'c_angel2' : 'c_angel1');
       const target = this.unitPosition(unit);
       view.root.x += (target.x - view.root.x) * Math.min(1, delta / 90);
       view.root.y =
@@ -277,6 +318,7 @@ export class CastleScene extends Phaser.Scene {
     for (const enemy of castleManager().state?.siege.enemies ?? []) {
       const view = this.invaders.get(enemy.id);
       if (!view) continue;
+      if (enemy.progress < 0.94) this.walkAnimation(view.body, enemy.sprite);
       const target = this.enemyPosition(enemy);
       view.root.x += (target.x - view.root.x) * Math.min(1, delta / 90);
       view.root.y =
@@ -303,6 +345,53 @@ export class CastleScene extends Phaser.Scene {
       y: this.groundY() - (enemy.id % 4) * 14,
     };
   }
+  private walkAnimation(body: Phaser.GameObjects.Sprite, sprite: string): void {
+    const key = body.anims.currentAnim?.key ?? '';
+    if (body.anims.isPlaying && (key.endsWith('-attack') || key.endsWith('-hurt'))) return;
+    body.play(`${sprite}-walk`, true);
+  }
+  private animateReshuffle(done: () => void): void {
+    this.locked = true;
+    this.paused = true;
+    this.accumulator = 0;
+    AudioSystem.play('card_shuffle', { volume: 0.85 });
+    this.stockText.setText('RESHUFFLING…');
+    this.nextCard?.destroy();
+    this.nextCard = null;
+    const p = this.activePosition(),
+      cards: Phaser.GameObjects.Container[] = [];
+    for (let i = 0; i < 7; i++) {
+      const back = createCardBack(this, p.x, p.y)
+        .setDepth(300 + i)
+        .setScale(0.75);
+      cards.push(back);
+      this.tweens.add({
+        targets: back,
+        x: 50 + i * 9,
+        y: this.layout.trayTop + 8 + (i % 2) * 10,
+        angle: (i - 3) * 8,
+        delay: i * 40,
+        duration: 330,
+        ease: 'Cubic.inOut',
+        onComplete: () => {
+          this.tweens.add({
+            targets: back,
+            x: 70,
+            y: this.layout.trayTop + 15,
+            angle: 0,
+            delay: 70,
+            duration: 220,
+          });
+        },
+      });
+    }
+    this.time.delayedCall(900, () => {
+      cards.forEach((c) => c.destroy());
+      this.locked = false;
+      this.paused = false;
+      done();
+    });
+  }
   private activePosition() {
     return { x: viewport(this).width * 0.78 - this.layout.cw / 2, y: this.layout.trayTop + 7 };
   }
@@ -321,6 +410,21 @@ export class CastleScene extends Phaser.Scene {
   }
   private renderCards(): void {
     const battle = castleManager().state!.run.battle!;
+    const preview = nextCastleCard(castleManager().state!);
+    if (this.nextCard?.getCard().id !== preview?.id) {
+      this.nextCard?.destroy();
+      this.nextCard = null;
+      if (preview) {
+        this.nextCard = new CardVisual(
+          this,
+          viewport(this).width * 0.63 - this.layout.cw * 0.26,
+          this.layout.trayTop + 15,
+          preview
+        );
+        this.nextCard.getContainer().setScale(0.52).setAlpha(0.9);
+        this.nextCard.setDepth(78);
+      }
+    }
     const next = new Set<string>(),
       { side, cw, gap, tableauTop, strip } = this.layout;
     battle.tableau.forEach((column, col) =>
@@ -330,7 +434,18 @@ export class CastleScene extends Phaser.Scene {
         const x = side + col * (cw + gap),
           y = tableauTop + row * strip;
         if (!visual) {
-          visual = new CardVisual(this, x, y, card, getPowerType(battle.powerCards, card.id));
+          visual = new CardVisual(
+            this,
+            x,
+            y,
+            card,
+            getPowerType(
+              battle.powerCards.filter(
+                (p) => !castleManager().state!.usedPowers?.includes(p.cardId)
+              ),
+              card.id
+            )
+          );
           this.cards.set(card.id, visual);
           visual.setInteractive(() => this.play(card.id));
         }
@@ -438,13 +553,14 @@ export class CastleScene extends Phaser.Scene {
     );
     this.steps.forEach((box, i) =>
       box
-        .setFillStyle(chain > i ? 0x936335 : 0x25193e)
-        .setStrokeStyle(chain > i ? 2 : 1, chain > i ? 0xffda64 : 0x8862ba)
+        .setFillStyle(chain > i ? 0x936335 : 0x254650)
+        .setStrokeStyle(chain > i ? 2 : 1, chain > i ? 0xffda64 : 0x6d989e)
     );
     const left = state.run.battle!.tableau.reduce((n, col) => n + col.cards.length, 0);
     this.stockText.setText(
       `${chain ? 'DRAW TO DEPLOY' : 'No chain banked'}\n${state.run.battle!.deck.length} stock · ${left} cards left`
     );
+    this.undoButton.setAlpha(castleManager().canUndo ? 1 : 0.35);
     this.activeLabel.setText(
       state.run.battle!.wildActive
         ? 'WILD · ANY CARD'
@@ -462,7 +578,7 @@ export class CastleScene extends Phaser.Scene {
       if (!view) {
         const p = this.enemyPosition(enemy),
           root = this.add.container(p.x, p.y).setDepth(39 - (enemy.id % 4));
-        const size = Math.min(enemy.boss ? 90 : 59, this.layout.arenaHeight * 0.6);
+        const size = Math.min(enemy.boss ? 104 : 72, this.layout.arenaHeight * 0.6);
         const body = this.add
           .sprite(0, 0, `enemy-${enemy.sprite}`)
           .setDisplaySize(size, size)
@@ -470,7 +586,7 @@ export class CastleScene extends Phaser.Scene {
         body.play(`${enemy.sprite}-idle`);
         const hp = this.add.graphics(),
           label = this.text(0, -size - 9, enemy.boss ? 'BOSS' : '', 10, '#ffe1a0');
-        root.add([body, hp, label]);
+        root.add([this.add.ellipse(0, -2, size * 0.55, 9, 0x17313a, 0.24), body, hp, label]);
         view = { root, body, hp, label };
         this.invaders.set(enemy.id, view);
       }
@@ -507,10 +623,10 @@ export class CastleScene extends Phaser.Scene {
           body = this.add
             .sprite(0, 0, `enemy-${sprite}`)
             .setOrigin(0.5, 1)
-            .setDisplaySize(unit.kind === 'knight' ? 56 : 47, unit.kind === 'knight' ? 56 : 47)
+            .setDisplaySize(unit.kind === 'knight' ? 67 : 58, unit.kind === 'knight' ? 67 : 58)
             .setFlipX(true);
           body.play(`${sprite}-idle`);
-          root.add(body);
+          root.add([this.add.ellipse(0, -2, 28, 8, 0x17313a, 0.24), body]);
         } else {
           weapon = weaponArt(this, unit.kind === 'mortar');
           root.add(weapon);
@@ -594,6 +710,10 @@ export class CastleScene extends Phaser.Scene {
           if (event.recycled) this.callout('STOCK RECYCLED', '#ffe3a4');
           break;
         case 'spawn':
+          if (this.time.now >= this.nextVoice) {
+            AudioSystem.play('orc_growl', { volume: 0.32 });
+            this.nextVoice = this.time.now + 6000;
+          }
           if (event.enemy.boss) this.callout('SUPERMONSTER!', '#ffce6e');
           break;
         case 'deploy': {
@@ -667,6 +787,10 @@ export class CastleScene extends Phaser.Scene {
           break;
         }
         case 'killed': {
+          if (this.time.now >= this.nextVoice || event.enemy.boss) {
+            AudioSystem.play('orc_death', { volume: 0.3 });
+            this.nextVoice = this.time.now + 1400;
+          }
           const view = this.invaders.get(event.enemy.id);
           if (!view) break;
           this.invaders.delete(event.enemy.id);
@@ -761,7 +885,14 @@ export class CastleScene extends Phaser.Scene {
       });
     }
     if (this.time.now >= this.nextShotSound) {
-      AudioSystem.play('enemy_hit', { volume: 0.09 });
+      AudioSystem.play(
+        event.kind === 'turret'
+          ? 'turret_shot'
+          : event.kind === 'mortar'
+            ? 'mortar_shot'
+            : 'orc_hit',
+        { volume: event.kind === 'turret' ? 0.4 : 0.28 }
+      );
       this.nextShotSound = this.time.now + 180;
     }
     if (event.kind !== 'turret') this.number(tx, ty - 8, String(event.damage), '#fff4d2');
@@ -840,7 +971,7 @@ export class CastleScene extends Phaser.Scene {
     beam.lineStyle(3, 0xffffff).lineBetween(w * 0.9, y, -20, y);
     this.tweens.add({ targets: beam, alpha: 0, duration: 500, onComplete: () => beam.destroy() });
     playCombatVFX(this, 'magic', this.castle.x, this.castle.y - 78, 100, 0x77ffff);
-    AudioSystem.playPower('BOMB');
+    AudioSystem.play('laser_blast', { volume: 0.6 });
     if (!isShakeReduced()) this.cameras.main.shake(170, 0.004);
     this.callout(final ? 'SOLITAIRE COMPLETE!' : 'LASER SWEEP!', '#a8ffff');
   }
