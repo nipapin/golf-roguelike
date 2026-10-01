@@ -12,7 +12,7 @@ export function gamePopup(scene: Phaser.Scene, title: string, subtitle: string, 
   // Backdrop/shade cover the full screen; the panel stays inside the safe band.
   const root = scene.add.container(viewport(scene).width / 2, safe.centerY).setDepth(1000);
   // Restore/save routes may open a modal without a live battle beneath it.
-  if (!scene.scene.isPaused('BattleScene')) {
+  if (!scene.scene.isPaused('BattleScene') && !scene.scene.isActive('CastleScene')) {
     const arena = new ArenaBackground(scene);
     arena.draw(viewport(scene).width, 0, viewport(scene).height * .6, 'goblin_camp');
     const felt = scene.add.rectangle(viewport(scene).width / 2, viewport(scene).height * .8, viewport(scene).width, viewport(scene).height * .4, colors.felt);

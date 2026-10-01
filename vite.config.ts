@@ -6,9 +6,9 @@ export default defineConfig({
     VitePWA({
       registerType: 'prompt',
       manifest: {
-        name: 'Golf Rogue',
-        short_name: 'Golf Rogue',
-        description: 'A mobile roguelike built on Golf Solitaire.',
+        name: 'Castle Solitaire',
+        short_name: 'Castle Solitaire',
+        description: 'Build chains, deploy defenders and protect your castle with one solitaire.',
         start_url: '/',
         display: 'standalone',
         background_color: '#140A2A',
