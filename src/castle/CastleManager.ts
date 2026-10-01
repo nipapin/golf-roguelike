@@ -8,14 +8,17 @@ import {
   type CastleRun,
   type SiegeResult,
 } from './CastleDefense';
+import type { BattleState } from '../core/types';
 import { CastleService } from './CastleService';
 export class CastleManager {
   state: CastleRun | null = null;
+  private previousCard: BattleState | null = null;
   readonly service: CastleService;
   constructor(storage: Storage) {
     this.service = new CastleService(storage);
   }
   start(): void {
+    this.previousCard = null;
     const seed = generateSeed(),
       meta = this.service.beginSiege();
     this.state = createCastleRun(
@@ -23,11 +26,12 @@ export class CastleManager {
       gameConfig,
       meta.upgrades,
       `${seed}:${Date.now()}`,
-      meta.siegesStarted
+      meta.currentStreak
     );
     this.save();
   }
   resume(): boolean {
+    this.previousCard = null;
     this.state = this.service.load();
     if (this.state && this.state.run.phase !== 'battle') this.service.settle(this.state);
     return !!this.state;
@@ -42,11 +46,33 @@ export class CastleManager {
     return result;
   }
   play(id: string): SiegeResult | null {
-    const result = this.apply(this.state ? playCastleCard(this.state, id, gameConfig) : null);
+    const before = this.state;
+    const result = this.apply(before ? playCastleCard(before, id, gameConfig) : null);
+    if (result && result.state !== before) this.previousCard = before!.run.battle;
     this.save();
     return result;
   }
+  get canUndo(): boolean {
+    return (
+      !!this.previousCard && this.state?.run.phase === 'battle' && this.state.run.player.hp > 1
+    );
+  }
+  undo(): boolean {
+    if (!this.canUndo || !this.state || !this.previousCard) return false;
+    this.state = {
+      ...this.state,
+      run: {
+        ...this.state.run,
+        battle: this.previousCard,
+        player: { ...this.state.run.player, hp: this.state.run.player.hp - 1 },
+      },
+    };
+    this.previousCard = null;
+    this.save();
+    return true;
+  }
   draw(): SiegeResult | null {
+    this.previousCard = null;
     const result = this.apply(this.state ? drawCastleCard(this.state, gameConfig) : null);
     this.save();
     return result;

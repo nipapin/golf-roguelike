@@ -8,6 +8,7 @@ import {
   emptyUpgrades,
   playCastleCard,
   drawCastleCard,
+  nextCastleCard,
   stepSiege,
   type CastleRun,
   type Invader,
@@ -470,5 +471,26 @@ describe('deterministic castle balance sample', () => {
     expect(wins).toBeGreaterThanOrEqual(12);
     expect(bossRuns).toBeGreaterThan(0);
     expect(totalCards / 40).toBeGreaterThan(20);
+  });
+});
+
+describe('stock preview', () => {
+  it('predicts both ordinary draws and recycled stock without advancing RNG', () => {
+    const state = start();
+    expect(drawCastleCard(state, config).state.run.battle!.activeCard).toEqual(
+      nextCastleCard(state)
+    );
+    const recycled = {
+      ...state,
+      run: {
+        ...state.run,
+        battle: { ...state.run.battle!, deck: [], discard: state.run.battle!.deck },
+      },
+    };
+    const rng = recycled.run.rngState;
+    const card = nextCastleCard(recycled);
+    expect(nextCastleCard(recycled)).toEqual(card);
+    expect(recycled.run.rngState).toBe(rng);
+    expect(drawCastleCard(recycled, config).state.run.battle!.activeCard).toEqual(card);
   });
 });

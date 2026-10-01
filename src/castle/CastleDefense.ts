@@ -101,6 +101,7 @@ export interface CastleRun {
   run: RunState;
   siege: SiegeState;
   upgrades: Upgrades;
+  usedPowers?: string[];
 }
 export type SiegeEvent =
   | { type: 'spawn'; enemy: Invader }
@@ -273,8 +274,17 @@ export function playCastleCard(
   config: GameConfig
 ): SiegeResult {
   if (current.run.phase !== 'battle') return { state: current, events: [] };
-  const played = playCard(current.run, cardId, config);
-  if (played.state === current.run || !played.state.battle) return { state: current, events: [] };
+  // Immediate powers are consumed once: undo must not farm healing, coins or bombs.
+  const used = new Set(current.usedPowers ?? []);
+  const battle = current.run.battle!;
+  const input = used.has(cardId)
+    ? {
+        ...current.run,
+        battle: { ...battle, powerCards: battle.powerCards.filter((p) => p.cardId !== cardId) },
+      }
+    : current.run;
+  const played = playCard(input, cardId, config);
+  if (played.state === input || !played.state.battle) return { state: current, events: [] };
   const state = clone(current);
   const chain = (current.run.battle?.chain.length ?? 0) + 1;
   // Card legality, powers and joker order come from the same solitaire engine.
@@ -283,8 +293,20 @@ export function playCastleCard(
     ...played.state,
     phase: 'battle',
     availableRewards: [],
-    battle: { ...played.state.battle, mode: 'solitaire', enemy: combatant() },
+    battle: {
+      ...played.state.battle,
+      powerCards: battle.powerCards,
+      mode: 'solitaire',
+      enemy: combatant(),
+    },
   };
+  if (
+    played.events.some(
+      (e) => e.type === 'power_activated' && ['HEAL', 'GUARD', 'GOLD', 'BOMB'].includes(e.powerType)
+    )
+  )
+    used.add(cardId);
+  state.usedPowers = [...used];
   state.siege.started = true;
   const events: SiegeEvent[] = [
     {
@@ -315,6 +337,12 @@ export function playCastleCard(
     events.push({ type: 'ended', victory: true });
   }
   return { state, events };
+}
+/** Preview uses a cloned RNG: seeing a recycled card never changes the shuffle. */
+export function nextCastleCard(current: CastleRun) {
+  const battle = current.run.battle;
+  if (!battle) return undefined;
+  return battle.deck[0] ?? RNG.fromState(current.run.rngState).shuffle(battle.discard)[0];
 }
 export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeResult {
   if (current.run.phase !== 'battle') return { state: current, events: [] };

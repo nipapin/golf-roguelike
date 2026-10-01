@@ -5,7 +5,6 @@ import {
   safeArea,
   getRenderDensity,
 } from '../presentation/design/viewport';
-import { ArenaBackground } from '../presentation/design/ArenaBackground';
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { castleArt } from './CastleArt';
@@ -47,11 +46,11 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'CARDS KEEP YOU ALIVE',
-      'Hearts repair walls, clubs add armor, diamonds earn coins. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
+      'Suits grant repairs, armor and coins. NEXT previews stock; UNDO returns your last card for 1 castle HP. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
     ],
     [
       'FINISH TO WIN',
-      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop. Each NEW siege raises enemy HP and pressure; continuing a save keeps its difficulty.',
+      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop. Winning advances siege difficulty. Losing resets it to siege 1. Your upgrades and best run stay.',
     ],
   ];
   const available = modal.height - 166,
@@ -91,9 +90,9 @@ export class CastleMenuScene extends Phaser.Scene {
     const { width: w, height: h } = viewport(this),
       safe = safeArea(this),
       manager = castleManager();
-    const arena = new ArenaBackground(this);
-    arena.draw(w, 0, h, 'castle');
-    this.add.rectangle(w / 2, h * 0.77, w, h * 0.46, 0x32206a).setStrokeStyle(3, 0x6748ae);
+    this.cameras.main.setBackgroundColor('#213e48');
+    this.add.image(w / 2, h * 0.32, 'battlefield-kenney').setDisplaySize(w, h * 0.64);
+    this.add.rectangle(w / 2, h * 0.77, w, h * 0.46, 0x254650).setStrokeStyle(3, 0x6d989e);
     this.text(w / 2, safe.top + 38, 'CASTLE\nSOLITAIRE', 38, '#fff1b3')
       .setAlign('center')
       .setStroke('#1b1030', 7);
@@ -114,7 +113,7 @@ export class CastleMenuScene extends Phaser.Scene {
     });
     const meta = manager.service.readMeta(),
       saved = manager.service.load();
-    const next = meta.siegesStarted + 1;
+    const next = meta.currentStreak + 1;
     const threat = siegeDifficulty(next);
     this.text(
       w / 2,
@@ -122,6 +121,13 @@ export class CastleMenuScene extends Phaser.Scene {
       `NEXT SIEGE #${next} · ENEMY HP +${Math.round((threat.hp - 1) * 100)}%`,
       13,
       '#ffda9a'
+    );
+    this.text(
+      w / 2,
+      safe.top + 162,
+      `BEST RUN · SIEGE #${meta.bestSiege} · ${meta.bestKills} KILLS`,
+      12,
+      '#bfe1e3'
     );
     const buttons = this.add.container(w / 2, safe.bottom - 165);
     this.add.image(w / 2 - 39, safe.bottom - 223, 'coin').setDisplaySize(26, 26);
@@ -201,16 +207,16 @@ export class CastleMenuScene extends Phaser.Scene {
   private credits(): void {
     const modal = gamePopup(this, 'CREDITS', 'Artists, audio and licenses', 400);
     const content =
-      'Animated monsters · CraftPix\nFree Game Assets · CraftPix license\nCombat VFX · Kalponic Studio / Jony\nFree Stylized Sprite VFX · CC BY 4.0\nMusic · request / Heartfelt Battle · CC0\nCard sounds · Kenney · CC0\nFonts · Google Fonts · SIL OFL 1.1\nCastle art & defense · Golf Rogue';
+      'Models & animation · Kenney · CC0\nCombat VFX · Kalponic Studio / Jony\nFree Stylized Sprite VFX · CC BY 4.0\nMusic · request / Heartfelt Battle · CC0\nCard / combat audio · Kenney · CC0\nOrc voices · Tim Rockk · CC0\nWeapon recordings · kurt / OGA · CC0\nFonts · Google Fonts · SIL OFL 1.1\nDefense · Golf Rogue';
     modal.content.add(
       this.add
         .text(0, modal.top + 110, content, {
           resolution: getRenderDensity(),
           fontFamily: 'Fredoka',
-          fontSize: '13px',
+          fontSize: '12px',
           color: '#f4e9ff',
           align: 'center',
-          lineSpacing: 6,
+          lineSpacing: 3,
         })
         .setOrigin(0.5, 0)
     );
