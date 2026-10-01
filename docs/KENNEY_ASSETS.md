@@ -12,7 +12,8 @@ The castle mode uses a coherent Kenney low-poly diorama style. GLB models are re
 | Laser | Kenney, [Sci-fi Sounds](https://kenney.nl/assets/sci-fi-sounds) | CC0 |
 | Orc growl, grunt, death | Tim Rockk, [Orc Voice](https://opengameart.org/content/orc-voice) | CC0 |
 | Turret and mortar recordings | kurt, [Gunshots](https://opengameart.org/content/gunshots), .22 pistol / black powder | CC0 |
-| Orchestral combat loop | request, [Heartfelt Battle](https://opengameart.org/content/heartfelt-battle-loopable-fantasy-stringspianohorn) | CC0 |
+| Orchestral combat loop | MintoDog, [Hope](https://opengameart.org/content/hopeorchestral-battle-music) | CC0 |
+| Layered recorded impacts / power cues | Kenney, [Impact Sounds](https://kenney.nl/assets/impact-sounds) | CC0 |
 
 Kenney license files are included in `public/assets/kenney/licenses`. Existing attributed VFX remain under their original license in the game's credits.
 
@@ -37,3 +38,5 @@ NEXT peeks at the stock's first card. With exhausted stock it previews the deter
 UNDO restores the previous successful tableau card and chain, costs one castle HP, and leaves live combat and already triggered effects intact. Immediate HEAL/GUARD/GOLD/BOMB powers are consumed once to prevent replay farming. Drawing commits deployment and clears undo. Undo is unavailable with one HP or after the run ends.
 
 The difficulty streak advances per new siege and resets after defeat. Total attempts, best siege, best kills, coins and workshop upgrades are tracked separately. Resuming a saved siege keeps its saved difficulty. Old wallets migrate to a fresh streak without losing permanent progression.
+
+The active audio revision is HD v3. See `public/audio/RECORDED_AUDIO_CREDITS.md` for current files, processing and source provenance; older render instructions describe the initial audio assets.

@@ -811,7 +811,7 @@ export class CastleScene extends Phaser.Scene {
         case 'castle_hit':
           this.actorAnimation(event.enemy, 'attack');
           if (event.damage > 0) {
-            AudioSystem.play('player_hit', { volume: 0.35 });
+            AudioSystem.play('player_hit', { volume: 0.85 });
             this.number(this.castle.x, this.castle.y - 70, `−${event.damage}`, '#ff6b84');
             if (!isShakeReduced()) this.cameras.main.shake(130, 0.003);
           } else {
@@ -891,7 +891,7 @@ export class CastleScene extends Phaser.Scene {
           : event.kind === 'mortar'
             ? 'mortar_shot'
             : 'orc_hit',
-        { volume: event.kind === 'turret' ? 0.4 : 0.28 }
+        { volume: event.kind === 'turret' ? 0.8 : 0.6 }
       );
       this.nextShotSound = this.time.now + 180;
     }
@@ -971,7 +971,7 @@ export class CastleScene extends Phaser.Scene {
     beam.lineStyle(3, 0xffffff).lineBetween(w * 0.9, y, -20, y);
     this.tweens.add({ targets: beam, alpha: 0, duration: 500, onComplete: () => beam.destroy() });
     playCombatVFX(this, 'magic', this.castle.x, this.castle.y - 78, 100, 0x77ffff);
-    AudioSystem.play('laser_blast', { volume: 0.6 });
+    AudioSystem.play('laser_blast', { volume: 1 });
     if (!isShakeReduced()) this.cameras.main.shake(170, 0.004);
     this.callout(final ? 'SOLITAIRE COMPLETE!' : 'LASER SWEEP!', '#a8ffff');
   }

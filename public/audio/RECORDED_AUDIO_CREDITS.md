@@ -1,12 +1,16 @@
-# Recorded audio
+# Audio revision HD v3
 
-Runtime assets are compressed derivatives of CC0 sources:
+Runtime now uses decoded samples for every effect. No Web Audio oscillators are used for combo, power, reward or end-screen cues.
 
-- **Kenney — Casino Audio**: https://opengameart.org/content/54-casino-sound-effects-cards-dice-chips
-  `card-tap-{1,2,3}.mp3`: recorded card placement trimmed to 180 ms with a short fade.
-- **request — Heartfelt Battle**: https://opengameart.org/content/heartfelt-battle-loopable-fantasy-stringspianohorn
-  `battle-orchestral.mp3`: fantasy strings, piano and horn loop, encoded at 96 kbps.
+- **MintoDog — Hope (Orchestral battle music)**, CC0: https://opengameart.org/content/hopeorchestral-battle-music . New 69.8-second loop from the lossless FLAC source, stereo MP3 192 kbps / 48 kHz, normalized to −16 LUFS / −1.5 dB peak. Runtime file: `hd-v3/hope-battle.mp3`.
+- **Kenney — Impact Sounds**, CC0: https://kenney.nl/assets/impact-sounds . Recorded metal, bell, glass, plate, wood and punch sounds underpin `strike`, `wall-hit`, `armor`, `combo`, `coin`, `heal`, `wild`, `echo`, `crit`, `invalid`, `click`, `win` and `lose`. License included under `public/assets/kenney/licenses/impact.txt`.
+- **kurt — Gunshots**, CC0: https://opengameart.org/content/gunshots . Original .22 Pistol and Black Powder WAV recordings underpin `gun`, `bomb` and the designed `laser` charge/impact, layered with Kenney foley.
+- **Kenney — Casino Audio**, CC0: https://kenney.nl/assets/casino-audio . Short 0.22s recorded card slides; existing shuffle is retained.
+- **Kenney — RPG Audio**, CC0: https://kenney.nl/assets/rpg-audio . Footsteps retained.
+- **Tim Rockk — Orc Voice**, CC0: https://opengameart.org/content/orc-voice . Recorded growl, grunt and death retained.
 
-One continuous music loop uses the independent music volume control. Outside combat, a low-pass filter and lower gain give a muffled behind-the-wall sound without restarting the track. Power-card and ascending combo cues are synthesized short effects.
+Effects are mixed from recordings, trimmed, equalized and moderately compressed while preserving their attacks. Output is stereo 192 kbps MP3 at 48 kHz, normalized to −14 LUFS / −1.5 dB peak. Final level remains controlled by the player's saved independent SFX/music sliders.
 
-Unused legacy recordings (battle-rock, menu-fantasy, result-*, foley-*, card-place-*, card-slide) were removed from the build to keep the PWA precache small.
+Combo pitches rise by half a semitone per card, capped at seven semitones. Powers use different samples; jokers use lower-pitched healing/critical cues. Menu and results still filter the same continuous new soundtrack behind a wall.
+
+New `/audio/hd-v3/` URLs prevent old cached files from replacing the new sounds. PWA checks for application updates immediately on launch and when foregrounded. Gameplay is saved before the existing update button reloads the application.
