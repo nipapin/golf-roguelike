@@ -3,22 +3,7 @@ import { viewport, configureViewport, getRenderDensity } from '../design/viewpor
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
-import enemiesData from '../../data/enemies.json';
-import type { EnemiesData } from '../../core/GameState';
-
-/** Every atlas + frame layout comes from enemies.json "sprites" (data-driven enemy defs). */
-const SPRITE_DEFS = (enemiesData as unknown as EnemiesData).sprites ?? {};
-const ENEMY_SPRITES = Object.keys(SPRITE_DEFS);
-const KENNEY_KEYS = new Set([
-  'c_orc',
-  'c_goblin',
-  'c_reaper2',
-  'c_ogre',
-  'c_reaper1',
-  'c_angel1',
-  'c_angel2',
-]);
-
+import { preloadCardboardArt, createCardboardAnimations } from '../../castle/CardboardArt';
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
@@ -29,21 +14,7 @@ export class BootScene extends Phaser.Scene {
     for (const key of VFX_KEYS)
       this.load.atlas('vfx-' + key, '/assets/vfx/' + key + '.webp', '/assets/vfx/' + key + '.json');
 
-    for (const key of ['castle', 'turret', 'mortar', 'battlefield'])
-      this.load.image(key + '-kenney', `/assets/kenney/${key}.webp`);
-
-    // Load enemy sprite atlases
-    for (const enemy of ENEMY_SPRITES) {
-      this.load.atlas(
-        `enemy-${enemy}`,
-        KENNEY_KEYS.has(enemy)
-          ? `/assets/kenney/${enemy.startsWith('c_angel') ? 'human' : 'orc'}.webp`
-          : `/assets/enemies/atlases/${enemy}.webp`,
-        KENNEY_KEYS.has(enemy)
-          ? `/assets/kenney/${enemy}.json`
-          : `/assets/enemies/atlases/${enemy}.json`
-      );
-    }
+    preloadCardboardArt(this);
 
     this.load.svg('coin', '/assets/coin.svg', { width: 96, height: 96 });
 
@@ -92,72 +63,9 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     configureViewport(this);
     // Create enemy animations
-    this.createEnemyAnimations();
+    createCardboardAnimations(this);
     createCombatAnimations(this);
 
     this.scene.start('StartScene');
-  }
-
-  private createEnemyAnimations(): void {
-    for (const enemy of ENEMY_SPRITES) {
-      const atlasKey = `enemy-${enemy}`;
-
-      if (!this.textures.exists(atlasKey)) {
-        console.warn(`Atlas not loaded: ${atlasKey}`);
-        continue;
-      }
-
-      const frames = this.textures.get(atlasKey).getFrameNames();
-      const frameCount = frames.length;
-
-      if (frameCount > 0) {
-        const frames = KENNEY_KEYS.has(enemy)
-          ? { idle: [0, 3], walk: [4, 11], attack: [12, 15], hurt: [16, 17], dead: [18, 21] }
-          : SPRITE_DEFS[enemy].frames;
-        for (const [name, [start, rawEnd]] of Object.entries(frames)) {
-          const end = rawEnd < 0 ? frameCount - 1 : Math.min(rawEnd, frameCount - 1);
-          this.createAnimationFromRange(
-            atlasKey,
-            name,
-            enemy,
-            start,
-            end,
-            name === 'idle' ? 6 : 12,
-            name === 'idle' || name === 'walk' ? -1 : 0
-          );
-        }
-      }
-    }
-  }
-
-  private createAnimationFromRange(
-    atlasKey: string,
-    animName: string,
-    enemy: string,
-    start: number,
-    end: number,
-    frameRate: number,
-    repeat: number
-  ): void {
-    const frames: Phaser.Types.Animations.AnimationFrame[] = [];
-
-    for (let i = start; i <= end; i++) {
-      const frameName = `${enemy}_${i.toString().padStart(3, '0')}`;
-      if (this.textures.get(atlasKey).has(frameName)) {
-        frames.push({ key: atlasKey, frame: frameName });
-      }
-    }
-
-    if (frames.length > 0) {
-      const animKey = `${enemy}-${animName}`;
-      if (!this.anims.exists(animKey)) {
-        this.anims.create({
-          key: animKey,
-          frames,
-          frameRate,
-          repeat,
-        });
-      }
-    }
   }
 }

@@ -26,7 +26,8 @@ export default defineConfig({
         // Pre-cache static assets for offline play. Short SFX (.mp3) are precached;
         // the current music loop also fits the precache size limit.
         globPatterns: ['**/*.{js,css,svg,png,webp,json,ttf,woff2,mp3}'],
-        globIgnores: ['**/node_modules/**', '**/*.ogg', 'icons/icon-maskable-*.png'],
+// Preserve originals in the catalog; precache only small gameplay WebP copies.
+        globIgnores: ['**/node_modules/**', '**/*.ogg', 'icons/icon-maskable-*.png', 'assets/cardboard/**'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
 
         // Don't pre-cache HTML - fetch from network first

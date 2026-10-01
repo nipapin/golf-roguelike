@@ -1,3 +1,4 @@
+import { cardboardArt } from './CardboardArt';
 import Phaser from 'phaser';
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { getRenderDensity } from '../presentation/design/viewport';
@@ -87,21 +88,19 @@ export function showCastleWorkshop(scene: Phaser.Scene, close: () => void): void
     y: number,
     size: number
   ): Phaser.GameObjects.Image | Phaser.GameObjects.Sprite => {
-    if (key === 'soldier' || key === 'knight') {
-      const actor = key === 'knight' ? 'c_angel2' : 'c_angel1';
-      const sprite = scene.add.sprite(x, y, `enemy-${actor}`).setDisplaySize(size, size);
-      sprite.play(`${actor}-idle`);
-      if (key === 'knight') sprite.setTint(0xffe3a5);
-      return sprite;
-    }
-    return scene.add
-      .image(
-        x,
-        y,
-        key === 'walls' ? 'castle-kenney' : key === 'mortar' ? 'mortar-kenney' : 'turret-kenney'
-      )
-      .setDisplaySize(size, size)
-      .setTint(key === 'laser' ? 0xa2ffff : 0xffffff);
+    const id =
+      key === 'knight'
+        ? 'archer'
+        : key === 'soldier'
+          ? 'soldier'
+          : key === 'walls'
+            ? 'castle'
+            : key === 'mortar'
+              ? 'mortar'
+              : key === 'laser'
+                ? 'laser'
+                : 'turret';
+    return cardboardArt(scene, id, x, y, size).setOrigin(0.5);
   };
   const draw = (bought = false) => {
     page?.destroy();

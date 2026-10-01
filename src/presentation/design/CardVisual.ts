@@ -1,3 +1,5 @@
+import { cardboardArt } from '../../castle/CardboardArt';
+import type { CardboardAssetId } from '../../castle/CardboardAssets';
 import { viewport, getRenderDensity } from './viewport';
 /**
  * CardVisual - Renders individual cards with all visual states
@@ -278,13 +280,16 @@ export class CardVisual {
       ECHO: '〰',
     };
 
-    const icon = this.scene.add
-      .text(0, 0, iconMap[powerType] || '★', {
-        fontSize: `${size * 0.5}px`,
-        color: '#ffffff',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 2);
+    const assetId = powerType.toLowerCase() as CardboardAssetId;
+    const icon = this.scene.textures.exists(`cardboard-${assetId}`)
+      ? cardboardArt(this.scene, assetId, 0, 0, size * 0.9).setOrigin(0.5)
+      : this.scene.add
+          .text(0, 0, iconMap[powerType] || '★', {
+            fontSize: `${size * 0.5}px`,
+            color: '#ffffff',
+          })
+          .setOrigin(0.5)
+          .setStroke('#1B1030', 2);
 
     this.powerMedal.add([medal, icon]);
     this.container.add(this.powerMedal);
