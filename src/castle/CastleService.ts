@@ -19,6 +19,7 @@ export interface CastleMeta {
   claimed: string[];
   bestKills: number;
   victories: number;
+  siegesStarted: number;
 }
 const fresh = (): CastleMeta => ({
   version: 1,
@@ -27,6 +28,7 @@ const fresh = (): CastleMeta => ({
   claimed: [],
   bestKills: 0,
   victories: 0,
+  siegesStarted: 0,
 });
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -41,6 +43,8 @@ function validRun(v: unknown): v is CastleRun {
     v.version !== 1 ||
     typeof v.id !== 'string' ||
     !v.id ||
+    !integer(v.siegeNumber) ||
+    v.siegeNumber < 1 ||
     !upgrades(v.upgrades) ||
     !record(v.run) ||
     !record(v.run.player) ||
@@ -112,11 +116,24 @@ export class CastleService {
         Array.isArray(v.claimed) &&
         v.claimed.every((id) => typeof id === 'string')
       )
-        return v as unknown as CastleMeta;
+        return {
+          ...v,
+          siegesStarted: integer(v.siegesStarted) ? v.siegesStarted : v.claimed.length,
+        } as unknown as CastleMeta;
     } catch {
       /* A damaged wallet never blocks a new game. */
     }
     return fresh();
+  }
+  beginSiege(): CastleMeta {
+    const meta = this.readMeta();
+    meta.siegesStarted++;
+    try {
+      this.storage.setItem(META_KEY, JSON.stringify(meta));
+    } catch {
+      /* Private storage. */
+    }
+    return meta;
   }
   purchase(key: UpgradeKey): boolean {
     const meta = this.readMeta(),
@@ -158,6 +175,7 @@ export class CastleService {
     try {
       const v: unknown = JSON.parse(this.storage.getItem(RUN_KEY) ?? 'null');
       // Existing saves predate marching infantry; preserve their board and wallet.
+      if (record(v) && v.siegeNumber === undefined) v.siegeNumber = 1;
       if (record(v) && record(v.siege) && Array.isArray(v.siege.units)) {
         v.siege.units = v.siege.units.map((u) =>
           record(u)
@@ -171,7 +189,14 @@ export class CastleService {
             : u
         );
       }
-      return validRun(v) ? v : null;
+      if (!validRun(v)) return null;
+      // Merge legacy duplicate cannons into one without summing their magazines.
+      const turrets = v.siege.units.filter((u) => u.kind === 'turret');
+      if (turrets.length > 1) {
+        const best = turrets.reduce((a, b) => (a.ammo >= b.ammo ? a : b));
+        v.siege.units = v.siege.units.filter((u) => u.kind !== 'turret' || u.id === best.id);
+      }
+      return v;
     } catch {
       return null;
     }

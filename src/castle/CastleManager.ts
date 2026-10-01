@@ -16,12 +16,14 @@ export class CastleManager {
     this.service = new CastleService(storage);
   }
   start(): void {
-    const seed = generateSeed();
+    const seed = generateSeed(),
+      meta = this.service.beginSiege();
     this.state = createCastleRun(
       seed,
       gameConfig,
-      this.service.readMeta().upgrades,
-      `${seed}:${Date.now()}`
+      meta.upgrades,
+      `${seed}:${Date.now()}`,
+      meta.siegesStarted
     );
     this.save();
   }
