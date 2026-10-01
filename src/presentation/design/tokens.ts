@@ -227,7 +227,7 @@ export type Suit = keyof typeof suitColors;
 
 /** Compact siege arena; reclaim excess sky for readable, less overlapped cards. */
 export function getCastleLayoutMetrics(width: number, height: number, insets?: SafeInsets) {
-  const base = getLayoutMetrics(width, height, insets);
+  const base = getLayoutMetrics(width, height - 56, insets);
   const extra = Math.max(0, base.arenaHeight - Math.min(200, width * 0.48));
   const strip = Math.min(base.ch * 0.95, base.strip + extra / 4);
   const shift = (strip - base.strip) * 4;

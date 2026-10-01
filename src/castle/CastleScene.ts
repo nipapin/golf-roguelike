@@ -9,8 +9,8 @@ import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { playCombatVFX } from '../presentation/design/CombatVFX';
 import { isShakeReduced } from '../presentation/juice/fxSettings';
 import { castleArt, weaponArt } from './CastleArt';
-import { castleManager } from './CastleManager';
-import { siegeRules } from './CastleMenuScene';
+import { CastleManager, castleManager } from './CastleManager';
+import { createTraining, trainingSteps, completeTraining } from './CastleTutorial';
 import { gameConfig } from '../data/gameConfig';
 import {
   STEP,
@@ -35,13 +35,19 @@ interface UnitView {
   weapon?: Phaser.GameObjects.Container;
   magazine?: Phaser.GameObjects.Graphics;
 }
-const RULES_KEY = 'golf-castle-rules-v1';
+
 export class CastleScene extends Phaser.Scene {
   private layout!: ReturnType<typeof getCastleLayoutMetrics>;
   private cards = new Map<string, CardVisual>();
   private active: CardVisual | null = null;
   private nextCard: CardVisual | null = null;
-  private undoButton!: Phaser.GameObjects.Text;
+  private undoButton!: Phaser.GameObjects.Container;
+  private manager!: CastleManager;
+  private training?: ReturnType<typeof createTraining>;
+  private lesson = 0;
+  private demoTime = 0;
+  private lessonUI?: Phaser.GameObjects.Container;
+  private tutorialFinish: 'start' | 'resume' | 'menu' = 'menu';
   private nextFootstep = 0;
   private nextVoice = 0;
   private invaders = new Map<number, EnemyView>();
@@ -66,9 +72,20 @@ export class CastleScene extends Phaser.Scene {
   constructor() {
     super('CastleScene');
   }
-  create(): void {
+  create(data: { tutorial?: boolean; finish?: 'start' | 'resume' | 'menu' } = {}): void {
     configureViewport(this);
-    const manager = castleManager();
+    if (data.tutorial) {
+      if (!this.training) {
+        this.training = createTraining();
+        this.lesson = 0;
+      }
+      this.tutorialFinish = data.finish ?? 'menu';
+      this.manager = this.training.manager;
+    } else {
+      this.training = undefined;
+      this.manager = castleManager();
+    }
+    const manager = this.manager;
     if (!manager.state && !manager.resume()) manager.start();
     this.cards = new Map();
     this.invaders = new Map();
@@ -114,7 +131,7 @@ export class CastleScene extends Phaser.Scene {
       .setInteractive();
     this.text(w - 31, hudTop + 20, 'Ⅱ', 23);
     pause.on('pointerup', () => {
-      if (this.ended || this.locked) return;
+      if (this.ended || this.locked || this.training) return;
       this.paused = true;
       manager.save();
       AudioSystem.setMusicScene('menu');
@@ -156,6 +173,7 @@ export class CastleScene extends Phaser.Scene {
       )
       .on('pointerup', () => {
         if (this.paused || this.locked || this.ended) return;
+        if (!this.allowTraining('draw')) return;
         AudioSystem.unlock();
         const result = manager.draw();
         if (!result) return;
@@ -170,6 +188,7 @@ export class CastleScene extends Phaser.Scene {
         this.renderCards();
         this.refreshHUD();
         this.handleEvents(result.events);
+        this.advanceTraining();
         if (this.active) {
           this.active.getContainer().setScale(0.15, 1);
           this.tweens.add({
@@ -181,24 +200,27 @@ export class CastleScene extends Phaser.Scene {
         }
       });
     this.text(w * 0.63, this.layout.trayTop + 3, 'NEXT', 9, '#b5d9dd');
-    this.undoButton = this.text(
-      w * 0.81,
-      this.layout.trayTop - 5,
-      '↶ UNDO · −1 HP',
-      10,
-      '#ffe6a9'
-    ).setInteractive();
-    this.undoButton.on('pointerup', () => {
-      if (this.paused || this.locked || this.ended) return;
-      if (!manager.undo()) {
-        AudioSystem.play('invalid_tap');
-        return;
-      }
-      AudioSystem.play('card_draw');
-      this.renderCards();
-      this.refreshHUD();
-      this.number(this.castle.x, this.castle.y - 70, '−1 HP · UNDO', '#ffc28f');
-    });
+    const undoRoot = this.add.container(w / 2, h - this.layout.safeBottom - 23);
+    this.undoButton = popupButton(
+      this,
+      undoRoot,
+      0,
+      w - 48,
+      'UNDO · −1 CASTLE HP',
+      () => {
+        if (this.paused || this.locked || this.ended || !this.allowTraining('undo')) return;
+        if (!manager.undo()) {
+          AudioSystem.play('invalid_tap');
+          return;
+        }
+        AudioSystem.play('card_draw');
+        this.renderCards();
+        this.refreshHUD();
+        this.number(this.castle.x, this.castle.y - 70, '−1 HP · UNDO', '#ffc28f');
+        this.advanceTraining();
+      },
+      true
+    );
     const target = this.activePosition();
     this.activeLabel = this.text(
       target.x + this.layout.cw / 2,
@@ -226,26 +248,8 @@ export class CastleScene extends Phaser.Scene {
     this.syncActors();
     this.refreshHUD();
     AudioSystem.setMusicScene('battle');
-    let seen = false;
-    try {
-      seen = localStorage.getItem(RULES_KEY) === 'yes';
-    } catch {
-      /* Private storage. */
-    }
     if (manager.state!.run.phase !== 'battle') this.endPopup();
-    else if (!seen) {
-      this.paused = true;
-      AudioSystem.setMusicScene('menu');
-      siegeRules(this, () => {
-        try {
-          localStorage.setItem(RULES_KEY, 'yes');
-        } catch {
-          /* Private storage. */
-        }
-        this.paused = false;
-        AudioSystem.setMusicScene('battle');
-      });
-    }
+    if (this.training) this.showTraining();
     const visibility = () => {
       this.accumulator = 0;
       manager.save();
@@ -254,7 +258,7 @@ export class CastleScene extends Phaser.Scene {
     };
     const resize = () => {
       manager.save();
-      this.scene.restart();
+      this.scene.restart({ tutorial: !!this.training, finish: this.tutorialFinish });
     };
     const pagehide = () => manager.save();
     document.addEventListener('visibilitychange', visibility);
@@ -276,12 +280,24 @@ export class CastleScene extends Phaser.Scene {
       this.accumulator = 0;
       return;
     }
+    if (this.training) {
+      if (this.lesson !== 6) {
+        this.accumulator = 0;
+        return;
+      }
+      this.demoTime += Math.min(delta / 1000, 0.1);
+      if (this.demoTime >= 4) {
+        this.advanceTraining();
+        this.accumulator = 0;
+        return;
+      }
+    }
     // A delayed frame never fast-forwards an inactive siege.
     this.accumulator += Math.min(delta / 1000, 0.5);
     this.saveTimer += delta / 1000;
     while (this.accumulator >= STEP) {
       this.accumulator -= STEP;
-      const result = castleManager().step();
+      const result = this.manager.step();
       if (!result) break;
       this.handleEvents(result.events);
       this.syncActors();
@@ -289,12 +305,12 @@ export class CastleScene extends Phaser.Scene {
       if (this.ended) break;
     }
     if (this.saveTimer >= 2) {
-      castleManager().save();
+      this.manager.save();
       this.saveTimer = 0;
     }
     if (
       this.time.now >= this.nextFootstep &&
-      castleManager().state!.siege.enemies.some((e) => e.progress < 0.94)
+      this.manager.state!.siege.enemies.some((e) => e.progress < 0.94)
     ) {
       AudioSystem.play(Math.random() > 0.5 ? 'footstep_1' : 'footstep_2', {
         volume: 0.18,
@@ -302,7 +318,7 @@ export class CastleScene extends Phaser.Scene {
       });
       this.nextFootstep = this.time.now + 430;
     }
-    for (const unit of castleManager().state?.siege.units ?? []) {
+    for (const unit of this.manager.state?.siege.units ?? []) {
       const view = this.defenders.get(unit.id);
       if (!view) continue;
       if (view.body)
@@ -315,7 +331,7 @@ export class CastleScene extends Phaser.Scene {
           ? Math.sin(this.time.now / 100 + unit.id) * 1.5
           : 0);
     }
-    for (const enemy of castleManager().state?.siege.enemies ?? []) {
+    for (const enemy of this.manager.state?.siege.enemies ?? []) {
       const view = this.invaders.get(enemy.id);
       if (!view) continue;
       if (enemy.progress < 0.94) this.walkAnimation(view.body, enemy.sprite);
@@ -409,8 +425,8 @@ export class CastleScene extends Phaser.Scene {
     };
   }
   private renderCards(): void {
-    const battle = castleManager().state!.run.battle!;
-    const preview = nextCastleCard(castleManager().state!);
+    const battle = this.manager.state!.run.battle!;
+    const preview = nextCastleCard(this.manager.state!);
     if (this.nextCard?.getCard().id !== preview?.id) {
       this.nextCard?.destroy();
       this.nextCard = null;
@@ -440,9 +456,7 @@ export class CastleScene extends Phaser.Scene {
             y,
             card,
             getPowerType(
-              battle.powerCards.filter(
-                (p) => !castleManager().state!.usedPowers?.includes(p.cardId)
-              ),
+              battle.powerCards.filter((p) => !this.manager.state!.usedPowers?.includes(p.cardId)),
               card.id
             )
           );
@@ -485,8 +499,9 @@ export class CastleScene extends Phaser.Scene {
   }
   private play(id: string): void {
     if (this.paused || this.locked || this.ended) return;
+    if (!this.allowTraining('card', id)) return;
     AudioSystem.unlock();
-    const manager = castleManager(),
+    const manager = this.manager,
       before = manager.state;
     const result = manager.play(id);
     if (!result || result.state === before) {
@@ -529,9 +544,150 @@ export class CastleScene extends Phaser.Scene {
     this.handleEvents(result.events);
     this.syncActors();
     this.refreshHUD();
+    this.advanceTraining();
+  }
+  private trainingAction(): { action: string; id?: string } {
+    const ids = this.training!.ids;
+    const cards: Record<number, string> = {
+      0: ids[0],
+      1: ids[1],
+      3: ids[1],
+      4: ids[2],
+      7: ids[7],
+      8: ids[3],
+      9: ids[4],
+      10: ids[5],
+      11: ids[6],
+    };
+    return this.lesson === 2
+      ? { action: 'undo' }
+      : [5, 12].includes(this.lesson)
+        ? { action: 'draw' }
+        : { action: 'card', id: cards[this.lesson] };
+  }
+  private allowTraining(action: string, id?: string): boolean {
+    if (!this.training) return true;
+    const expected = this.trainingAction();
+    const allowed = expected.action === action && (action !== 'card' || expected.id === id);
+    if (!allowed) AudioSystem.play('invalid_tap', { volume: 0.3 });
+    return allowed;
+  }
+  private advanceTraining(): void {
+    if (!this.training) return;
+    this.lesson++;
+    if (this.lesson === 6) {
+      this.demoTime = 0;
+      const siege = this.manager.state!.siege;
+      siege.enemies.push(
+        ...Array.from({ length: 3 }, (_, i) => ({
+          id: siege.nextId++,
+          sprite: 'c_orc',
+          boss: false,
+          hp: 12,
+          maxHp: 12,
+          progress: 0.35 + i * 0.1,
+          speed: 0.02,
+          damage: 1,
+          cooldown: 0,
+        }))
+      );
+      this.syncActors();
+    }
+    this.showTraining();
+  }
+  private finishTraining(): void {
+    completeTraining();
+    this.lessonUI?.destroy();
+    this.training = undefined;
+    if (this.tutorialFinish === 'menu') {
+      this.scene.start('StartScene');
+      return;
+    }
+    const manager = castleManager();
+    if (this.tutorialFinish === 'resume') manager.resume();
+    else manager.start();
+    this.scene.restart({ tutorial: false });
+  }
+  private showTraining(): void {
+    this.lessonUI?.destroy();
+    const { width: w } = viewport(this);
+    const root = this.add.container(0, 0).setDepth(2000);
+    this.lessonUI = root;
+    const y = this.layout.arenaTop + 4;
+    const [title, body] = trainingSteps[this.lesson];
+    root.add(
+      this.add.rectangle(w / 2, y + 49, w - 16, 98, 0x18323d, 0.96).setStrokeStyle(2, 0xffdc63)
+    );
+    root.add(
+      this.text(
+        w / 2,
+        y + 17,
+        `${this.lesson + 1}/${trainingSteps.length} · ${title}`,
+        17,
+        '#ffe35a'
+      )
+    );
+    root.add(
+      this.add.text(20, y + 36, body, {
+        resolution: getRenderDensity(),
+        fontFamily: 'Fredoka',
+        fontSize: '14px',
+        color: '#ffffff',
+        wordWrap: { width: w - 40 },
+      })
+    );
+    const skip = this.text(w / 2, this.layout.relicTop + 14, 'SKIP TRAINING', 13, '#fff1b3')
+      .setPadding(10)
+      .setInteractive();
+    skip.on('pointerup', () => this.finishTraining());
+    root.add(skip);
+    const expected = this.trainingAction();
+    const target = expected.id ? this.cards.get(expected.id)?.getContainer() : undefined;
+    let rect: Phaser.Geom.Rectangle | undefined;
+    if (target)
+      rect = new Phaser.Geom.Rectangle(
+        target.x - 3,
+        target.y - 3,
+        this.layout.cw + 6,
+        this.layout.ch + 6
+      );
+    if (expected.action === 'draw')
+      rect = new Phaser.Geom.Rectangle(
+        21,
+        this.layout.trayTop + 5,
+        w * 0.48 + 6,
+        this.layout.trayHeight - 9
+      );
+    if (expected.action === 'undo')
+      rect = new Phaser.Geom.Rectangle(
+        20,
+        viewport(this).height - this.layout.safeBottom - 49,
+        w - 40,
+        52
+      );
+    if (rect) {
+      const glow = this.add
+        .graphics()
+        .lineStyle(4, 0xffe35a)
+        .strokeRoundedRect(rect.x, rect.y, rect.width, rect.height, 8);
+      root.add(glow);
+      this.tweens.add({ targets: glow, alpha: 0.35, duration: 500, yoyo: true, repeat: -1 });
+    }
+    if (this.lesson === 13) {
+      const buttons = this.add.container(w / 2, y + 125);
+      root.add(buttons);
+      popupButton(
+        this,
+        buttons,
+        0,
+        w - 48,
+        this.tutorialFinish === 'menu' ? 'BACK TO MENU' : 'START SIEGE',
+        () => this.finishTraining()
+      );
+    }
   }
   private refreshHUD(): void {
-    const state = castleManager().state!,
+    const state = this.manager.state!,
       player = state.run.player,
       chain = state.run.battle!.chain.length;
     const { width: w } = viewport(this),
@@ -560,7 +716,7 @@ export class CastleScene extends Phaser.Scene {
     this.stockText.setText(
       `${chain ? 'DRAW TO DEPLOY' : 'No chain banked'}\n${state.run.battle!.deck.length} stock · ${left} cards left`
     );
-    this.undoButton.setAlpha(castleManager().canUndo ? 1 : 0.35);
+    this.undoButton.setAlpha(this.manager.canUndo ? 1 : 0.7);
     this.activeLabel.setText(
       state.run.battle!.wildActive
         ? 'WILD · ANY CARD'
@@ -572,7 +728,7 @@ export class CastleScene extends Phaser.Scene {
     );
   }
   private syncActors(): void {
-    const state = castleManager().state!;
+    const state = this.manager.state!;
     for (const enemy of state.siege.enemies) {
       let view = this.invaders.get(enemy.id);
       if (!view) {
@@ -717,7 +873,7 @@ export class CastleScene extends Phaser.Scene {
           if (event.enemy.boss) this.callout('SUPERMONSTER!', '#ffce6e');
           break;
         case 'deploy': {
-          const unit = castleManager().state!.siege.units.find((u) => u.id === event.id);
+          const unit = this.manager.state!.siege.units.find((u) => u.id === event.id);
           if (unit) {
             const p = this.unitPosition(unit);
             this.releaseEffect(
@@ -737,7 +893,7 @@ export class CastleScene extends Phaser.Scene {
           break;
         }
         case 'reload': {
-          const turret = castleManager().state!.siege.units.find((u) => u.id === event.id);
+          const turret = this.manager.state!.siege.units.find((u) => u.id === event.id);
           if (turret) {
             const p = this.unitPosition(turret);
             this.releaseEffect(p.x, p.y - 18, 0x7ceaff);
@@ -923,10 +1079,11 @@ export class CastleScene extends Phaser.Scene {
     });
   }
   private rewardInfo(index: number): void {
+    if (this.training) return;
     if (this.paused || this.ended) return;
     this.paused = true;
     AudioSystem.setMusicScene('menu');
-    const state = castleManager().state!;
+    const state = this.manager.state!;
     const descriptions = [
       `${upgradeValue('soldier', state.upgrades.soldier)} soldiers march from the castle. Each has 1 HP and 1 base damage. Workshop levels add soldiers.`,
       `A knight has ${upgradeValue('knight', state.upgrades.knight)} HP and deals ${upgradeValue('knight', state.upgrades.knight)} base damage in melee. Workshop levels increase HP and damage.`,
@@ -955,7 +1112,7 @@ export class CastleScene extends Phaser.Scene {
   }
   private actorAnimation(id: number, action: 'attack' | 'hurt') {
     const view = this.invaders.get(id),
-      enemy = castleManager().state!.siege.enemies.find((e) => e.id === id);
+      enemy = this.manager.state!.siege.enemies.find((e) => e.id === id);
     if (!view || !enemy || view.body.anims.currentAnim?.key === `${enemy.sprite}-${action}`) return;
     view.body.play(`${enemy.sprite}-${action}`);
     view.body.once('animationcomplete', () => {
@@ -999,7 +1156,7 @@ export class CastleScene extends Phaser.Scene {
     });
   }
   private bankAbandoned(): void {
-    const manager = castleManager();
+    const manager = this.manager;
     if (!manager.state) return;
     manager.state.run = { ...manager.state.run, phase: 'defeat' };
     manager.save();
@@ -1009,7 +1166,7 @@ export class CastleScene extends Phaser.Scene {
     if (this.ended) return;
     this.ended = true;
     this.paused = true;
-    const manager = castleManager(),
+    const manager = this.manager,
       state = manager.state!,
       won = state.run.phase === 'victory';
     const banked = manager.service.settle(state);

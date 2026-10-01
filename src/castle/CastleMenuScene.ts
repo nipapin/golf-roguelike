@@ -10,6 +10,7 @@ import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { castleArt } from './CastleArt';
 import { showCastleWorkshop } from './CastleWorkshop';
 import { castleManager } from './CastleManager';
+import { trainingCompleted } from './CastleTutorial';
 import { siegeDifficulty } from './CastleDefense';
 
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
@@ -124,6 +125,13 @@ export class CastleMenuScene extends Phaser.Scene {
       saved?.run.phase === 'battle' ? 'CONTINUE SIEGE' : 'NEW SIEGE',
       () => {
         AudioSystem.unlock();
+        if (!trainingCompleted()) {
+          this.scene.start('CastleScene', {
+            tutorial: true,
+            finish: saved?.run.phase === 'battle' ? 'resume' : 'start',
+          });
+          return;
+        }
         if (saved?.run.phase === 'battle') manager.resume();
         else manager.start();
         this.scene.start('CastleScene');
@@ -135,8 +143,8 @@ export class CastleMenuScene extends Phaser.Scene {
       buttons,
       124,
       (w - 60) / 2,
-      'RULES',
-      () => siegeRules(this, () => {}),
+      'TRAINING',
+      () => this.scene.start('CastleScene', { tutorial: true, finish: 'menu' }),
       true
     ).setX(-(w - 36) / 4);
     popupButton(this, buttons, 124, (w - 60) / 2, 'CREDITS', () => this.credits(), true).setX(
