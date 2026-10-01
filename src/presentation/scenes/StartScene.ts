@@ -1,4 +1,5 @@
-import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
+import { configureSafeViewport, getRenderDensity } from '../design/viewport';
+import { ensureTouchTarget } from '../design/touch';
 import { showRules } from '../design/RulesPopup';
 import { AudioSystem } from '../audio/AudioSystem';
 import { SettingsModal } from '../design/SettingsModal';
@@ -13,15 +14,16 @@ export class StartScene extends Phaser.Scene {
   }
 
   create(): void {
-    configureViewport(this);
+    // World y=0..height is the safe band; the background bleeds under notch/home indicator.
+    const safe = configureSafeViewport(this);
     AudioSystem.setMusicScene('menu');
-    const width = viewport(this).width;
-    const height = viewport(this).height;
+    const width = safe.width;
+    const height = safe.height;
     const cx = width / 2;
     const manager = getGameManager();
 
     // Draw background
-    this.drawBackground(width, height);
+    this.drawBackground(width, safe.fullHeight, -safe.insets.top);
 
     // Logo
     const logoY = height * 0.12;
@@ -129,7 +131,7 @@ export class StartScene extends Phaser.Scene {
       this.scene.start('CreditsScene');
     });
 
-    this.add.text(cx, height - 40, 'HOW TO PLAY', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#ffe35a' }).setOrigin(.5).setInteractive().on('pointerup', () => showRules(this));
+    ensureTouchTarget(this.add.text(cx, height - 34, 'HOW TO PLAY', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#ffe35a' }).setOrigin(.5)).on('pointerup', () => showRules(this));
 
     // Mascot (small slime in corner)
     if (this.textures.exists('enemy-slime')) {
@@ -143,8 +145,9 @@ export class StartScene extends Phaser.Scene {
     }
   }
 
-  private drawBackground(width: number, height: number): void {
+  private drawBackground(width: number, height: number, offsetY = 0): void {
     const g = this.add.graphics();
+    g.setY(offsetY);
 
     // Purple gradient sky
     const skyStops = [0x3f2ab8, 0x6030c0, 0x8040d0, 0xa050d8, 0xc060e0];

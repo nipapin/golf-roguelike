@@ -9,4 +9,4 @@ Runtime assets are compressed derivatives of CC0 sources:
 
 One continuous music loop uses the independent music volume control. Outside combat, a low-pass filter and lower gain give a muffled behind-the-wall sound without restarting the track. Power-card and ascending combo cues are synthesized short effects.
 
-Legacy unused recordings remain credited: HydroGene — JRPG Epic Rock Battle Theme #1 (https://opengameart.org/content/jrpg-epic-rock-battle-theme-1); RandomMind — Medieval: Exploration (https://opengameart.org/content/medieval-exploration). Both CC0.
+Unused legacy recordings (battle-rock, menu-fantasy, result-*, foley-*, card-place-*, card-slide) were removed from the build to keep the PWA precache small.

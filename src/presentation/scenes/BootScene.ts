@@ -36,26 +36,10 @@ export class BootScene extends Phaser.Scene {
     this.load.svg('coin', '/assets/coin.svg', { width: 96, height: 96 });
 
     // Load crown overlay for boss
-    this.load.svg('crown', '/assets/enemies/crown.svg');
+    // Explicit size: SVGs without intrinsic width/height fail WebGL upload ("texImage2D: bad image data").
+    this.load.svg('crown', '/assets/enemies/crown.svg', { width: 128, height: 96 });
 
-    // Load game-icons.net icons
-    const icons = [
-      'lorc_broadsword',
-      'lorc_checked-shield',
-      'lorc_crossed-swords',
-      'delapouite_two-coins',
-      'lorc_shining-heart',
-      'lorc_sword-wound',
-      'lorc_echo-ripples',
-      'delapouite_card-joker',
-      'lorc_unlit-bomb',
-      'lorc_cog',
-      'carl-olsen_flame',
-      'lorc_horned-skull',
-    ];
-    for (const icon of icons) {
-      this.load.svg(`icon-${icon}`, `/assets/icons/${icon}.svg`);
-    }
+    // (game-icons.net SVGs are not used by any scene; they are no longer loaded at boot.)
 
     // Show loading progress
     const width = viewport(this).width;

@@ -1,3 +1,5 @@
+import { getSafeInsets, type SafeInsets } from './viewport';
+
 /**
  * Design tokens from visual/STYLE.md
  * "Яркий мультяшный премиум в духе Supercell"
@@ -136,11 +138,14 @@ export function getCardMetrics(screenWidth: number) {
  * - 375×667: HUD 40, Arena 260, Banner 50, Tableau 188, Tray 109
  * - 430×932: HUD 44, Arena 391, Banner 56, Tableau 221, Tray 145
  */
-export function getLayoutMetrics(width: number, height: number) {
+export function getLayoutMetrics(width: number, height: number, insets: SafeInsets = getSafeInsets()) {
   const metrics = getCardMetrics(width);
-  // #game is already inset by the actual CSS safe areas. No guessed notch offsets.
-  const safeTop = 8;
-  const safeBottom = 8;
+  // The canvas covers the full screen; backgrounds paint from y=0 to height,
+  // interactive UI starts below the notch and ends above the home indicator.
+  const insetTop = insets.top;
+  const insetBottom = insets.bottom;
+  const safeTop = 8 + insetTop;
+  const safeBottom = 8 + insetBottom;
   const hudHeight = 40;
   const playerHudHeight = 30;
   const relicHeight = 28;
@@ -162,7 +167,7 @@ export function getLayoutMetrics(width: number, height: number) {
   const arenaHeight = Math.max(60, bannerTop - arenaTop - 6);
   return {
     ...metrics, strip,
-    safeTop, safeBottom, hudHeight, hudTop, playerHudTop, playerHudHeight,
+    insetTop, insetBottom, safeTop, safeBottom, hudHeight, hudTop, playerHudTop, playerHudHeight,
     relicTop, relicHeight, arenaTop, arenaHeight, bannerTop, bannerHeight,
     tableTop, tableHeight: height - safeBottom - tableTop,
     tableauTop, tableauHeight, trayTop, trayHeight,

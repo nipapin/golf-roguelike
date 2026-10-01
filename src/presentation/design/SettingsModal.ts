@@ -1,4 +1,4 @@
-import { viewport, getRenderDensity } from './viewport';
+import { viewport, getRenderDensity, safeArea } from './viewport';
 /**
  * SettingsModal - In-game settings panel
  * Per STYLE.md: dark ink outline, cream panel, 3D Supercell-style buttons
@@ -35,7 +35,7 @@ export class SettingsModal {
     this.overlay.setDepth(200);
     
     // Main container
-    this.container = scene.add.container(width / 2, height / 2);
+    this.container = scene.add.container(width / 2, safeArea(scene).centerY);
     this.container.setDepth(201);
     
     this.createPanel();
@@ -163,7 +163,7 @@ export class SettingsModal {
     this.container.add(knob);
     
     // Interactive zone
-    const hitZone = this.scene.add.zone(x + 40 + toggleWidth / 2, y, toggleWidth + 20, toggleHeight + 10);
+    const hitZone = this.scene.add.zone(x + 40 + toggleWidth / 2, y, toggleWidth + 20, Math.max(44, toggleHeight + 14));
     hitZone.setInteractive();
     hitZone.on('pointerdown', () => {
       enabled = !enabled;
@@ -179,7 +179,8 @@ export class SettingsModal {
     }).setOrigin(0.5);
     this.container.add(valueText);
     for (const [x, delta, label] of [[-80, -0.1, '−'], [80, 0.1, '+']] as const) {
-      const button = this.scene.add.rectangle(x, y, 40, 30, 0xd9c6eb).setInteractive();
+      // Visual 40×30, touch target 48×44.
+      const button = this.scene.add.rectangle(x, y, 40, 30, 0xd9c6eb).setInteractive(new Phaser.Geom.Rectangle(-4, -7, 48, 44), Phaser.Geom.Rectangle.Contains);
       button.on('pointerup', () => {
         AudioSystem.unlock();
         set(Math.round((get() + delta) * 100) / 100);
@@ -318,7 +319,7 @@ export class SettingsModal {
     callback: () => void
   ): Phaser.GameObjects.Container {
     const btnW = 80;
-    const btnH = 40;
+    const btnH = 44;
     
     const btn = this.scene.add.container(x, y);
     

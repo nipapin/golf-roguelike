@@ -3,7 +3,7 @@ import type Phaser from 'phaser';
 import { configureViewport, getRenderDensity, setRenderDensity, viewport } from './viewport';
 import { getLayoutMetrics } from './tokens';
 afterEach(() => setRenderDensity(1));
-it.each([1, 2, 3])('keeps layout and camera in CSS coordinates at density %d', density => {
+it.each([1, 2])('keeps layout and camera in CSS coordinates at density %d', density => {
   setRenderDensity(density);
   const camera = { setOrigin: vi.fn(), setZoom: vi.fn(), centerOn: vi.fn() };
   Object.values(camera).forEach(fn => fn.mockReturnValue(camera));
@@ -16,6 +16,7 @@ it.each([1, 2, 3])('keeps layout and camera in CSS coordinates at density %d', d
   expect(layout.trayTop + layout.trayHeight + layout.safeBottom).toBe(759);
 });
 it('caps canvas density and rejects invalid values', () => {
-  setRenderDensity(5); expect(getRenderDensity()).toBe(3);
+  setRenderDensity(5); expect(getRenderDensity()).toBe(2);
+  setRenderDensity(3); expect(getRenderDensity()).toBe(2);
   setRenderDensity(NaN); expect(getRenderDensity()).toBe(1);
 });

@@ -1,4 +1,4 @@
-import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
+import { configureSafeViewport, getRenderDensity } from '../design/viewport';
 import { AudioSystem } from '../audio/AudioSystem';
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
@@ -9,10 +9,10 @@ export class CreditsScene extends Phaser.Scene {
   }
 
   create(): void {
-    configureViewport(this);
+    const safe = configureSafeViewport(this);
     AudioSystem.setMusicScene('menu');
-    const width = viewport(this).width;
-    const height = viewport(this).height;
+    const width = safe.width;
+    const height = safe.height;
     const cx = width / 2;
 
     // Background

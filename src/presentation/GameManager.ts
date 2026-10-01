@@ -19,6 +19,7 @@ import {
   setupRewards,
 } from '../core/GameActions';
 import { generateSeed } from '../core/RNG';
+import { UndoHistory } from '../core/UndoHistory';
 import { saveGame, loadGame, clearSave, hasSave } from '../services/SaveService';
 
 import configData from '../data/config.json';
@@ -33,11 +34,35 @@ export class GameManager {
   private enemies: EnemiesData;
   private allRelics: Relic[];
   private eventListeners: GameEventCallback[] = [];
+  private history: UndoHistory;
 
   constructor() {
     this.config = configData as GameConfig;
     this.enemies = enemiesData as EnemiesData;
     this.allRelics = relicsData.relics as Relic[];
+    this.history = new UndoHistory(this.config.undo?.maxDepth ?? 10);
+  }
+
+  /** True when the last card play(s) of the current battle can be taken back. */
+  canUndo(): boolean {
+    return this.history.canUndo(this.state);
+  }
+
+  getUndoDepth(): number {
+    return this.history.size;
+  }
+
+  /** Revert the most recent card play (one step). Persists the reverted state. */
+  undo(): ActionResult | null {
+    const current = this.state;
+    const restored = this.history.undo(current);
+    if (!restored || !current) return null;
+    const cardId = current.battle?.activeCard?.id ?? null;
+    this.state = restored;
+    this.save();
+    const events: GameEvent[] = [{ type: 'undo_applied', cardId }];
+    this.emitEvents(events);
+    return { state: this.state, events };
   }
 
   getConfig(): GameConfig {
@@ -59,6 +84,7 @@ export class GameManager {
   loadSavedGame(): boolean {
     const saved = loadGame();
     if (saved) {
+      this.history.clear();
       this.state = saved;
       return true;
     }
@@ -66,6 +92,7 @@ export class GameManager {
   }
 
   startNewRun(seed?: string): void {
+    this.history.clear();
     const useSeed = seed || generateSeed();
     this.state = startRun(useSeed, this.config);
     this.state = setupRewards({ ...this.state, phase: 'reward', rewardKind: 'starter' }, this.allRelics);
@@ -97,8 +124,10 @@ export class GameManager {
   playCard(cardId: string): ActionResult | null {
     if (!this.state) return null;
 
+    const before = this.state;
     const result = playCard(this.state, cardId, this.config);
     if (result.state === this.state) return result;
+    this.history.recordPlay(before, result);
     this.state = result.state;
     if (this.state.phase === 'reward') {
       this.state = setupRewards(this.state, this.allRelics);
@@ -113,6 +142,8 @@ export class GameManager {
 
     const result = drawCard(this.state, this.config);
     if (result.state === this.state) return result;
+    // Drawing from stock (and the enemy action it may trigger) commits the turn.
+    this.history.clear();
     this.state = result.state;
 
     // Handle state transitions
@@ -127,6 +158,7 @@ export class GameManager {
 
   selectRelic(relicId: string): ActionResult | null {
     if (!this.state) return null;
+    this.history.clear();
 
     const result = chooseRelic(this.state, relicId);
     this.state = result.state;
@@ -140,6 +172,7 @@ export class GameManager {
 
   skipReward(): ActionResult | null {
     if (!this.state) return null;
+    this.history.clear();
 
     const result = skipReward(this.state);
     this.state = result.state;
@@ -173,6 +206,7 @@ export class GameManager {
 
   proceedFromShop(): void {
     if (!this.state) return;
+    this.history.clear();
 
     const result = leaveShop(this.state);
     this.state = result.state;
@@ -184,6 +218,7 @@ export class GameManager {
   }
 
   abandonRun(): void {
+    this.history.clear();
     clearSave();
     this.state = null;
   }
@@ -231,6 +266,8 @@ export interface TestHook {
   getTableauCount: () => number;
   getDeckCount: () => number;
   getActiveCardId: () => string | null;
+  getUndoBounds?: () => { x: number; y: number; width: number; height: number };
+  canUndo?: () => boolean;
 }
 
 export function setTestHook(hook: TestHook | null): void {

@@ -8,3 +8,5 @@ https://creativecommons.org/licenses/by/4.0/
 Used animations: Sword Slash, Heal, Shield Aura, Smoke, Quest Complete, Dizzy, Butterfly.
 
 Changes: frame sequences cropped using a shared animation bounding box, resized to 256×256, packed into lossless WebP atlases, and recolored at runtime for game effects. Attribution is also included in the game's Credits screen. These assets are used as part of Golf Rogue; they are not sold as a standalone asset pack.
+
+Note: `reward.webp` (the "Quest Complete" slot) was shipped as an empty file; it is now a procedurally generated gold sparkle burst (16 frames, 256×256) made for Golf Rogue with ImageMagick, released under the same terms as the game code.

@@ -117,6 +117,9 @@ export interface GameConfig {
     readonly healAmount: number;
     readonly relicBaseCost: number;
   };
+  readonly undo?: {
+    readonly maxDepth: number;
+  };
   readonly runStructure: ReadonlyArray<{
     readonly type: string;
     readonly enemyTier: 'normal' | 'elite' | 'boss';
@@ -147,4 +150,5 @@ export type GameEvent =
   | { type: 'battle_lost' }
   | { type: 'run_won' }
   | { type: 'relic_chosen'; relic: Relic }
-  | { type: 'shop_purchase'; item: string; cost: number };
+  | { type: 'shop_purchase'; item: string; cost: number }
+  | { type: 'undo_applied'; cardId: string | null };

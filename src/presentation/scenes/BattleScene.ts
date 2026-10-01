@@ -5,7 +5,7 @@ import { getGameManager, setTestHook } from '../GameManager';
 import { colors, getLayoutMetrics, getCardMetrics } from '../design/tokens';
 import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
 import { HPBar, ComboBanner, createIntentBubble } from '../design/HudComponents';
-import { CardVisual } from '../design/CardVisual';
+import { CardVisual, createCardBack } from '../design/CardVisual';
 import { showBuildPanel } from '../design/BuildPanel';
 import { SettingsModal } from '../design/SettingsModal';
 import { showRules, hasSeenRules } from '../design/RulesPopup';
@@ -30,8 +30,18 @@ export class BattleScene extends Phaser.Scene {
   private goldText!: Phaser.GameObjects.Text;
   private armorText!: Phaser.GameObjects.Text;
   private buildText!: Phaser.GameObjects.Text;
-  private turnHint!: Phaser.GameObjects.Text;
-  private drawText!: Phaser.GameObjects.Text;
+  private stockLabel!: Phaser.GameObjects.Text;
+  private stockBadge!: Phaser.GameObjects.Text;
+  private stockBadgeBg!: Phaser.GameObjects.Arc;
+  private stockBacks: Phaser.GameObjects.Container[] = [];
+  private stockEmpty!: Phaser.GameObjects.Container;
+  private stockHit = { x: 0, y: 0, width: 0, height: 0 };
+  private undoButton: Phaser.GameObjects.Container | null = null;
+  private undoEnabled = false;
+  /** True once a pointerdown happened inside this scene (rejects ghost pointerups from the previous scene). */
+  private pointerArmed = false;
+  /** Resting rect of each exposed tableau card (cards may still be flying in during the deal). */
+  private exposedSlots = new Map<string, { x: number; y: number; width: number; height: number; onTap: () => void }>();
   private buildPanel: Phaser.GameObjects.Container | null = null;
   private topHUD: Phaser.GameObjects.Container | null = null;
   private activeLabel: Phaser.GameObjects.Text | null = null;
@@ -92,15 +102,22 @@ export class BattleScene extends Phaser.Scene {
     // Player HUD at bottom
     this.createPlayerHUD();
 
-    // Draw pile
-    this.createDrawPile();
+    // Stock pile (tap to draw / end turn) and undo
+    this.createStockPile();
+    this.createUndoButton();
 
     // Initial render
     this.dealt = false;
     this.enemyDying = false;
     AudioSystem.setMusicScene('battle');
     this.refreshState();
-    if (hasSeenRules()) { this.inputPaused = true; this.time.delayedCall(650, () => { this.inputPaused = false; }); }
+    // No timed input lock at battle start: a game-clock delayedCall stretched to
+    // 1-3s whenever the first frames were slow (Phaser clamps delta after a long
+    // frame), silently eating the first tap. Instead, only reject pointerups whose
+    // pointerdown happened before this scene existed (the tap that started it).
+    this.pointerArmed = false;
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, this.armPointer, this);
+    this.input.on(Phaser.Input.Events.POINTER_UP, this.onScenePointerUp, this);
     if (!hasSeenRules()) { this.inputPaused = true; showRules(this, () => { this.inputPaused = false; }); }
 
     // Create settings modal
@@ -129,26 +146,44 @@ export class BattleScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
+  private armPointer(): void {
+    this.pointerArmed = true;
+  }
+
+  /**
+   * Fallback for taps that land on a card's resting slot while the card is still
+   * animating (deal / layout tween): hit zones travel with the card, the finger doesn't.
+   */
+  private onScenePointerUp(pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]): void {
+    if (over.length || this.inputPaused || !this.pointerArmed) return;
+    const x = pointer.worldX;
+    const y = pointer.worldY;
+    for (const slot of this.exposedSlots.values()) {
+      if (x >= slot.x && x <= slot.x + slot.width && y >= slot.y && y <= slot.y + slot.height) { slot.onTap(); return; }
+    }
+  }
+
   private setupTestHook(): void {
     setTestHook({
       isActive: true,
       getPlayableCards: () => {
+        // Resting bounds (not mid-animation positions), so automation taps where a player would.
         return this.cardVisuals
           .filter((cv) => cv.getState() === 'playable')
-          .map((cv) => ({
-            cardId: cv.getCard().id,
-            bounds: cv.getWorldBounds(),
-          }));
+          .map((cv) => {
+            const slot = this.exposedSlots.get(cv.getCard().id);
+            return { cardId: cv.getCard().id, bounds: slot ? { x: slot.x, y: slot.y, width: slot.width, height: slot.height } : cv.getWorldBounds() };
+          });
       },
       getDrawPileBounds: () => {
         if (!this.drawPile) return { x: 0, y: 0, width: 0, height: 0 };
-        return {
-          x: 12,
-          y: this.layout.trayTop + 14,
-          width: viewport(this).width * 0.46,
-          height: this.layout.trayHeight - 28,
-        };
+        return { ...this.stockHit };
       },
+      getUndoBounds: () => {
+        if (!this.undoButton) return { x: 0, y: 0, width: 0, height: 0 };
+        return { x: this.undoButton.x - 24, y: this.undoButton.y - 24, width: 48, height: 48 };
+      },
+      canUndo: () => getGameManager().canUndo(),
       getTableauCount: () => {
         const state = getGameManager().getState();
         if (!state?.battle) return 0;
@@ -169,6 +204,10 @@ export class BattleScene extends Phaser.Scene {
     const width = viewport(this).width;
     const { hudTop, hudHeight, relicTop } = this.layout;
     const manager = getGameManager();
+    // HUD band is painted edge to edge from y=0 (under the notch); content stays below safeTop.
+    const band = this.add.graphics().setDepth(99);
+    band.fillStyle(0x1a1030, 1).fillRect(0, 0, width, hudTop + hudHeight + 4);
+    band.fillStyle(0x654581, 1).fillRect(0, hudTop + hudHeight + 3, width, 1);
     this.topHUD = this.add.container(0, hudTop).setDepth(100);
     const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
     const progress = this.add.text(16, hudHeight / 2, `FIGHT ${manager.getCurrentFightNumber()} / ${manager.getTotalFights()}`, {
@@ -178,11 +217,13 @@ export class BattleScene extends Phaser.Scene {
     this.goldText = this.add.text(width * 0.58 + 6, hudHeight / 2, '0', {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#ffd267',
     }).setOrigin(0.5);
-    const settings = this.add.rectangle(width - 30, hudHeight / 2, 40, 36, 0x3d2c66).setInteractive();
+    const settings = this.add.rectangle(width - 32, hudHeight / 2, 44, 44, 0x3d2c66).setInteractive();
     settings.on('pointerup', () => { AudioSystem.unlock(); this.openSettings(); });
-    const gear = this.add.text(width - 30, hudHeight / 2, '⚙', { resolution: getRenderDensity(), fontSize: '22px', color: '#fff' }).setOrigin(0.5);
+    const gear = this.add.text(width - 32, hudHeight / 2, '⚙', { resolution: getRenderDensity(), fontSize: '22px', color: '#fff' }).setOrigin(0.5);
     this.topHUD.add([bg, progress, coin, this.goldText, settings, gear]);
-    const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100).setInteractive();
+    // Visual strip is 26px tall; the touch target is 44px.
+    const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100)
+      .setInteractive(new Phaser.Geom.Rectangle(0, -9, width - 24, 44), Phaser.Geom.Rectangle.Contains);
     this.buildText = this.add.text(width / 2, build.y, 'BUILD · CHOOSE A RELIC', {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '12px', color: '#dac6ff',
     }).setOrigin(0.5).setDepth(101);
@@ -205,14 +246,14 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTableBackground(): void {
-    const { tableTop, safeBottom } = this.layout;
+    const { tableTop } = this.layout;
     const width = viewport(this).width;
     const height = viewport(this).height;
 
     this.tableBackground = this.add.graphics();
     this.tableBackground.setDepth(10);
 
-    // Felt gradient - extends to bottom of screen minus safe area
+    // Felt gradient - painted to the very bottom edge (under the home indicator)
     this.tableBackground.fillStyle(colors.feltHi, 1);
     this.tableBackground.fillGradientStyle(colors.feltHi,
       colors.feltHi,
@@ -224,7 +265,7 @@ export class BattleScene extends Phaser.Scene {
       0,
       tableTop,
       width,
-      height - tableTop - safeBottom + 10,
+      height - tableTop,
       { tl: 22, tr: 22, bl: 0, br: 0 }
     );
 
@@ -245,22 +286,86 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(1, 0.5).setDepth(100);
   }
 
-  private createDrawPile(): void {
-    const { trayTop, trayHeight } = this.layout;
+  /** Stock pile layout: card backs at the left of the tray, label to its right. */
+  private stockGeometry() {
+    const { trayTop, activeW, activeH } = this.layout;
+    const left = 14;
+    const top = trayTop + 12;
+    return { left, top, w: activeW, h: activeH, cx: left + activeW / 2, cy: top + activeH / 2 };
+  }
+
+  private createStockPile(): void {
+    const { trayTop, trayHeight, activeScale } = this.layout;
+    const g = this.stockGeometry();
+    this.drawPile = this.add.container(0, 0).setDepth(55);
+    // Empty state: dashed slot with a recycle glyph.
+    const empty = this.add.graphics();
+    empty.lineStyle(2, 0x9a8aba, 0.8);
+    const dash = 6;
+    for (let x = g.left; x < g.left + g.w; x += dash * 2) { empty.lineBetween(x, g.top, Math.min(x + dash, g.left + g.w), g.top); empty.lineBetween(x, g.top + g.h, Math.min(x + dash, g.left + g.w), g.top + g.h); }
+    for (let y = g.top; y < g.top + g.h; y += dash * 2) { empty.lineBetween(g.left, y, g.left, Math.min(y + dash, g.top + g.h)); empty.lineBetween(g.left + g.w, y, g.left + g.w, Math.min(y + dash, g.top + g.h)); }
+    const emptyGlyph = this.add.text(g.cx, g.cy, '↻', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '22px', color: '#9a8aba' }).setOrigin(0.5);
+    this.stockEmpty = this.add.container(0, 0, [empty, emptyGlyph]).setVisible(false);
+    this.drawPile.add(this.stockEmpty);
+    // Up to 3 stacked backs (offset up-left) suggest depth.
+    this.stockBacks = [];
+    for (let i = 2; i >= 0; i--) {
+      const back = createCardBack(this, g.left - i * 2, g.top - i * 2);
+      back.setScale(activeScale);
+      this.stockBacks.push(back);
+      this.drawPile.add(back);
+    }
+    // Remaining-count badge.
+    this.stockBadgeBg = this.add.circle(g.left + g.w - 2, g.top + 2, 12, 0xff3b4e).setStrokeStyle(2.5, 0x1b1030);
+    this.stockBadge = this.add.text(this.stockBadgeBg.x, this.stockBadgeBg.y, '0', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '13px', color: '#ffffff' }).setOrigin(0.5);
+    this.drawPile.add([this.stockBadgeBg, this.stockBadge]);
+    // Info label (chain progress / enemy hit) next to the pile.
+    this.stockLabel = this.add.text(g.left + g.w + 12, trayTop + trayHeight / 2 - 4, '', {
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', lineSpacing: 1,
+    }).setOrigin(0, 0.5).setDepth(55);
+    // Touch target: whole pile plus padding, at least 44×44.
+    const hitW = Math.max(44, g.w + 16);
+    const hitH = Math.max(44, Math.min(trayHeight - 4, g.h + 16));
+    this.stockHit = { x: g.cx - hitW / 2, y: g.cy - hitH / 2, width: hitW, height: hitH };
+    const zone = this.add.zone(g.cx, g.cy, hitW, hitH).setInteractive().setDepth(56);
+    zone.on('pointerdown', () => { if (!this.inputPaused) this.setStockPressed(true); });
+    zone.on('pointerout', () => this.setStockPressed(false));
+    zone.on('pointerup', () => { this.setStockPressed(false); if (this.pointerArmed) this.onDrawClick(); });
+  }
+
+  private setStockPressed(pressed: boolean): void {
+    if (!this.drawPile) return;
+    const g = this.stockGeometry();
+    // Scale around the pile centre.
+    const scale = pressed ? 0.94 : 1;
+    this.drawPile.setScale(scale).setPosition(g.cx * (1 - scale), g.cy * (1 - scale));
+  }
+
+  private createUndoButton(): void {
+    const { trayTop, trayHeight, activeW } = this.layout;
     const width = viewport(this).width;
-    const buttonWidth = width * 0.46;
-    const buttonHeight = trayHeight - 28;
-    this.drawPile = this.add.container(12 + buttonWidth / 2, trayTop + 14 + buttonHeight / 2).setDepth(55);
-    const bg = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x31559a).setStrokeStyle(2, 0x9aafe0);
-    this.drawText = this.add.text(0, -10, 'DRAW', {
-      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff',
-    }).setOrigin(0.5);
-    this.turnHint = this.add.text(0, 16, 'Enemy turn', {
-      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', align: 'center',
-    }).setOrigin(0.5);
-    this.drawPile.add([bg, this.drawText, this.turnHint]);
-    this.drawPile.setInteractive(new Phaser.Geom.Rectangle(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
-    this.drawPile.on('pointerup', () => this.onDrawClick());
+    const activeLeft = width * 0.76 - activeW / 2;
+    const x = activeLeft - 14 - 24;
+    const y = trayTop + trayHeight / 2 - 2;
+    const button = this.add.container(x, y).setDepth(56);
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1b1030, 1).fillRoundedRect(-22, -20, 44, 44, 12);
+    bg.fillStyle(0x4b3a7a, 1).fillRoundedRect(-22, -22, 44, 42, 12);
+    bg.lineStyle(2.5, 0x1b1030, 1).strokeRoundedRect(-22, -22, 44, 42, 12);
+    const glyph = this.add.text(0, -6, '↶', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
+    const label = this.add.text(0, 11, 'UNDO', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '9px', fontStyle: 'bold', color: '#dcd0ff' }).setOrigin(0.5);
+    button.add([bg, glyph, label]);
+    button.setInteractive(new Phaser.Geom.Rectangle(-24, -24, 48, 48), Phaser.Geom.Rectangle.Contains);
+    button.on('pointerdown', () => { if (this.undoEnabled && !this.inputPaused) button.setScale(0.92); });
+    button.on('pointerout', () => button.setScale(1));
+    button.on('pointerup', () => { button.setScale(1); if (this.pointerArmed) this.onUndoClick(); });
+    this.undoButton = button;
+    this.setUndoEnabled(false);
+  }
+
+  private setUndoEnabled(enabled: boolean): void {
+    this.undoEnabled = enabled;
+    this.undoButton?.setAlpha(enabled ? 1 : 0.38);
   }
 
   private refreshState(): void {
@@ -432,6 +537,7 @@ export class BattleScene extends Phaser.Scene {
     this.dealt = true;
     const { tableauTop, cw, strip, side, gap } = this.layout;
     const powers = new Map(battle.powerCards.map((power) => [power.cardId, power.type]));
+    this.exposedSlots.clear();
 
     battle.tableau.forEach((column, colIndex) => {
       column.cards.forEach((card, cardIndex) => {
@@ -445,17 +551,22 @@ export class BattleScene extends Phaser.Scene {
         visual.setPosition(x, y);
         const state = !exposed ? 'covered' : playable ? 'playable' : 'disabled';
         if (visual.getState() !== state) visual.setState(state);
-        visual.setInteractive(() => {
-          if (this.inputPaused) return;
+        const onTap = () => {
+          if (this.inputPaused || !this.pointerArmed) return;
           const live = getGameManager().getState()?.battle;
           if (live && isPlayable(live, card.id)) this.onCardClick(card.id);
           else this.rejectCard(visual, exposed);
-        });
+        };
+        visual.setInteractive(onTap);
+        if (exposed) this.exposedSlots.set(card.id, { x, y, width: cw, height: this.cardMetrics.ch, onTap });
         visual.setDepth((playable ? 60 : 15) + cardIndex);
         if (isNew && firstDeal) {
           const container = visual.getContainer();
-          container.setPosition(12, this.layout.trayTop).setScale(.35).setAlpha(0);
-          this.tweens.add({ targets: container, x, y, scale: 1, alpha: 1, duration: 350, delay: colIndex * 35 + cardIndex * 22, ease: 'Cubic.out' });
+          container.setScale(.35).setAlpha(0);
+          const g = this.stockGeometry();
+          container.setPosition(g.left, g.top);
+          // Short deal (≤ ~450ms total); cards are tappable immediately.
+          this.tweens.add({ targets: container, x, y, scale: 1, alpha: 1, duration: 240, delay: colIndex * 22 + cardIndex * 14, ease: 'Cubic.out' });
         }
         next.push(visual);
       });
@@ -522,11 +633,22 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updateDrawPile(battle: BattleState): void {
-    this.drawText.setText(battle.chain.length ? 'END TURN' : 'DRAW');
+    const count = battle.deck.length;
+    this.stockBacks.forEach((back, i) => back.setVisible(count > 2 - i));
+    this.stockEmpty.setVisible(count === 0);
+    this.stockBadge.setText(String(count));
+    this.stockBadgeBg.setFillStyle(count === 0 ? 0x6b5a8a : 0xff3b4e);
+    const g = this.stockGeometry();
+    const topOffset = Math.min(2, Math.max(0, count - 1)) * 2;
+    this.stockBadgeBg.setPosition(g.left + g.w - 2 - topOffset, g.top + 2 - topOffset);
+    this.stockBadge.setPosition(this.stockBadgeBg.x, this.stockBadgeBg.y);
     const intent = battle.enemy.intents[battle.enemy.currentIntentIndex];
     const ready = battle.chain.length >= MIN_ATTACK_CHAIN;
-    const action = ready ? 'Enemy skips this turn' : `Chain ${battle.chain.length}/${MIN_ATTACK_CHAIN} · ${intent.type === 'attack' ? `Enemy hits ${intent.value}` : intent.type}`;
-    this.turnHint.setText(`${battle.deck.length} cards left\n${action}`);
+    const verb = battle.chain.length ? 'TAP DECK · END TURN' : count ? 'TAP DECK · DRAW' : 'TAP DECK · PASS';
+    const enemy = ready ? 'Enemy skips turn' : intent.type === 'attack' ? `Enemy hits ${intent.value}` : `Enemy: ${intent.type}`;
+    this.stockLabel.setText(`${verb}\nChain ${battle.chain.length}/${MIN_ATTACK_CHAIN}\n${enemy}`);
+    this.stockLabel.setColor(ready ? '#9effc0' : '#e1e6ff');
+    this.setUndoEnabled(getGameManager().canUndo());
   }
 
   private updatePlayerHUD(state: RunState): void {
@@ -568,7 +690,8 @@ export class BattleScene extends Phaser.Scene {
         active?.setVisible(true).setScale(this.layout.activeScale * 1.12);
         if (active) this.tweens.add({ targets: active, scale: this.layout.activeScale, duration: 140, ease: 'Back.out' });
         this.cardBurst(destinationX + this.layout.activeW / 2, destinationY + this.layout.activeH / 2, power ? 0xff7cee : 0xffdf70);
-        this.time.delayedCall(getGameManager().getState()?.phase === 'battle' ? 160 : 450, () => { this.inputPaused = false; this.checkPhaseTransition(); });
+        const handle = window.setTimeout(() => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); }, getGameManager().getState()?.phase === 'battle' ? 120 : 450);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.clearTimeout(handle));
       } });
     } });
   }
@@ -586,13 +709,43 @@ export class BattleScene extends Phaser.Scene {
     const active = this.activeCardVisual?.getContainer();
     if (active && result.state.battle) {
       const targetX = active.x;
-      active.setX(16).setAlpha(0.4).setAngle(-18).setScale(.55);
-      this.tweens.add({ targets: active, x: targetX, alpha: 1, angle: 0, scale: this.layout.activeScale, duration: 340, ease: 'Back.out' });
+      const targetY = active.y;
+      const g = this.stockGeometry();
+      active.setPosition(g.left, g.top).setAlpha(0.6).setAngle(-12).setScale(this.layout.activeScale * .9);
+      this.tweens.add({ targets: active, x: targetX, y: targetY, alpha: 1, angle: 0, scale: this.layout.activeScale, duration: 280, ease: 'Back.out' });
     }
-    this.time.delayedCall(750, () => {
-      this.inputPaused = false;
-      this.checkPhaseTransition();
-    });
+    // Unlock on a real-time timer (not the game clock, which can stretch after slow frames).
+    const unlock = () => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); };
+    const handle = window.setTimeout(unlock, result.state.phase === 'battle' ? 520 : 750);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.clearTimeout(handle));
+  }
+
+  private onUndoClick(): void {
+    if (this.inputPaused) return;
+    AudioSystem.unlock();
+    const manager = getGameManager();
+    if (!manager.canUndo()) {
+      AudioSystem.play('invalid_tap', { volume: .35 });
+      if (this.undoButton) { const b = this.undoButton; const x = b.x; this.tweens.add({ targets: b, x: x + 4, duration: 40, yoyo: true, repeat: 1, onComplete: () => b.setX(x) }); }
+      return;
+    }
+    // Where the card currently sits (active slot) before the state is reverted.
+    const fromX = viewport(this).width * 0.76 - this.layout.activeW / 2;
+    const fromY = this.layout.trayTop + 12;
+    const result = manager.undo();
+    if (!result) return;
+    const event = result.events.find((item) => item.type === 'undo_applied') as { cardId: string | null } | undefined;
+    this.refreshState();
+    AudioSystem.play('card_draw', { pitchShift: -0.15, volume: .7 });
+    // Short reverse tween: the undone card slides from the active slot back to its column.
+    const visual = event?.cardId ? this.cardVisuals.find((item) => item.getCard().id === event.cardId) : undefined;
+    if (visual) {
+      const container = visual.getContainer();
+      const toX = container.x;
+      const toY = container.y;
+      container.setPosition(fromX, fromY).setScale(this.layout.activeScale).setAngle(6);
+      this.tweens.add({ targets: container, x: toX, y: toY, scale: 1, angle: 0, duration: 170, ease: 'Cubic.out' });
+    }
   }
 
   private handleEvents(events: Array<{ type: string; [key: string]: unknown }>): void {
@@ -822,6 +975,11 @@ export class BattleScene extends Phaser.Scene {
 
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this);
+    this.input.off(Phaser.Input.Events.POINTER_DOWN, this.armPointer, this);
+    this.input.off(Phaser.Input.Events.POINTER_UP, this.onScenePointerUp, this);
+    this.exposedSlots.clear();
+    this.stockBacks = [];
+    this.undoButton = null;
     setTestHook(null);
     this.cardVisuals = [];
     this.activeCardVisual = null;
