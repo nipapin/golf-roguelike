@@ -11,6 +11,7 @@ import {
   stepSiege,
   type CastleRun,
   type Invader,
+  SIEGE_PACING,
 } from './CastleDefense';
 const start = (seed = 'castle-test') => createCastleRun(seed, config, emptyUpgrades());
 const enemy = (boss = false, hp = 20): Invader => ({
@@ -126,7 +127,55 @@ describe('castle siege', () => {
   it('creates a dense stream of invaders in the first ten seconds', () => {
     let state = drawCastleCard(start(), config).state;
     for (let i = 0; i < 40; i++) state = stepSiege(state).state;
-    expect(state.siege.enemies.length).toBeGreaterThanOrEqual(6);
+    expect(state.siege.enemies.length).toBeGreaterThanOrEqual(15);
+  });
+  it('lets a group enter the field before ranged weapons can fire', () => {
+    const f = forcedChain(4);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    state.siege.spawnIn = 0;
+    let result = stepSiege(state);
+    expect(result.events.filter((e) => e.type === 'spawn')).toHaveLength(3);
+    expect(result.events.filter((e) => e.type === 'shot')).toHaveLength(0);
+    expect(result.state.siege.enemies).toHaveLength(3);
+    state = result.state;
+    state.siege.spawnIn = 1000;
+    state.siege.enemies = [{ ...enemy(), progress: 0.41 }];
+    result = stepSiege(state);
+    expect(result.events.some((e) => e.type === 'shot' && e.kind === 'turret')).toBe(true);
+  });
+  it('keeps an approaching horde visible even when a turret is already deployed', () => {
+    const f = forcedChain(3);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    for (let i = 0; i < 40; i++) state = stepSiege(state).state;
+    expect(state.siege.enemies.length).toBeGreaterThanOrEqual(10);
+    expect(state.siege.enemies.some((e) => e.progress > 0.2)).toBe(true);
+  });
+  it('grows groups and HP over time and never exceeds the saveable enemy cap', () => {
+    const state = start();
+    state.siege.started = true;
+    state.siege.elapsed = 60;
+    state.siege.spawnIn = 0;
+    const group = stepSiege(state).state.siege.enemies;
+    expect(group).toHaveLength(5);
+    expect(group.every((e) => e.maxHp === 10)).toBe(true);
+    state.siege.enemies = Array.from({ length: 47 }, (_, i) => ({
+      ...enemy(),
+      id: i + 200,
+      progress: 0,
+    }));
+    const result = stepSiege(state);
+    expect(result.state.siege.enemies).toHaveLength(SIEGE_PACING.maxEnemies);
+    expect(result.events.filter((e) => e.type === 'spawn')).toHaveLength(1);
+  });
+  it('an undefended horde reaches and destroys the castle', () => {
+    let state = drawCastleCard(start(), config).state;
+    for (let i = 0; i < 240 && state.run.phase === 'battle'; i++) state = stepSiege(state).state;
+    expect(state.run.phase).toBe('defeat');
+    expect(state.siege.elapsed).toBeLessThan(60);
   });
   it('deploys the reached tiers only after drawing at lengths one through four', () => {
     for (let length = 1; length <= 4; length++) {
@@ -154,10 +203,10 @@ describe('castle siege', () => {
     expect(state.siege.units).toHaveLength(4);
     expect(state.siege.units.every((u) => u.hp === 1 && u.damage === 1)).toBe(true);
   });
-  it('spawns a supermonster after every ten regular invaders', () => {
+  it('spawns a supermonster after every twenty regular invaders', () => {
     const state = start();
     state.siege.started = true;
-    state.siege.spawned = 10;
+    state.siege.spawned = 20;
     state.siege.spawnIn = 0;
     const result = stepSiege(state);
     expect(result.state.siege.enemies[0].boss).toBe(true);
@@ -286,7 +335,7 @@ describe('deterministic castle balance sample', () => {
           state = stepSiege(state).state;
       }
       if (state.run.phase === 'victory') wins++;
-      if (state.siege.spawned >= 11) bossRuns++;
+      if (state.siege.spawned >= SIEGE_PACING.bossEvery) bossRuns++;
       totalCards += count;
     }
     console.log(JSON.stringify({ seeds: 40, wins, averageCards: totalCards / 40, bossRuns }));

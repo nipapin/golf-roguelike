@@ -10,8 +10,8 @@ The first card or draw starts the siege. Enemies arrive from the left and attack
 |---|---|---|
 | 1 | Soldier | 1 HP, 1 damage once per second, marches left and fights in melee; 18 seconds after engagement |
 | 2 | Knight | 6 damage every 1.5 seconds; 6 HP, marches left; 24 seconds after engagement |
-| 3 | Turret | 100 rounds, 2 damage per bullet, 4 bullets/second, targets the closest enemy to the castle |
-| 4 | Mortar | 12 shells, 9 damage to up to three leading enemies, one shot every 2 seconds |
+| 3 | Turret | 100 rounds, 2 damage per bullet, 4 bullets/second, targets the closest enemy to the castle after it travels 40% of the road |
+| 4 | Mortar | 12 shells, 9 damage to up to three leading enemies, one shot every 2 seconds, starts firing after enemies travel 22% of the road |
 | 5 | Laser | Deletes normal invaders, deals 80 damage to supermonsters |
 | 8, 11, 14… | Another laser | Same effect; rewards never downgrade when extending a chain |
 
@@ -23,9 +23,11 @@ Hearts repair castle HP; clubs provide armor; diamonds add bankable coins. Exist
 
 ## Waves and difficulty
 
-The first spawn has a one-second grace period after the first action. Spawn intervals start near 1.5 seconds and shorten toward 0.75 seconds. Regular enemy HP grows with spawn count. A supermonster appears after each ten regular invaders, with larger HP, slower approach and heavier castle attacks. At most thirty-two invaders are alive concurrently; additional spawns wait instead of disappearing or advancing offscreen.
+The first group arrives one second after the first action. Groups of three enemies spawn every two seconds; group size rises to four at 30 seconds and five at 60 seconds. Intervals shorten toward 1.25 seconds. Regular HP starts at six and increases by two every 30 seconds, independently of how many enemies have spawned. A supermonster follows every twenty regular invaders. At most 48 invaders can be alive; a partially filled group respects the cap.
 
-Normal enemies need roughly 30–45 seconds to traverse the lane. Contact deals damage every 3.5 seconds; supermonsters attack every three seconds. Armor absorbs damage before castle HP.
+Turrets and mortars no longer shoot enemies at the spawn edge. Their firing zones let groups enter and cross the field before combat, while infantry marches to meet them. Group members have staggered positions, seeded speed variation and four visual ranks so they read as an advancing horde. The HUD shows live enemy count and turns red when an enemy reaches the final quarter of the approach; near-castle enemies show a danger marker.
+
+Normal invaders reach the castle in roughly 23–30 seconds if unopposed. Contact damages armor before castle HP; regular invaders attack every 3.5 seconds and bosses every three seconds. An unattended baseline castle falls within a minute. The tableau, stock-draw deployment timing, soldier 1 HP / 1 base damage and final victory blast remain unchanged.
 
 The prototype favors readable decisions over frantic tapping. Automated seeded simulations check board completion and the effect of upgrades; human pacing feedback should guide the next tuning pass.
 
