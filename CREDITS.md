@@ -22,6 +22,17 @@ No attribution required, but credit given:
 - **Undead** - https://opengameart.org/content/2d-zombie-chibi
 - **The Golf King (Samurai)** - https://opengameart.org/content/2d-samurai-chibi
 
+### CraftPix chibi monsters (OGA-BY 3.0)
+Credit:
+
+> Chibi monster sprites by CraftPix.net (https://craftpix.net), via OpenGameArt.org, licensed OGA-BY 3.0: Orc, Ogre and Goblin Chibi Sprites; Reaper Man Chibi Sprites; Fallen Angel Chibi Sprites.
+
+- License: OGA-BY 3.0, https://static.opengameart.org/OGA-BY-3.0.txt
+- Orc, Ogre and Goblin Chibi Sprites: https://opengameart.org/content/orc-ogre-and-goblin-chibi-sprites (Goblin Scrapper, Orc Brute, Ogre Crusher, Ogre Warlord)
+- Reaper Man Chibi Sprites: https://opengameart.org/content/reaper-man-chibi-sprites (Soul Reaper, Grave Reaper, Reaper Lord)
+- Fallen Angel Chibi Sprites: https://opengameart.org/content/fallen-angel-chibi-sprites (Fallen Knight, Fallen Squire, Fallen Seraph)
+- Files: `public/assets/enemies/atlases/c_*.webp|json`. Modified: frames picked from the PNG sequences, trimmed, resized to 160 px cells, packed into WebP atlases (`scripts/build-chibi-atlases.sh`), tinted per act in game.
+
 ---
 
 ## Icons
@@ -55,8 +66,7 @@ All fonts are licensed under SIL Open Font License 1.1, which permits commercial
 
 Sound effects used from:
 - **Casino Audio** (https://kenney.nl/assets/casino-audio)
-  - card-place-1, card-place-2, card-place-3 (card play sounds)
-  - card-slide-3 (draw sound)
+  - card-tap-1/2/3 (card play and draw sounds, trimmed recordings)
   - chips-stack-3 (reward pickup)
 - **Interface Sounds** (https://kenney.nl/assets/interface-sounds)
   - click_002 (button tap)

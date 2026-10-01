@@ -1,6 +1,6 @@
+import { viewportHeight } from './presentation/design/safeArea';
 import Phaser from 'phaser';
 import './style.css';
-import { viewportHeight } from './presentation/design/safeArea';
 import { setRenderDensity, getRenderDensity } from './presentation/design/viewport';
 
 import { loadFonts } from './presentation/design/fontLoader';
@@ -41,6 +41,8 @@ async function initGame() {
     document.documentElement.style.setProperty('--viewport-height', height + 'px');
   };
   syncViewportHeight();
+  // #game is position:absolute; inset:0 (style.css), so it already matches the
+  // full viewport in Safari and in the standalone PWA. Render density is capped at 2.
   setRenderDensity(window.devicePixelRatio || 1);
   const density = getRenderDensity();
   const bounds = host.getBoundingClientRect();

@@ -1,4 +1,4 @@
-import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
+import { configureSafeViewport, getRenderDensity } from '../design/viewport';
 import { AudioSystem } from '../audio/AudioSystem';
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
@@ -9,10 +9,10 @@ export class CreditsScene extends Phaser.Scene {
   }
 
   create(): void {
-    configureViewport(this);
+    const safe = configureSafeViewport(this);
     AudioSystem.setMusicScene('menu');
-    const width = viewport(this).width;
-    const height = viewport(this).height;
+    const width = safe.width;
+    const height = safe.height;
     const cx = width / 2;
 
     // Background
@@ -36,10 +36,7 @@ export class CreditsScene extends Phaser.Scene {
       { text: 'kalponic-studio.itch.io', style: 'item' },
       { text: 'Atlases resized and recolored for Golf Rogue', style: 'item' },
       { text: '', style: 'spacer' },
-      { text: 'Animated Orcs · CraftPix', style: 'header' },
-      { text: 'free-game-assets.itch.io', style: 'normal' },
-      { text: 'Free 2D Orcs Sprite Sheets · game-use license', style: 'item' },
-      { text: 'Legacy Character Art', style: 'header' },
+      { text: 'Character Art', style: 'header' },
       { text: 'Segel (Segel2D)', style: 'name' },
       { text: 'OpenGameArt.org', style: 'normal' },
       { text: '', style: 'spacer' },
@@ -52,6 +49,13 @@ export class CreditsScene extends Phaser.Scene {
       { text: '• Green Slime, Spore Shroom', style: 'item' },
       { text: '• Dire Wolf, Undead', style: 'item' },
       { text: '• The Golf King (Samurai)', style: 'item' },
+      { text: '', style: 'spacer' },
+      { text: 'Chibi Monsters · CraftPix.net', style: 'name' },
+      { text: 'via OpenGameArt.org · OGA-BY 3.0', style: 'normal' },
+      { text: '• Orc, Ogre and Goblin Chibi Sprites', style: 'item' },
+      { text: '• Reaper Man Chibi Sprites', style: 'item' },
+      { text: '• Fallen Angel Chibi Sprites', style: 'item' },
+      { text: 'craftpix.net', style: 'item' },
       { text: '', style: 'spacer' },
       { text: 'Icons', style: 'header' },
       { text: 'game-icons.net', style: 'name' },

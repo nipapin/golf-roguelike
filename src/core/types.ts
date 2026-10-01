@@ -1,3 +1,4 @@
+import type { RunFormula } from './RunStructure';
 export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs';
 export type PowerType = 'CRIT' | 'HEAL' | 'GUARD' | 'GOLD' | 'BOMB' | 'WILD' | 'ECHO';
 
@@ -25,6 +26,8 @@ export interface Enemy {
   readonly tint?: string;
   readonly crown?: boolean;
   readonly tier?: 'normal' | 'elite' | 'boss';
+  /** Act the enemy was spawned in (drives act tint/aura in presentation). */
+  readonly act?: number;
 }
 
 export interface Intent {
@@ -118,10 +121,26 @@ export interface GameConfig {
     readonly healAmount: number;
     readonly relicBaseCost: number;
   };
+  readonly undo?: {
+    readonly maxDepth: number;
+  };
   readonly runStructure: ReadonlyArray<{
     readonly type: string;
     readonly enemyTier: 'normal' | 'elite' | 'boss';
+    readonly act?: number;
+    readonly fightInAct?: number;
+    readonly hpMultiplier?: number;
+    readonly attackMultiplier?: number;
   }>;
+  /** Formula the runStructure is generated from (see core/RunStructure). */
+  readonly run?: RunFormula;
+  readonly simulation?: {
+    readonly seeds: number;
+    readonly relicsPerAct?: number;
+    readonly referenceBuild?: readonly string[];
+    readonly minKillRate: Readonly<Record<'normal' | 'elite' | 'boss', number>>;
+    readonly maxKillRate: Readonly<Record<'normal' | 'elite' | 'boss', number>>;
+  };
 }
 
 export type ActionResult = {
@@ -148,4 +167,6 @@ export type GameEvent =
   | { type: 'battle_lost' }
   | { type: 'run_won' }
   | { type: 'relic_chosen'; relic: Relic }
-  | { type: 'shop_purchase'; item: string; cost: number };
+  | { type: 'shop_purchase'; item: string; cost: number }
+  | { type: 'undo_applied'; cardId: string | null }
+  | { type: 'act_started'; act: number; maxHpBonus: number; healed: number };

@@ -3,15 +3,25 @@ import { viewport, configureViewport, getRenderDensity } from '../design/viewpor
 import Phaser from 'phaser';
 import { getGameManager, setTestHook } from '../GameManager';
 import { colors, getLayoutMetrics, getCardMetrics } from '../design/tokens';
-import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
+import { ArenaBackground, getEncounterForEnemy, type EncounterType } from '../design/ArenaBackground';
+import type { ActDef } from '../../core/GameState';
+import { getEmotion, type Emotion } from './enemyEmotion';
 import { HPBar, ComboBanner, createIntentBubble } from '../design/HudComponents';
-import { CardVisual } from '../design/CardVisual';
+import { CardVisual, createCardBack } from '../design/CardVisual';
 import { showBuildPanel } from '../design/BuildPanel';
 import { SettingsModal } from '../design/SettingsModal';
 import { showRules, hasSeenRules } from '../design/RulesPopup';
 import { isPlayable, MIN_ATTACK_CHAIN } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
+import { Juice } from '../juice/Juice';
+import { JUICE, classifyHit, hitStopMs, shakeIntensity } from '../juice/juiceConfig';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
+
+const parseHex = (value: string): number => parseInt(value.replace('#', ''), 16);
+
+const POWER_TINTS: Record<PowerType, number> = {
+  CRIT: 0xff6633, HEAL: 0x3aef98, GUARD: 0x50bfff, GOLD: 0xffd34a, BOMB: 0xff9a30, WILD: 0x80eaff, ECHO: 0xc58aff,
+};
 
 export class BattleScene extends Phaser.Scene {
   private layout!: ReturnType<typeof getLayoutMetrics>;
@@ -30,8 +40,18 @@ export class BattleScene extends Phaser.Scene {
   private goldText!: Phaser.GameObjects.Text;
   private armorText!: Phaser.GameObjects.Text;
   private buildText!: Phaser.GameObjects.Text;
-  private turnHint!: Phaser.GameObjects.Text;
-  private drawText!: Phaser.GameObjects.Text;
+  private stockLabel!: Phaser.GameObjects.Text;
+  private stockBadge!: Phaser.GameObjects.Text;
+  private stockBadgeBg!: Phaser.GameObjects.Arc;
+  private stockBacks: Phaser.GameObjects.Container[] = [];
+  private stockEmpty!: Phaser.GameObjects.Container;
+  private stockHit = { x: 0, y: 0, width: 0, height: 0 };
+  private undoButton: Phaser.GameObjects.Container | null = null;
+  private undoEnabled = false;
+  /** True once a pointerdown happened inside this scene (rejects ghost pointerups from the previous scene). */
+  private pointerArmed = false;
+  /** Resting rect of each exposed tableau card (cards may still be flying in during the deal). */
+  private exposedSlots = new Map<string, { x: number; y: number; width: number; height: number; onTap: () => void }>();
   private buildPanel: Phaser.GameObjects.Container | null = null;
   private topHUD: Phaser.GameObjects.Container | null = null;
   private activeLabel: Phaser.GameObjects.Text | null = null;
@@ -56,6 +76,17 @@ export class BattleScene extends Phaser.Scene {
   private enemyDying = false;
   private dealt = false;
   private lastShake = 0;
+  private juice!: Juice;
+  private lastEnemyMaxHp = 1;
+  /** While an enemy attack animates, the player HP bar keeps showing the pre-hit value until contact. */
+  private heldPlayerHp: number | null = null;
+  private chainHadCrit = false;
+  private enemyBaseTint: number | null = null;
+  private enemyAura: Phaser.GameObjects.Image | null = null;
+  private emotion: Emotion = 'calm';
+  private enemyHeadTop = 0.9;
+  private emoteMark: Phaser.GameObjects.Graphics | null = null;
+  private emoteTimer: number | null = null;
 
   constructor() {
     super('BattleScene');
@@ -92,15 +123,30 @@ export class BattleScene extends Phaser.Scene {
     // Player HUD at bottom
     this.createPlayerHUD();
 
-    // Draw pile
-    this.createDrawPile();
+    // Stock pile (tap to draw / end turn) and undo
+    this.createStockPile();
+    this.createUndoButton();
+
+    // Juice toolkit (pooled particles/numbers, hit-stop, shake)
+    this.juice = new Juice(this);
+    // Crown / emote marks follow the bobbing enemy sprite.
+    const follow = () => this.positionEmote();
+    this.events.on(Phaser.Scenes.Events.UPDATE, follow);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.UPDATE, follow));
 
     // Initial render
     this.dealt = false;
     this.enemyDying = false;
     AudioSystem.setMusicScene('battle');
     this.refreshState();
-    if (hasSeenRules()) { this.inputPaused = true; this.time.delayedCall(650, () => { this.inputPaused = false; }); }
+
+    // No timed input lock at battle start: a game-clock delayedCall stretched to
+    // 1-3s whenever the first frames were slow (Phaser clamps delta after a long
+    // frame), silently eating the first tap. Instead, only reject pointerups whose
+    // pointerdown happened before this scene existed (the tap that started it).
+    this.pointerArmed = false;
+    this.input.on(Phaser.Input.Events.POINTER_DOWN, this.armPointer, this);
+    this.input.on(Phaser.Input.Events.POINTER_UP, this.onScenePointerUp, this);
     if (!hasSeenRules()) { this.inputPaused = true; showRules(this, () => { this.inputPaused = false; }); }
 
     // Create settings modal
@@ -129,26 +175,44 @@ export class BattleScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, this.shutdown, this);
   }
 
+  private armPointer(): void {
+    this.pointerArmed = true;
+  }
+
+  /**
+   * Fallback for taps that land on a card's resting slot while the card is still
+   * animating (deal / layout tween): hit zones travel with the card, the finger doesn't.
+   */
+  private onScenePointerUp(pointer: Phaser.Input.Pointer, over: Phaser.GameObjects.GameObject[]): void {
+    if (over.length || this.inputPaused || !this.pointerArmed) return;
+    const x = pointer.worldX;
+    const y = pointer.worldY;
+    for (const slot of this.exposedSlots.values()) {
+      if (x >= slot.x && x <= slot.x + slot.width && y >= slot.y && y <= slot.y + slot.height) { slot.onTap(); return; }
+    }
+  }
+
   private setupTestHook(): void {
     setTestHook({
       isActive: true,
       getPlayableCards: () => {
+        // Resting bounds (not mid-animation positions), so automation taps where a player would.
         return this.cardVisuals
           .filter((cv) => cv.getState() === 'playable')
-          .map((cv) => ({
-            cardId: cv.getCard().id,
-            bounds: cv.getWorldBounds(),
-          }));
+          .map((cv) => {
+            const slot = this.exposedSlots.get(cv.getCard().id);
+            return { cardId: cv.getCard().id, bounds: slot ? { x: slot.x, y: slot.y, width: slot.width, height: slot.height } : cv.getWorldBounds() };
+          });
       },
       getDrawPileBounds: () => {
         if (!this.drawPile) return { x: 0, y: 0, width: 0, height: 0 };
-        return {
-          x: 12,
-          y: this.layout.trayTop + 14,
-          width: viewport(this).width * 0.46,
-          height: this.layout.trayHeight - 28,
-        };
+        return { ...this.stockHit };
       },
+      getUndoBounds: () => {
+        if (!this.undoButton) return { x: 0, y: 0, width: 0, height: 0 };
+        return { x: this.undoButton.x - 24, y: this.undoButton.y - 24, width: 48, height: 48 };
+      },
+      canUndo: () => getGameManager().canUndo(),
       getTableauCount: () => {
         const state = getGameManager().getState();
         if (!state?.battle) return 0;
@@ -169,20 +233,26 @@ export class BattleScene extends Phaser.Scene {
     const width = viewport(this).width;
     const { hudTop, hudHeight, relicTop } = this.layout;
     const manager = getGameManager();
+    // HUD band is painted edge to edge from y=0 (under the notch); content stays below safeTop.
+    const band = this.add.graphics().setDepth(99);
+    band.fillStyle(0x1a1030, 1).fillRect(0, 0, width, hudTop + hudHeight + 4);
+    band.fillStyle(0x654581, 1).fillRect(0, hudTop + hudHeight + 3, width, 1);
     this.topHUD = this.add.container(0, hudTop).setDepth(100);
     const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
-    const progress = this.add.text(16, hudHeight / 2, manager.getState()?.battle?.mode === 'boss' ? 'BOSS FIGHT' : `LEVEL ${manager.getCurrentFightNumber()}`, {
+    const progress = this.add.text(16, hudHeight / 2, manager.isBossFight() ? 'BOSS FIGHT' : `LEVEL ${manager.getCurrentFightNumber()}`, {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
     }).setOrigin(0, 0.5);
     const coin = this.add.image(width * 0.58 - 20, hudHeight / 2, 'coin').setDisplaySize(24, 24);
     this.goldText = this.add.text(width * 0.58 + 6, hudHeight / 2, '0', {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#ffd267',
     }).setOrigin(0.5);
-    const settings = this.add.rectangle(width - 30, hudHeight / 2, 40, 36, 0x3d2c66).setInteractive();
+    const settings = this.add.rectangle(width - 32, hudHeight / 2, 44, 44, 0x3d2c66).setInteractive();
     settings.on('pointerup', () => { AudioSystem.unlock(); this.openSettings(); });
-    const gear = this.add.text(width - 30, hudHeight / 2, '⚙', { resolution: getRenderDensity(), fontSize: '22px', color: '#fff' }).setOrigin(0.5);
+    const gear = this.add.text(width - 32, hudHeight / 2, '⚙', { resolution: getRenderDensity(), fontSize: '22px', color: '#fff' }).setOrigin(0.5);
     this.topHUD.add([bg, progress, coin, this.goldText, settings, gear]);
-    const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100).setInteractive();
+    // Visual strip is 26px tall; the touch target is 44px.
+    const build = this.add.rectangle(width / 2, relicTop + 14, width - 24, 26, 0x352353).setDepth(100)
+      .setInteractive(new Phaser.Geom.Rectangle(0, -9, width - 24, 44), Phaser.Geom.Rectangle.Contains);
     this.buildText = this.add.text(width / 2, build.y, 'BUILD · CHOOSE A RELIC', {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '12px', color: '#dac6ff',
     }).setOrigin(0.5).setDepth(101);
@@ -212,7 +282,7 @@ export class BattleScene extends Phaser.Scene {
     this.tableBackground = this.add.graphics();
     this.tableBackground.setDepth(10);
 
-    // Felt gradient - extends to bottom of screen minus safe area
+    // Felt gradient - painted to the very bottom edge (under the home indicator)
     this.tableBackground.fillStyle(colors.feltHi, 1);
     this.tableBackground.fillGradientStyle(colors.feltHi,
       colors.feltHi,
@@ -224,7 +294,7 @@ export class BattleScene extends Phaser.Scene {
       0,
       tableTop,
       width,
-      height - tableTop + 10,
+      height - tableTop,
       { tl: 22, tr: 22, bl: 0, br: 0 }
     );
 
@@ -245,22 +315,86 @@ export class BattleScene extends Phaser.Scene {
     }).setOrigin(1, 0.5).setDepth(100);
   }
 
-  private createDrawPile(): void {
-    const { trayTop, trayHeight } = this.layout;
+  /** Stock pile layout: card backs at the left of the tray, label to its right. */
+  private stockGeometry() {
+    const { trayTop, activeW, activeH } = this.layout;
+    const left = 14;
+    const top = trayTop + 12;
+    return { left, top, w: activeW, h: activeH, cx: left + activeW / 2, cy: top + activeH / 2 };
+  }
+
+  private createStockPile(): void {
+    const { trayTop, trayHeight, activeScale } = this.layout;
+    const g = this.stockGeometry();
+    this.drawPile = this.add.container(0, 0).setDepth(55);
+    // Empty state: dashed slot with a recycle glyph.
+    const empty = this.add.graphics();
+    empty.lineStyle(2, 0x9a8aba, 0.8);
+    const dash = 6;
+    for (let x = g.left; x < g.left + g.w; x += dash * 2) { empty.lineBetween(x, g.top, Math.min(x + dash, g.left + g.w), g.top); empty.lineBetween(x, g.top + g.h, Math.min(x + dash, g.left + g.w), g.top + g.h); }
+    for (let y = g.top; y < g.top + g.h; y += dash * 2) { empty.lineBetween(g.left, y, g.left, Math.min(y + dash, g.top + g.h)); empty.lineBetween(g.left + g.w, y, g.left + g.w, Math.min(y + dash, g.top + g.h)); }
+    const emptyGlyph = this.add.text(g.cx, g.cy, '↻', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '22px', color: '#9a8aba' }).setOrigin(0.5);
+    this.stockEmpty = this.add.container(0, 0, [empty, emptyGlyph]).setVisible(false);
+    this.drawPile.add(this.stockEmpty);
+    // Up to 3 stacked backs (offset up-left) suggest depth.
+    this.stockBacks = [];
+    for (let i = 2; i >= 0; i--) {
+      const back = createCardBack(this, g.left - i * 2, g.top - i * 2);
+      back.setScale(activeScale);
+      this.stockBacks.push(back);
+      this.drawPile.add(back);
+    }
+    // Remaining-count badge.
+    this.stockBadgeBg = this.add.circle(g.left + g.w - 2, g.top + 2, 12, 0xff3b4e).setStrokeStyle(2.5, 0x1b1030);
+    this.stockBadge = this.add.text(this.stockBadgeBg.x, this.stockBadgeBg.y, '0', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '13px', color: '#ffffff' }).setOrigin(0.5);
+    this.drawPile.add([this.stockBadgeBg, this.stockBadge]);
+    // Info label (chain progress / enemy hit) next to the pile.
+    this.stockLabel = this.add.text(g.left + g.w + 12, trayTop + trayHeight / 2 - 4, '', {
+      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', lineSpacing: 1,
+    }).setOrigin(0, 0.5).setDepth(55);
+    // Touch target: whole pile plus padding, at least 44×44.
+    const hitW = Math.max(44, g.w + 16);
+    const hitH = Math.max(44, Math.min(trayHeight - 4, g.h + 16));
+    this.stockHit = { x: g.cx - hitW / 2, y: g.cy - hitH / 2, width: hitW, height: hitH };
+    const zone = this.add.zone(g.cx, g.cy, hitW, hitH).setInteractive().setDepth(56);
+    zone.on('pointerdown', () => { if (!this.inputPaused) this.setStockPressed(true); });
+    zone.on('pointerout', () => this.setStockPressed(false));
+    zone.on('pointerup', () => { this.setStockPressed(false); if (this.pointerArmed) this.onDrawClick(); });
+  }
+
+  private setStockPressed(pressed: boolean): void {
+    if (!this.drawPile) return;
+    const g = this.stockGeometry();
+    // Scale around the pile centre.
+    const scale = pressed ? 0.94 : 1;
+    this.drawPile.setScale(scale).setPosition(g.cx * (1 - scale), g.cy * (1 - scale));
+  }
+
+  private createUndoButton(): void {
+    const { trayTop, trayHeight, activeW } = this.layout;
     const width = viewport(this).width;
-    const buttonWidth = width * 0.46;
-    const buttonHeight = trayHeight - 28;
-    this.drawPile = this.add.container(12 + buttonWidth / 2, trayTop + 14 + buttonHeight / 2).setDepth(55);
-    const bg = this.add.rectangle(0, 0, buttonWidth, buttonHeight, 0x31559a).setStrokeStyle(2, 0x9aafe0);
-    this.drawText = this.add.text(0, -10, 'DRAW', {
-      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff',
-    }).setOrigin(0.5);
-    this.turnHint = this.add.text(0, 16, 'Enemy turn', {
-      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '11px', color: '#e1e6ff', align: 'center',
-    }).setOrigin(0.5);
-    this.drawPile.add([bg, this.drawText, this.turnHint]);
-    this.drawPile.setInteractive(new Phaser.Geom.Rectangle(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight), Phaser.Geom.Rectangle.Contains);
-    this.drawPile.on('pointerup', () => this.onDrawClick());
+    const activeLeft = width * 0.76 - activeW / 2;
+    const x = activeLeft - 14 - 24;
+    const y = trayTop + trayHeight / 2 - 2;
+    const button = this.add.container(x, y).setDepth(56);
+    const bg = this.add.graphics();
+    bg.fillStyle(0x1b1030, 1).fillRoundedRect(-22, -20, 44, 44, 12);
+    bg.fillStyle(0x4b3a7a, 1).fillRoundedRect(-22, -22, 44, 42, 12);
+    bg.lineStyle(2.5, 0x1b1030, 1).strokeRoundedRect(-22, -22, 44, 42, 12);
+    const glyph = this.add.text(0, -6, '↶', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '22px', color: '#ffffff' }).setOrigin(0.5);
+    const label = this.add.text(0, 11, 'UNDO', { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '9px', fontStyle: 'bold', color: '#dcd0ff' }).setOrigin(0.5);
+    button.add([bg, glyph, label]);
+    button.setInteractive(new Phaser.Geom.Rectangle(-24, -24, 48, 48), Phaser.Geom.Rectangle.Contains);
+    button.on('pointerdown', () => { if (this.undoEnabled && !this.inputPaused) button.setScale(0.92); });
+    button.on('pointerout', () => button.setScale(1));
+    button.on('pointerup', () => { button.setScale(1); if (this.pointerArmed) this.onUndoClick(); });
+    this.undoButton = button;
+    this.setUndoEnabled(false);
+  }
+
+  private setUndoEnabled(enabled: boolean): void {
+    this.undoEnabled = enabled;
+    this.undoButton?.setAlpha(enabled ? 1 : 0.38);
   }
 
   private refreshState(): void {
@@ -273,7 +407,8 @@ export class BattleScene extends Phaser.Scene {
 
     // Update arena background based on enemy
     if (state.battle) {
-      const encounter = getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
+      const actDef = this.getActDef(state.battle.enemy.act);
+      const encounter = (actDef?.encounter as EncounterType | undefined) ?? getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
       if (!previousState?.battle || previousState.battle.enemy.id !== state.battle.enemy.id) this.arenaBackground.draw(
         viewport(this).width,
         this.layout.arenaTop,
@@ -299,14 +434,20 @@ export class BattleScene extends Phaser.Scene {
     const intent = enemy.intents[enemy.currentIntentIndex];
     const intentKey = `${intent?.type}:${intent?.value}`;
     if (this.renderedEnemyId === enemy.id) {
+      this.lastEnemyMaxHp = enemy.maxHp;
       this.enemyHPBar.setHp(enemy.hp, enemy.maxHp);
       this.enemyHPBar.setPendingDamage(battle.accumulatedDamage);
+      this.updateEmotion(battle);
       if (this.renderedIntentKey !== intentKey) {
         this.updateIntent(battle);
       }
       return;
     }
     this.renderedEnemyId = enemy.id;
+    this.lastEnemyMaxHp = enemy.maxHp;
+    this.emotion = 'calm';
+    this.clearEmote();
+    if (!enemy.crown) { this.crownSprite?.destroy(); this.crownSprite = null; }
     const enemyX = width / 2;
     const enemyY = arenaTop + arenaHeight - 70;
 
@@ -325,8 +466,7 @@ export class BattleScene extends Phaser.Scene {
       this.enemySprite.destroy();
     }
 
-    const monster = enemy.sprite?.startsWith('orc') ? enemy.sprite : enemy.tier === 'boss' ? 'orc3' : 'orc1';
-    const atlasKey = `enemy-${monster}`;
+    const atlasKey = `enemy-${enemy.sprite || 'goblin'}`;
     if (this.textures.exists(atlasKey)) {
       this.enemySprite = this.add.sprite(enemyX, enemyY, atlasKey);
       this.enemySprite.setOrigin(0.5, 1);
@@ -335,12 +475,18 @@ export class BattleScene extends Phaser.Scene {
       const frame = this.textures.getFrame(atlasKey);
       const baseHeight = frame ? frame.height : 180;
       const baseScale = targetEnemyHeight / baseHeight;
-      const scale = baseScale * (enemy.scale || 1);
+      const actDef = this.getActDef(enemy.act);
+      const scale = baseScale * (enemy.scale || 1) * (actDef?.scale ?? 1);
+      const spriteDef = getGameManager().getEnemiesData().sprites?.[enemy.sprite];
+      this.enemySprite.setFlipX(!!spriteDef?.facesRight);
+      this.enemyHeadTop = spriteDef?.headTop ?? 0.9;
       
-      this.enemySprite.setScale(scale);
+      // Never taller than ~82% of the arena (big bosses at high act scale).
+      const maxScale = (this.layout.arenaHeight * 0.82) / baseHeight;
+      this.enemySprite.setScale(Math.min(scale, maxScale));
       this.enemySprite.setDepth(20);
-      this.enemyKey = monster;
-      this.enemyScale = scale;
+      this.enemyKey = enemy.sprite || 'goblin';
+      this.enemyScale = Math.min(scale, maxScale);
       this.enemyBaseY = enemyY;
       this.startEnemyIdle();
 
@@ -349,25 +495,37 @@ export class BattleScene extends Phaser.Scene {
       this.enemyShadow.setSize(shadowWidth, shadowWidth * 0.2);
 
       // Play idle animation
-      const idleKey = `${monster}-idle`;
+      const idleKey = `${enemy.sprite || 'goblin'}-idle`;
       if (this.anims.exists(idleKey)) {
         this.enemySprite.play(idleKey);
       }
 
-      // Boss gold tint
-      if (enemy.tint === 'gold') {
-        this.enemySprite.setTint(0xffd700);
+      // Tint: enemy override (boss gold etc.) > act tint.
+      const tint = enemy.tint === 'gold' ? 0xffd700 : enemy.tint ? parseHex(enemy.tint) : actDef?.tint ? parseHex(actDef.tint) : null;
+      this.enemyBaseTint = tint;
+      if (tint !== null) this.enemySprite.setTint(tint); else this.enemySprite.clearTint();
+
+      // Act aura: soft additive glow behind the enemy.
+      this.enemyAura?.destroy();
+      this.enemyAura = null;
+      const auraColor = actDef?.aura ? parseHex(actDef.aura) : enemy.tier === 'boss' ? 0xffd34a : null;
+      if (auraColor !== null) {
+        const auraSize = this.enemySprite.displayHeight * (enemy.tier === 'boss' ? 1.25 : 1.05);
+        this.enemyAura = this.add.image(enemyX, enemyY - this.enemySprite.displayHeight * .45, 'fx-dot')
+          .setDisplaySize(auraSize, auraSize).setTint(auraColor).setAlpha(enemy.tier === 'normal' ? .28 : .42)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(18);
+        this.tweens.add({ targets: this.enemyAura, alpha: (enemy.tier === 'normal' ? .28 : .42) * .55, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       }
 
       // Crown for boss
       if (enemy.crown) {
-        if (this.crownSprite) this.crownSprite.destroy();
+        this.crownSprite?.destroy();
         this.crownSprite = this.add.image(
           enemyX,
           enemyY - this.enemySprite.displayHeight - 10,
           'crown'
         );
-        this.crownSprite.setScale(0.5);
+        this.crownSprite.setScale(0.5).setOrigin(0.5, 0.85);
         this.crownSprite.setDepth(21);
       }
     }
@@ -408,6 +566,62 @@ export class BattleScene extends Phaser.Scene {
     this.enemyHPBar.setDepth(30);
 
     this.updateIntent(battle);
+    this.updateEmotion(battle);
+  }
+
+
+  private getActDef(act: number | undefined): ActDef | undefined {
+    return getGameManager().getEnemiesData().acts?.[(act ?? 1) - 1];
+  }
+
+  /** Calm / angry / scared from HP and intent (thresholds in enemies.json "emotions"). */
+  private updateEmotion(battle: BattleState): void {
+    const next = getEmotion(battle.enemy, getGameManager().getEnemiesData().emotions);
+    if (next === this.emotion || this.enemyDying) return;
+    this.emotion = next;
+    this.clearEmote();
+    const sprite = this.enemySprite;
+    if (!sprite) return;
+    sprite.anims.timeScale = next === 'calm' ? 1 : next === 'angry' ? 1.35 : 1.6;
+    if (next === 'calm') return;
+    const mark = this.add.graphics().setDepth(26);
+    if (next === 'angry') {
+      // Anime anger vein: four red curved strokes.
+      mark.lineStyle(5, 0xff2a3d, 1);
+      for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        mark.beginPath(); mark.arc(dx * 9, dy * 9, 7, Math.atan2(-dy, -dx) - .9, Math.atan2(-dy, -dx) + .9); mark.strokePath();
+      }
+    } else {
+      // Sweat drop.
+      mark.fillStyle(0x7fd4ff, 1).lineStyle(3, 0x1b1030, 1);
+      mark.beginPath(); mark.moveTo(0, -14); mark.lineTo(9, 3); mark.arc(0, 4, 9, 0, Math.PI); mark.lineTo(0, -14); mark.closePath(); mark.fillPath(); mark.strokePath();
+    }
+    this.emoteMark = mark;
+    this.positionEmote();
+    this.tweens.add({ targets: mark, scale: { from: 0, to: 1 }, duration: 220, ease: 'Back.out' });
+    if (next === 'angry') this.tweens.add({ targets: mark, scale: 1.18, duration: 380, yoyo: true, repeat: -1, delay: 220 });
+    else this.tweens.add({ targets: mark, y: '+=6', alpha: .6, duration: 700, yoyo: true, repeat: -1, delay: 220 });
+    // Scared enemies shiver; angry ones puff steam.
+    this.emoteTimer = window.setInterval(() => {
+      if (!this.sys.isActive() || !this.enemySprite || this.enemyDying) return;
+      const x = this.enemySprite.x; const top = this.enemySprite.y - this.enemySprite.displayHeight * .8;
+      if (this.emotion === 'angry') this.juice.dustPuff(x + Phaser.Math.Between(-20, 20), top, 3, 0xffffff);
+      else this.juice.sparkBurst(x + 24, top + 10, 2, 0x7fd4ff);
+    }, 900);
+  }
+
+  private positionEmote(): void {
+    const sprite = this.enemySprite;
+    if (!sprite) return;
+    const head = sprite.y - sprite.displayHeight * this.enemyHeadTop;
+    this.emoteMark?.setPosition(sprite.x + sprite.displayWidth * .2, head + 14);
+    this.crownSprite?.setPosition(sprite.x, head + 6);
+  }
+
+  private clearEmote(): void {
+    if (this.emoteMark) { this.tweens.killTweensOf(this.emoteMark); this.emoteMark.destroy(); this.emoteMark = null; }
+    if (this.emoteTimer !== null) { window.clearInterval(this.emoteTimer); this.emoteTimer = null; }
+    if (this.enemySprite) this.enemySprite.anims.timeScale = 1;
   }
 
   private updateIntent(battle: BattleState): void {
@@ -429,10 +643,11 @@ export class BattleScene extends Phaser.Scene {
   private renderTableau(battle: BattleState): void {
     const existing = new Map(this.cardVisuals.map((visual) => [visual.getCard().id, visual]));
     const next: CardVisual[] = [];
-    const firstDeal = !this.dealt && battle.enemy.id.endsWith('-level-1') && battle.mode !== 'boss';
+    const firstDeal = !this.dealt && battle.turnNumber === 0 && battle.mode !== 'boss';
     this.dealt = true;
     const { tableauTop, cw, strip, side, gap } = this.layout;
     const powers = new Map(battle.powerCards.map((power) => [power.cardId, power.type]));
+    this.exposedSlots.clear();
 
     battle.tableau.forEach((column, colIndex) => {
       column.cards.forEach((card, cardIndex) => {
@@ -446,17 +661,22 @@ export class BattleScene extends Phaser.Scene {
         visual.setPosition(x, y);
         const state = !exposed ? 'covered' : playable ? 'playable' : 'disabled';
         if (visual.getState() !== state) visual.setState(state);
-        visual.setInteractive(() => {
-          if (this.inputPaused) return;
+        const onTap = () => {
+          if (this.inputPaused || !this.pointerArmed) return;
           const live = getGameManager().getState()?.battle;
           if (live && isPlayable(live, card.id)) this.onCardClick(card.id);
           else this.rejectCard(visual, exposed);
-        });
+        };
+        visual.setInteractive(onTap);
+        if (exposed) this.exposedSlots.set(card.id, { x, y, width: cw, height: this.layout.ch, onTap });
         visual.setDepth((playable ? 60 : 15) + cardIndex);
         if (isNew && firstDeal) {
           const container = visual.getContainer();
-          container.setPosition(12, this.layout.trayTop).setScale(.35).setAlpha(0);
-          this.tweens.add({ targets: container, x, y, scale: 1, alpha: 1, duration: 350, delay: colIndex * 35 + cardIndex * 22, ease: 'Cubic.out' });
+          container.setScale(.35).setAlpha(0);
+          const g = this.stockGeometry();
+          container.setPosition(g.left, g.top);
+          // Short deal (≤ ~450ms total); cards are tappable immediately.
+          this.tweens.add({ targets: container, x, y, scale: 1, alpha: 1, duration: 240, delay: colIndex * 22 + cardIndex * 14, ease: 'Cubic.out' });
         }
         next.push(visual);
       });
@@ -523,15 +743,26 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updateDrawPile(battle: BattleState): void {
-    this.drawText.setText(battle.chain.length ? 'END TURN' : 'DRAW');
+    const count = battle.deck.length;
+    this.stockBacks.forEach((back, i) => back.setVisible(count > 2 - i));
+    this.stockEmpty.setVisible(count === 0);
+    this.stockBadge.setText(String(count));
+    this.stockBadgeBg.setFillStyle(count === 0 ? 0x6b5a8a : 0xff3b4e);
+    const g = this.stockGeometry();
+    const topOffset = Math.min(2, Math.max(0, count - 1)) * 2;
+    this.stockBadgeBg.setPosition(g.left + g.w - 2 - topOffset, g.top + 2 - topOffset);
+    this.stockBadge.setPosition(this.stockBadgeBg.x, this.stockBadgeBg.y);
     const intent = battle.enemy.intents[battle.enemy.currentIntentIndex];
     const ready = battle.chain.length >= MIN_ATTACK_CHAIN;
-    const action = ready ? 'Enemy skips this turn' : `Chain ${battle.chain.length}/${MIN_ATTACK_CHAIN} · ${intent.type === 'attack' ? `Enemy hits ${intent.value}` : intent.type}`;
-    this.turnHint.setText(`${battle.deck.length} cards left\n${action}`);
+    const verb = battle.chain.length ? 'TAP DECK · END TURN' : count ? 'TAP DECK · DRAW' : 'TAP DECK · PASS';
+    const enemy = ready ? 'Enemy skips turn' : intent.type === 'attack' ? `Enemy hits ${intent.value}` : `Enemy: ${intent.type}`;
+    this.stockLabel.setText(`${verb}\nChain ${battle.chain.length}/${MIN_ATTACK_CHAIN}\n${enemy}`);
+    this.stockLabel.setColor(ready ? '#9effc0' : '#e1e6ff');
+    this.setUndoEnabled(getGameManager().canUndo());
   }
 
   private updatePlayerHUD(state: RunState): void {
-    this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
+    this.playerHPBar.setHp(this.heldPlayerHp ?? state.player.hp, state.player.maxHp);
     this.goldText.setText(`${state.player.gold}`);
     this.armorText.setText(`ARMOR ${state.player.armor}`);
     const relics = state.player.relics;
@@ -558,20 +789,61 @@ export class BattleScene extends Phaser.Scene {
     const moving = flying.getContainer();
     const destinationX = viewport(this).width * 0.76 - this.layout.activeW / 2;
     const destinationY = this.layout.trayTop + 12;
-    this.tweens.add({ targets: moving, y: bounds.y - 22, angle: -8, scale: 1.15, duration: 90, ease: 'Quad.out', onComplete: () => {
-      const path = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(moving.x, moving.y), new Phaser.Math.Vector2(destinationX + 20, bounds.y - 55), new Phaser.Math.Vector2(destinationX, destinationY));
+    const J = JUICE.cards;
+    const played = result.events.find((item) => item.type === 'card_played') as { damage: number; chainPosition: number } | undefined;
+    const tint = card.joker ? (card.joker === 'red' ? 0xff557c : 0xb795ff) : power ? POWER_TINTS[power] : 0xffe7a0;
+    const special = !!(power || card.joker);
+    const { cw, ch, activeScale, activeW, activeH } = this.layout;
+    // 1) Anticipation lift.
+    this.tweens.add({ targets: moving, y: bounds.y - J.liftPx, angle: -J.rotateDeg * 0.5, scale: J.liftScale, duration: J.liftMs, ease: 'Quad.out', onComplete: () => {
+      // 2) Arc flight with rotation and trail.
+      const path = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(moving.x, moving.y), new Phaser.Math.Vector2((moving.x + destinationX) / 2 + 20, Math.min(moving.y, destinationY) - J.flightArcPx), new Phaser.Math.Vector2(destinationX, destinationY));
       const progress = { t: 0 };
-      this.tweens.add({ targets: progress, t: 1, duration: 240, ease: 'Cubic.inOut', onUpdate: () => {
-        const point = path.getPoint(progress.t); moving.setPosition(point.x, point.y).setAngle(-8 * (1 - progress.t));
+      const point = new Phaser.Math.Vector2();
+      this.juice.startTrail(moving, cw / 2, ch / 2, tint);
+      this.tweens.add({ targets: progress, t: 1, duration: J.flightMs, ease: 'Sine.inOut', onUpdate: () => {
+        path.getPoint(progress.t, point);
+        const t = progress.t;
+        moving.setPosition(point.x, point.y).setAngle(-J.rotateDeg * 0.5 + J.rotateDeg * Math.sin(t * Math.PI) * 0.9 - J.rotateDeg * 0.5 * t).setScale(J.liftScale + (activeScale - J.liftScale) * t);
       }, onComplete: () => {
+        this.juice.stopTrail();
         flying.destroy();
+        // 3) Landing squash + dust/glow.
         const active = this.activeCardVisual?.getContainer();
-        active?.setVisible(true).setScale(this.layout.activeScale * 1.12);
-        if (active) this.tweens.add({ targets: active, scale: this.layout.activeScale, duration: 140, ease: 'Back.out' });
-        this.cardBurst(destinationX + this.layout.activeW / 2, destinationY + this.layout.activeH / 2, power ? 0xff7cee : 0xffdf70);
-        this.time.delayedCall(getGameManager().getState()?.phase === 'battle' ? 160 : 450, () => { this.inputPaused = false; this.checkPhaseTransition(); });
+        if (active) {
+          active.setVisible(true).setScale(activeScale * (1 + J.landSquash), activeScale * (1 - J.landSquash));
+          this.tweens.add({ targets: active, scaleX: activeScale, scaleY: activeScale, duration: J.landMs, ease: 'Back.out' });
+        }
+        const cx = destinationX + activeW / 2;
+        this.juice.dustPuff(cx, destinationY + activeH, J.dustCount, special ? tint : 0xfff3d0);
+        if (special) {
+          this.juice.ring(cx, destinationY + activeH / 2, tint, 3, 340, 5);
+          this.juice.sparkBurst(cx, destinationY + activeH / 2, 14, tint);
+        } else {
+          this.cardBurst(cx, destinationY + activeH / 2, 0xffdf70);
+        }
+        // 4) Routine hit feedback on the enemy: the chain is charging up.
+        if (played && played.damage > 0) this.playChargeFeedback(played.damage, played.chainPosition);
+        const ended = getGameManager().getState()?.phase !== 'battle';
+        const handle = window.setTimeout(() => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); }, ended ? 1400 : 110);
+        this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.clearTimeout(handle));
       } });
     } });
+  }
+
+  /** Routine tier: small number + flinch while a chain builds (damage lands on END TURN). */
+  private playChargeFeedback(damage: number, chainPosition: number): void {
+    const x = viewport(this).width / 2;
+    const y = this.enemyBaseY - this.layout.enemyHeight * 0.55;
+    this.juice.damageNumber(x + Phaser.Math.Between(-30, 30), y, damage, { small: true, prefix: '+', size: JUICE.numbers.routineSize + Math.min(10, chainPosition), color: '#fff1a8' });
+    this.juice.shake(JUICE.shake.routine.intensity + chainPosition * 0.0003, JUICE.shake.routine.ms);
+    const sprite = this.enemySprite;
+    if (sprite && !this.enemyDying) {
+      const baseX = viewport(this).width / 2;
+      const px = JUICE.enemy.routineFlinchPx + Math.min(4, chainPosition * 0.5);
+      this.tweens.add({ targets: sprite, x: baseX + px, duration: 40, yoyo: true, ease: 'Sine.inOut', onComplete: () => sprite.setX(baseX) });
+      this.juice.sparkBurst(x, y + 10, 4 + Math.min(8, chainPosition), 0xffe08a);
+    }
   }
 
   private onDrawClick(): void {
@@ -582,18 +854,54 @@ export class BattleScene extends Phaser.Scene {
     if (!result || result.state === before) return;
     this.inputPaused = true;
     AudioSystem.play('card_draw');
+    const chain = before?.battle?.chain ?? [];
+    const powers = before?.battle?.powerCards ?? [];
+    this.chainHadCrit = chain.some((c) => c.joker === 'black' || powers.some((p) => p.cardId === c.id && p.type === 'CRIT'));
+    const attacked = result.events.some((e) => e.type === 'enemy_attacked');
+    this.heldPlayerHp = attacked && before ? before.player.hp : null;
     this.refreshState();
     this.handleEvents(result.events);
     const active = this.activeCardVisual?.getContainer();
     if (active && result.state.battle) {
       const targetX = active.x;
-      active.setX(16).setAlpha(0.4).setAngle(-18).setScale(.55);
-      this.tweens.add({ targets: active, x: targetX, alpha: 1, angle: 0, scale: this.layout.activeScale, duration: 340, ease: 'Back.out' });
+      const targetY = active.y;
+      const g = this.stockGeometry();
+      active.setPosition(g.left, g.top).setAlpha(0.6).setAngle(-12).setScale(this.layout.activeScale * .9);
+      this.tweens.add({ targets: active, x: targetX, y: targetY, alpha: 1, angle: 0, scale: this.layout.activeScale, duration: 280, ease: 'Back.out' });
     }
-    this.time.delayedCall(750, () => {
-      this.inputPaused = false;
-      this.checkPhaseTransition();
-    });
+    // Unlock on a real-time timer (not the game clock, which can stretch after slow frames).
+    const unlock = () => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); };
+    const died = result.events.some((e) => e.type === 'enemy_died');
+    const handle = window.setTimeout(unlock, result.state.phase === 'battle' ? (attacked ? 900 : 520) : died ? 1500 : 1100);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.clearTimeout(handle));
+  }
+
+  private onUndoClick(): void {
+    if (this.inputPaused) return;
+    AudioSystem.unlock();
+    const manager = getGameManager();
+    if (!manager.canUndo()) {
+      AudioSystem.play('invalid_tap', { volume: .35 });
+      if (this.undoButton) { const b = this.undoButton; const x = b.x; this.tweens.add({ targets: b, x: x + 4, duration: 40, yoyo: true, repeat: 1, onComplete: () => b.setX(x) }); }
+      return;
+    }
+    // Where the card currently sits (active slot) before the state is reverted.
+    const fromX = viewport(this).width * 0.76 - this.layout.activeW / 2;
+    const fromY = this.layout.trayTop + 12;
+    const result = manager.undo();
+    if (!result) return;
+    const event = result.events.find((item) => item.type === 'undo_applied') as { cardId: string | null } | undefined;
+    this.refreshState();
+    AudioSystem.play('card_draw', { pitchShift: -0.15, volume: .7 });
+    // Short reverse tween: the undone card slides from the active slot back to its column.
+    const visual = event?.cardId ? this.cardVisuals.find((item) => item.getCard().id === event.cardId) : undefined;
+    if (visual) {
+      const container = visual.getContainer();
+      const toX = container.x;
+      const toY = container.y;
+      container.setPosition(fromX, fromY).setScale(this.layout.activeScale).setAngle(6);
+      this.tweens.add({ targets: container, x: toX, y: toY, scale: 1, angle: 0, duration: 170, ease: 'Cubic.out' });
+    }
   }
 
   private handleEvents(events: Array<{ type: string; [key: string]: unknown }>): void {
@@ -606,17 +914,23 @@ export class BattleScene extends Phaser.Scene {
           playCombatVFX(this, 'stagger', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight - 8, 84);
           this.cardBurst(viewport(this).width / 2, this.enemyBaseY - 40, 0x69d6ff);
           break;
-        case 'enemy_attacked':
-          this.playEnemyAttackAnimation();
-          AudioSystem.play('player_hit');
+        case 'enemy_attacked': {
+          const damage = event.damage as number;
+          const blocked = event.blocked as number;
+          // Let a chain hit land first, then the enemy answers.
+          const hitFirst = events.some((e) => e.type === 'chain_resolved');
+          this.time.delayedCall(hitFirst ? 380 : 0, () => this.playEnemyAttackAnimation(damage, blocked));
           break;
+        }
         case 'enemy_died':
           playCombatVFX(this, 'smoke', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight * .4, 140, 0xcfc2ff);
+          this.enemyHPBar.setPendingDamage(0);
+          this.enemyHPBar.setHp(0, this.lastEnemyMaxHp);
           this.playEnemyDeathAnimation();
           AudioSystem.play('enemy_death');
           break;
         case 'chain_resolved':
-          this.playDamageAnimation(event.totalDamage as number);
+          this.playChainHit(event.totalDamage as number, event.chainLength as number, events.some((e) => e.type === 'enemy_died'));
           AudioSystem.play('enemy_hit');
           break;
         case 'power_activated':
@@ -651,19 +965,94 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private playEnemyAttackAnimation(): void {
+  private playEnemyAttackAnimation(damage = 0, blocked = 0): void {
     const sprite = this.enemySprite;
-    if (!sprite || this.enemyDying) return;
+    if (!sprite || this.enemyDying) { this.releasePlayerHp(); return; }
     this.tweens.killTweensOf(sprite);
     sprite.play(`${this.enemyKey}-attack`, true);
     this.tweens.add({ targets: sprite, y: this.enemyBaseY - 18, angle: -7, duration: 130, ease: 'Quad.out', onComplete: () => {
       this.tweens.add({ targets: sprite, y: this.enemyBaseY + 16, angle: 7, scaleX: this.enemyScale * 1.12, scaleY: this.enemyScale * .92, duration: 110, ease: 'Cubic.in', onComplete: () => {
-        this.cameras.main.shake(110, .006);
+        this.onPlayerHit(damage, blocked);
         playCombatVFX(this, 'slash', 76, this.layout.playerHudTop + 15, 94, 0xff606f, 35);
         this.cardBurst(viewport(this).width / 2, this.layout.arenaTop + this.layout.arenaHeight - 70, 0xff6655);
         this.tweens.add({ targets: sprite, y: this.enemyBaseY, angle: 0, scale: this.enemyScale, duration: 240, onComplete: () => { sprite.play(`${this.enemyKey}-idle`); this.startEnemyIdle(); } });
       } });
     } });
+  }
+
+  /** Player getting hit: red vignette, screen shake, HP bar shake, number. */
+  private onPlayerHit(damage: number, blocked: number): void {
+    AudioSystem.play('player_hit');
+    const taken = Math.max(0, damage - blocked);
+    const s = JUICE.shake;
+    this.releasePlayerHp();
+    if (taken > 0) {
+      this.juice.vignetteFlash();
+      this.juice.shake(Math.min(s.max, s.playerBase + taken * s.playerPerDamage), s.playerMs);
+      this.playerHPBar.shake();
+      this.juice.damageNumber(110, this.layout.playerHudTop + 34, taken, { prefix: '-', color: JUICE.numbers.playerHitColor, size: 26 + Math.min(16, taken) });
+    } else {
+      this.juice.shake(s.routine.intensity * 2, s.routine.ms);
+    }
+    if (blocked > 0) {
+      playCombatVFX(this, 'shield', viewport(this).width - 60, this.layout.playerHudTop + 15, 70);
+      this.juice.damageNumber(viewport(this).width - 60, this.layout.playerHudTop + 34, blocked, { prefix: '⛨ ', color: '#9ccfff', size: 20 });
+    }
+  }
+
+  private releasePlayerHp(): void {
+    if (this.heldPlayerHp === null) return;
+    this.heldPlayerHp = null;
+    const state = getGameManager().getState();
+    if (state) this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
+  }
+
+  /**
+   * Every chain-resolve hit: hit-stop, camera shake, white flash, knockback/squash,
+   * sparks at the hit point, big punchy number; escalates with damage and chain length
+   * up to a finisher (slow-mo, screen flash, bigger burst).
+   */
+  private playChainHit(damage: number, chainLength: number, killing: boolean): void {
+    const tier = classifyHit(damage, chainLength, this.lastEnemyMaxHp, killing);
+    if (killing) { this.enemyHPBar.setPendingDamage(0); this.enemyHPBar.setHp(0, this.lastEnemyMaxHp); }
+    const width = viewport(this).width;
+    const x = width / 2;
+    const y = this.enemyBaseY - this.layout.enemyHeight * 0.45;
+    const S = JUICE.shake;
+    const E = JUICE.enemy;
+    const P = JUICE.sparks;
+    this.juice.hitStop(killing ? JUICE.hitStop.deathMs : hitStopMs(damage, tier));
+    this.juice.shake(shakeIntensity(damage, chainLength), tier === 'finisher' ? S.finisherMs : tier === 'big' ? S.bigMs : S.hitMs);
+    playCombatVFX(this, 'slash', x, y, Math.min(195, this.layout.arenaHeight * .75), tier !== 'routine' ? 0xffb43b : undefined, -20);
+    const sprite = this.enemySprite;
+    if (sprite && !this.enemyDying) {
+      this.juice.flashWhite(sprite, E.flashMs, this.enemyBaseTint ?? undefined);
+      // Hurt animation state, then back to idle.
+      const hurtKey = `${this.enemyKey}-hurt`;
+      if (!killing && this.anims.exists(hurtKey)) {
+        sprite.play(hurtKey, true);
+        sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => { if (sprite.active && !this.enemyDying) sprite.play(`${this.enemyKey}-idle`, true); });
+      }
+      const kb = Math.min(E.knockbackMax, E.knockbackPx + damage * E.knockbackPerDamage);
+      const sq = E.squash * (tier === 'routine' ? 0.6 : tier === 'big' ? 1 : 1.4);
+      this.tweens.killTweensOf(sprite);
+      sprite.setX(x);
+      this.tweens.add({ targets: sprite, x: x + kb, scaleX: this.enemyScale * (1 - sq), scaleY: this.enemyScale * (1 + sq), duration: E.knockbackMs, ease: 'Quad.out', onComplete: () => {
+        if (!sprite.active || this.enemyDying) return;
+        this.tweens.add({ targets: sprite, x, scaleX: this.enemyScale, scaleY: this.enemyScale, duration: E.recoverMs, ease: 'Back.out', onComplete: () => this.startEnemyIdle() });
+      } });
+    }
+    const sparks = Math.min(P.max, P.base + damage * P.perDamage) + (tier === 'finisher' ? P.finisherExtra : 0);
+    this.juice.sparkBurst(x, y, sparks, tier === 'finisher' ? 0xfff0a0 : 0xffd27a);
+    if (tier !== 'routine') this.juice.shardBurst(x, y, tier === 'finisher' ? 18 : 9, 0xffffff);
+    this.juice.ring(x, y, tier === 'finisher' ? 0xfff3b0 : 0xffc65a, tier === 'finisher' ? 5 : 3.2, 360, tier === 'finisher' ? 6 : 4);
+    this.juice.damageNumber(x, this.layout.arenaTop + this.layout.arenaHeight * 0.36, damage, { chain: chainLength, crit: this.chainHadCrit });
+    if (tier === 'finisher') {
+      const hold = killing ? JUICE.hitStop.deathMs : JUICE.hitStop.finisherMs;
+      window.setTimeout(() => { if (this.sys.isActive()) this.juice.slowMo(); }, hold);
+      this.juice.screenFlash();
+      window.setTimeout(() => { if (this.sys.isActive()) this.juice.ring(x, y, 0xffffff, 6, 520, 3); }, 60);
+    }
   }
 
   private playEnemyDeathAnimation(): void {
@@ -672,8 +1061,27 @@ export class BattleScene extends Phaser.Scene {
     this.enemyDying = true;
     this.tweens.killTweensOf(sprite);
     sprite.play(`${this.enemyKey}-dead`, true);
-    this.tweens.add({ targets: sprite, y: this.enemyBaseY + 20, angle: 22, alpha: 0, scaleY: this.enemyScale * .4, duration: 650, ease: 'Cubic.in' });
-    if (this.enemyShadow) this.tweens.add({ targets: this.enemyShadow, alpha: 0, scaleX: .3, duration: 650 });
+    this.juice.flashWhite(sprite, 110, this.enemyBaseTint ?? undefined);
+    this.clearEmote();
+    for (const extra of [this.enemyAura, this.crownSprite]) if (extra) { this.tweens.killTweensOf(extra); this.tweens.add({ targets: extra, alpha: 0, duration: 300 }); }
+    const ms = JUICE.death.fallMs;
+    this.tweens.add({ targets: sprite, y: this.enemyBaseY + 20, angle: 22, alpha: 0, scaleY: this.enemyScale * .4, duration: ms, delay: 120, ease: 'Cubic.in' });
+    if (this.enemyShadow) this.tweens.add({ targets: this.enemyShadow, alpha: 0, scaleX: .3, duration: ms, delay: 120 });
+    // Coin burst flying to the gold counter.
+    const width = viewport(this).width;
+    const fromY = this.enemyBaseY - this.layout.enemyHeight * 0.45;
+    const goldX = width * 0.58 + 6;
+    const goldY = this.layout.hudTop + this.layout.hudHeight / 2;
+    window.setTimeout(() => {
+      if (!this.sys.isActive()) return;
+      this.juice.sparkBurst(width / 2, fromY, 30, 0xffe9a0);
+      this.juice.coinBurst(width / 2, fromY, goldX, goldY, JUICE.death.coinCount, () => {
+        if (!this.goldText?.active) return;
+        this.tweens.killTweensOf(this.goldText);
+        this.goldText.setScale(1.35);
+        this.tweens.add({ targets: this.goldText, scale: 1, duration: 120, ease: 'Quad.out' });
+      });
+    }, 160);
   }
 
   private rejectCard(visual: CardVisual, exposed: boolean): void {
@@ -762,43 +1170,6 @@ export class BattleScene extends Phaser.Scene {
     this.cardBurst(x, y, theme.color);
   }
 
-  private playDamageAnimation(damage: number): void {
-    playCombatVFX(this, 'slash', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight * .45, Math.min(195, this.layout.arenaHeight * .75), damage >= 20 ? 0xffb43b : undefined, -20);
-    if (!this.enemySprite) return;
-
-    if (!this.enemyDying) {
-      const sprite = this.enemySprite;
-      sprite.play(`${this.enemyKey}-hurt`, true);
-      sprite.once('animationcomplete', () => { if (sprite.active && !this.enemyDying) sprite.play(`${this.enemyKey}-idle`); });
-      sprite.setTint(0xff8c8c);
-      this.time.delayedCall(150, () => { if (sprite.active) sprite.clearTint(); });
-      this.tweens.add({ targets: sprite, x: viewport(this).width / 2 + 7, duration: 45, yoyo: true, repeat: 2, onComplete: () => sprite.setX(viewport(this).width / 2) });
-      this.cardBurst(sprite.x, sprite.y - sprite.displayHeight / 2, 0xffdf70);
-    }
-
-    // Damage number popup
-    const dmgText = this.add
-      .text(viewport(this).width / 2, this.layout.arenaTop + this.layout.arenaHeight * 0.4, damage.toString(), {
-        resolution: getRenderDensity(), fontFamily: 'Lilita One',
-        fontSize: '40px',
-        color: '#FFD070',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 8)
-      .setShadow(0, 4, '#1B1030', 0, true, true)
-      .setDepth(100);
-
-    this.tweens.add({
-      targets: dmgText,
-      y: dmgText.y - 60,
-      alpha: 0,
-      scale: 1.3,
-      duration: 800,
-      ease: 'Power2',
-      onComplete: () => dmgText.destroy(),
-    });
-  }
-
   private checkPhaseTransition(): void {
     const manager = getGameManager();
     const state = manager.getState();
@@ -825,6 +1196,11 @@ export class BattleScene extends Phaser.Scene {
 
   shutdown(): void {
     this.scale.off('resize', this.handleResize, this);
+    this.input.off(Phaser.Input.Events.POINTER_DOWN, this.armPointer, this);
+    this.input.off(Phaser.Input.Events.POINTER_UP, this.onScenePointerUp, this);
+    this.exposedSlots.clear();
+    this.stockBacks = [];
+    this.undoButton = null;
     setTestHook(null);
     this.cardVisuals = [];
     this.activeCardVisual = null;
@@ -832,6 +1208,9 @@ export class BattleScene extends Phaser.Scene {
     this.enemySprite = null;
     this.enemyShadow = null;
     this.crownSprite = null;
+    this.clearEmote();
+    this.enemyAura = null;
+    this.emotion = 'calm';
     this.intentBubble = null;
     this.buildPanel?.destroy();
     this.buildPanel = null;

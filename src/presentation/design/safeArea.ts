@@ -7,10 +7,3 @@ export function viewportHeight(metrics: ScreenMetrics): number {
     : Math.min(metrics.screenHeight, metrics.screenWidth);
   return Math.max(metrics.innerHeight, screenHeight);
 }
-export function readSafeArea(): { top: number; bottom: number } {
-  if (typeof document === 'undefined') return { top: 0, bottom: 0 };
-  const probe = document.getElementById('safe-area-probe');
-  if (!probe) return { top: 0, bottom: 0 };
-  const style = getComputedStyle(probe);
-  return { top: parseFloat(style.paddingTop) || 0, bottom: parseFloat(style.paddingBottom) || 0 };
-}

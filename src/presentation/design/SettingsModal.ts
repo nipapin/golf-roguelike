@@ -1,4 +1,5 @@
-import { viewport, getRenderDensity } from './viewport';
+import { isShakeReduced, setShakeReduced } from '../juice/fxSettings';
+import { viewport, getRenderDensity, safeArea } from './viewport';
 /**
  * SettingsModal - In-game settings panel
  * Per STYLE.md: dark ink outline, cream panel, 3D Supercell-style buttons
@@ -35,7 +36,7 @@ export class SettingsModal {
     this.overlay.setDepth(200);
     
     // Main container
-    this.container = scene.add.container(width / 2, height / 2);
+    this.container = scene.add.container(width / 2, safeArea(scene).centerY);
     this.container.setDepth(201);
     
     this.createPanel();
@@ -44,7 +45,7 @@ export class SettingsModal {
 
   private createPanel(): void {
     const panelWidth = 280;
-    const panelHeight = 440;
+    const panelHeight = 490;
     
     // Panel background (cream with dark outline)
     const panel = this.scene.add.graphics();
@@ -77,21 +78,23 @@ export class SettingsModal {
     this.container.add(title);
     
     // Sound toggle
-    const soundY = -130;
+    const soundY = -155;
     this.createToggle(0, soundY, 'Sound', AudioSystem.isSoundEnabled, (enabled) => {
       AudioSystem.isSoundEnabled = enabled;
       if (enabled) AudioSystem.play('button_tap');
     });
     
-    this.createVolume(-95, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; });
-    this.createToggle(0, -45, 'Music', AudioSystem.isMusicEnabled, (enabled) => {
+    this.createVolume(-120, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; });
+    this.createToggle(0, -75, 'Music', AudioSystem.isMusicEnabled, (enabled) => {
       AudioSystem.unlock();
       AudioSystem.isMusicEnabled = enabled;
     });
-    this.createVolume(-10, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; });
+    this.createVolume(-40, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; });
+    // Accessibility: reduce camera shake (persisted)
+    this.createToggle(0, 5, 'Less shake', isShakeReduced(), (enabled) => { setShakeReduced(enabled); });
 
     // Buttons
-    const buttonY = 55;
+    const buttonY = 75;
     const buttonSpacing = 54;
     
     // Resume button (green - primary action)
@@ -163,7 +166,7 @@ export class SettingsModal {
     this.container.add(knob);
     
     // Interactive zone
-    const hitZone = this.scene.add.zone(x + 40 + toggleWidth / 2, y, toggleWidth + 20, toggleHeight + 10);
+    const hitZone = this.scene.add.zone(x + 40 + toggleWidth / 2, y, toggleWidth + 20, Math.max(44, toggleHeight + 14));
     hitZone.setInteractive();
     hitZone.on('pointerdown', () => {
       enabled = !enabled;
@@ -179,7 +182,8 @@ export class SettingsModal {
     }).setOrigin(0.5);
     this.container.add(valueText);
     for (const [x, delta, label] of [[-80, -0.1, '−'], [80, 0.1, '+']] as const) {
-      const button = this.scene.add.rectangle(x, y, 40, 30, 0xd9c6eb).setInteractive();
+      // Visual 40×30, touch target 48×44.
+      const button = this.scene.add.rectangle(x, y, 40, 30, 0xd9c6eb).setInteractive(new Phaser.Geom.Rectangle(-4, -7, 48, 44), Phaser.Geom.Rectangle.Contains);
       button.on('pointerup', () => {
         AudioSystem.unlock();
         set(Math.round((get() + delta) * 100) / 100);
@@ -318,7 +322,7 @@ export class SettingsModal {
     callback: () => void
   ): Phaser.GameObjects.Container {
     const btnW = 80;
-    const btnH = 40;
+    const btnH = 44;
     
     const btn = this.scene.add.container(x, y);
     

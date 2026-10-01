@@ -1,5 +1,5 @@
 import type { RunState } from '../core/types';
-import config from '../data/config.json';
+import { gameConfig as config } from '../data/gameConfig';
 
 const record = (value: unknown): value is Record<string, unknown> =>
   typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -47,7 +47,7 @@ export function isSavedRun(value: unknown): value is RunState {
     !record(value) ||
     !text(value.seed) ||
     !integer(value.currentFight) ||
-    value.currentFight > config.tableau.columns * config.tableau.rows ||
+    value.currentFight > 100 ||
 
     !integer(value.rngState) ||
     !['start', 'battle', 'reward', 'shop', 'victory', 'defeat'].includes(String(value.phase)) ||

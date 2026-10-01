@@ -1,3 +1,4 @@
+import { RelicManager } from './RelicManager';
 import { Card, PowerType, Relic, GameConfig } from './types';
 
 export interface DamageContext {
@@ -29,40 +30,26 @@ export function calculateCardDamage(ctx: DamageContext): DamageResult {
   // Base damage = position in chain
   const baseDamage = card.joker ? 0 : chainPosition;
 
-  // Apply first chain bonus from relics
-  const firstChainBonus = relics.find((r) => r.effect.type === 'firstChainBonus');
-  if (firstChainBonus && chainPosition === 1) {
-    // This is handled at chain level, not card level
-  }
+  const relicManager = RelicManager.of(relics);
+  // (First-chain bonus is applied at chain level, see getEffectiveChainPosition.)
 
   // Suit bonus (spades only add to damage)
   let suitBonus = 0;
   if (!card.joker && card.suit === 'spades') {
     suitBonus = config.combat.baseSpadeDamageBonus;
-    const spadeBonusRelic = relics.find((r) => r.effect.type === 'spadeDamageBonus');
-    if (spadeBonusRelic && typeof spadeBonusRelic.effect.value === 'number') {
-      suitBonus += spadeBonusRelic.effect.value;
-    }
+    suitBonus += relicManager.spadeDamageBonus();
   }
 
   // Boosted rank bonus
   let relicBonus = 0;
-  const boostedRankRelic = relics.find(
-    (r) => r.effect.type === 'boostedRank' && r.effect.rank === card.rank
-  );
-  if (boostedRankRelic && typeof boostedRankRelic.effect.bonus === 'number') {
-    relicBonus += boostedRankRelic.effect.bonus;
-  }
+  relicBonus += relicManager.rankBonus(card.rank);
 
   // Power card bonus
   let powerBonus = 0;
   let multiplier = 1;
 
   if (powerType) {
-    const doublePowerRelic = relics.find(
-      (r) => r.effect.type === 'doublePower' && r.effect.powerType === powerType
-    );
-    const powerMultiplier = doublePowerRelic ? 2 : 1;
+    const powerMultiplier = relicManager.powerMultiplier(powerType);
 
     switch (powerType) {
       case 'CRIT':
@@ -79,10 +66,7 @@ export function calculateCardDamage(ctx: DamageContext): DamageResult {
   }
 
   // Third card multiplier from relic
-  const thirdCardRelic = relics.find((r) => r.effect.type === 'thirdCardMultiplier');
-  if (thirdCardRelic && chainPosition % 3 === 0 && typeof thirdCardRelic.effect.value === 'number') {
-    multiplier *= thirdCardRelic.effect.value;
-  }
+  multiplier *= relicManager.chainPositionMultiplier(chainPosition);
 
   const totalDamage = Math.floor((baseDamage + suitBonus + relicBonus + powerBonus) * multiplier);
 

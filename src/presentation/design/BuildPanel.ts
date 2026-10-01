@@ -1,4 +1,4 @@
-import { viewport, getRenderDensity } from './viewport';
+import { viewport, getRenderDensity, safeArea } from './viewport';
 import Phaser from 'phaser';
 import type { Relic } from '../../core/types';
 import { relicIcon } from './relicInfo';
@@ -11,10 +11,11 @@ export function showBuildPanel(scene: Phaser.Scene, relics: Relic[], onClose: ()
   const overlay = scene.add.rectangle(width / 2, height / 2, width, height, 0x100a22, 0.9).setInteractive();
   container.add(overlay);
   const panelWidth = Math.min(width - 28, 380);
-  const panelHeight = Math.min(height - 40, 520);
+  const safe = safeArea(scene);
+  const panelHeight = Math.min(safe.height - 24, 520);
   const left = (width - panelWidth) / 2;
-  const top = (height - panelHeight) / 2;
-  const bg = scene.add.rectangle(width / 2, height / 2, panelWidth, panelHeight, 0x2b1c48).setStrokeStyle(2, 0xab83e0);
+  const top = safe.centerY - panelHeight / 2;
+  const bg = scene.add.rectangle(width / 2, safe.centerY, panelWidth, panelHeight, 0x2b1c48).setStrokeStyle(2, 0xab83e0);
   container.add(bg);
   container.add(scene.add.text(width / 2, top + 25, 'YOUR BUILD', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '24px', color: '#ffe1a0' }).setOrigin(0.5));
   let page = 0;
@@ -37,7 +38,7 @@ export function showBuildPanel(scene: Phaser.Scene, relics: Relic[], onClose: ()
     rows.add(scene.add.text(width / 2, top + panelHeight - 63, `${page + 1} / ${pages}`, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '13px', color: '#ba9dde' }).setOrigin(0.5));
   };
   const button = (x: number, text: string, callback: () => void) => {
-    const box = scene.add.rectangle(x, top + panelHeight - 30, 88, 38, 0x65439c).setInteractive();
+    const box = scene.add.rectangle(x, top + panelHeight - 32, 88, 44, 0x65439c).setInteractive();
     box.on('pointerup', callback);
     container.add([box, scene.add.text(x, box.y, text, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', color: '#fff' }).setOrigin(0.5)]);
   };

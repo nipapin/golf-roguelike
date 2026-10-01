@@ -101,3 +101,21 @@ describe('saved battle', () => {
     vi.restoreAllMocks();
   });
 });
+
+describe('save migration v1 -> v2', () => {
+  it('loads a v1 save (7-fight run) and rewrites it as v2', async () => {
+    const { loadGame, SAVE_VERSION } = await import('./SaveService');
+    const state = { ...battleFixture(), currentFight: 4 };
+    localStorage.setItem('golf-rogue-save', JSON.stringify({ version: 1, state, savedAt: 1 }));
+    const loaded = loadGame();
+    expect(loaded?.currentFight).toBe(4);
+    expect(JSON.parse(localStorage.getItem('golf-rogue-save')!).version).toBe(SAVE_VERSION);
+  });
+  it('accepts fights beyond the old 7-fight limit in v2', async () => {
+    const { saveGame, loadGame } = await import('./SaveService');
+    const state = { ...battleFixture(), currentFight: 30 };
+    saveGame(state);
+    expect(loadGame()?.currentFight).toBe(30);
+  });
+});
+

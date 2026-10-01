@@ -7,6 +7,7 @@ import { viewport, getRenderDensity } from './viewport';
 import Phaser from 'phaser';
 import { colors, suitColors, powerColors, getCardMetrics } from './tokens';
 import type { Card, PowerType } from '../../core/types';
+import { JUICE } from '../juice/juiceConfig';
 
 export type CardState = 'normal' | 'covered' | 'playable' | 'selected' | 'disabled' | 'active';
 
@@ -39,6 +40,7 @@ export class CardVisual {
   private powerRibbon: Phaser.GameObjects.Container | null = null;
   private hitZone: Phaser.GameObjects.Zone | null = null;
   private played: boolean = false;
+  private pulseTween: Phaser.Tweens.Tween | null = null;
 
   private card: Card;
   private metrics: ReturnType<typeof getCardMetrics>;
@@ -296,7 +298,9 @@ export class CardVisual {
 
     switch (this.state) {
       case 'playable':
-        // Gold ring + glow
+        // Gold ring + soft outer glow (pulsed in setState)
+        this.glowGfx.fillStyle(0xffd646, 0.16);
+        this.glowGfx.fillRoundedRect(-8, -8, cw + 16, ch + 16, radius + 8);
         this.glowGfx.fillStyle(0xffd646, 0.4);
         this.glowGfx.fillRoundedRect(-3, -3, cw + 6, ch + 6, radius + 3);
 
@@ -372,6 +376,20 @@ export class CardVisual {
     this.cardBg.setAlpha(1);
 
     this.updateOutline();
+    this.updatePulse();
+  }
+
+  /** Playable cards breathe: subtle glow pulse so legal moves read at a glance. */
+  private updatePulse(): void {
+    if (this.state === 'playable') {
+      if (this.pulseTween) return;
+      this.glowGfx.setAlpha(1);
+      this.pulseTween = this.scene.tweens.add({ targets: this.glowGfx, alpha: JUICE.cards.glowAlphaMin, duration: JUICE.cards.glowPulseMs, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
+    } else if (this.pulseTween) {
+      this.pulseTween.stop();
+      this.pulseTween = null;
+      this.glowGfx.setAlpha(1);
+    }
   }
 
   getState(): CardState {
@@ -437,6 +455,9 @@ export class CardVisual {
       this.hitZone.destroy();
       this.hitZone = null;
     }
+    this.scene.tweens.killTweensOf(this.container);
+    this.pulseTween?.stop();
+    this.pulseTween = null;
     this.container.removeAllListeners();
     this.container.destroy();
   }

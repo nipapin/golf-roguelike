@@ -5,7 +5,8 @@ import { getRenderDensity } from './viewport';
  */
 
 import Phaser from 'phaser';
-import { colors } from './tokens';
+import { colors, getComboTier } from './tokens';
+import { JUICE } from '../juice/juiceConfig';
 
 /**
  * Chip - small stat display (gold, armor, etc)
@@ -72,6 +73,11 @@ export class HPBar {
   private container: Phaser.GameObjects.Container;
   private fillGraphics: Phaser.GameObjects.Graphics;
   private previewGraphics: Phaser.GameObjects.Graphics;
+  private ghostGraphics: Phaser.GameObjects.Graphics;
+  /** Delayed "ghost" value that drains after a chunk of HP is lost. */
+  private ghost = { hp: 0 };
+  private ghostTween: Phaser.Tweens.Tween | null = null;
+  private baseX: number;
   private hpText: Phaser.GameObjects.Text;
   private previewText: Phaser.GameObjects.Text;
   private width: number;
@@ -98,6 +104,8 @@ export class HPBar {
     this.isPlayer = isPlayer;
 
     this.container = scene.add.container(x, y);
+    this.baseX = x;
+    this.ghost.hp = maxHp;
 
     // Track background
     const trackBg = scene.add.graphics();
@@ -107,6 +115,10 @@ export class HPBar {
     trackBg.lineStyle(3, colors.ink, 1);
     trackBg.strokeRoundedRect(-width / 2, -height / 2, width, height, height / 2);
     this.container.add(trackBg);
+
+    // Ghost (recently lost HP) fill, drawn behind the live fill
+    this.ghostGraphics = scene.add.graphics();
+    this.container.add(this.ghostGraphics);
 
     // Preview (pending damage) fill
     this.previewGraphics = scene.add.graphics();
@@ -145,8 +157,40 @@ export class HPBar {
 
   setHp(current: number, max?: number): void {
     if (max !== undefined) this.maxHp = max;
+    const previous = this.currentHp;
     this.currentHp = Math.max(0, Math.min(current, this.maxHp));
+    if (this.currentHp < previous) {
+      // Chunk drain: the live bar drops now, the ghost lingers then drains.
+      this.ghost.hp = Math.max(this.ghost.hp, previous);
+      this.ghostTween?.stop();
+      const cfg = JUICE.hpBar;
+      this.ghostTween = this.scene.tweens.add({
+        targets: this.ghost, hp: this.currentHp, delay: cfg.ghostDelayMs, duration: cfg.ghostDrainMs, ease: 'Quad.in',
+        onUpdate: () => this.drawGhost(),
+        onComplete: () => { this.ghostTween = null; this.drawGhost(); },
+      });
+    } else if (this.currentHp > this.ghost.hp || !this.ghostTween) {
+      this.ghost.hp = this.currentHp;
+    }
     this.updateFill();
+  }
+
+  /** Short horizontal shake (player getting hit). */
+  shake(): void {
+    const cfg = JUICE.hpBar;
+    this.scene.tweens.killTweensOf(this.container);
+    this.container.x = this.baseX;
+    this.scene.tweens.add({ targets: this.container, x: this.baseX + cfg.shakePx, duration: cfg.shakeMs, yoyo: true, repeat: 2, ease: 'Sine.inOut', onComplete: () => { this.container.x = this.baseX; } });
+  }
+
+  private drawGhost(): void {
+    this.ghostGraphics.clear();
+    if (!this.scene || this.ghost.hp <= this.currentHp) return;
+    const innerWidth = this.width - 6;
+    const innerHeight = this.height - 6;
+    const ghostWidth = innerWidth * (this.ghost.hp / this.maxHp);
+    this.ghostGraphics.fillStyle(JUICE.hpBar.ghostColor, 0.95);
+    this.ghostGraphics.fillRoundedRect(-this.width / 2 + 3, -this.height / 2 + 3, ghostWidth, innerHeight, { tl: innerHeight / 2, bl: innerHeight / 2, tr: 0, br: 0 });
   }
 
   setPendingDamage(damage: number): void {
@@ -208,6 +252,7 @@ export class HPBar {
 
     // Update text
     this.hpText.setText(`${this.currentHp}/${this.maxHp}`);
+    this.drawGhost();
   }
 
   getContainer(): Phaser.GameObjects.Container {
@@ -215,6 +260,7 @@ export class HPBar {
   }
 
   setPosition(x: number, y: number): void {
+    this.baseX = x;
     this.container.setPosition(x, y);
   }
 
@@ -223,6 +269,7 @@ export class HPBar {
   }
 
   destroy(): void {
+    this.ghostTween?.stop();
     this.container.destroy();
   }
 }
@@ -231,11 +278,14 @@ export class HPBar {
  * Combo Banner - shows current chain multiplier and tier
  */
 export class ComboBanner {
+  private scene: Phaser.Scene;
+  private lastChain = 0;
   private container: Phaser.GameObjects.Container;
   private chainText: Phaser.GameObjects.Text;
   private damageText: Phaser.GameObjects.Text;
 
   constructor(scene: Phaser.Scene, x: number, y: number, width: number, height: number) {
+    this.scene = scene;
     this.container = scene.add.container(x, y);
     const bg = scene.add.graphics();
     bg.fillStyle(0x211740, 1);
@@ -253,7 +303,18 @@ export class ComboBanner {
 
   update(chainLength: number, totalDamage: number): void {
     this.chainText.setText(chainLength ? `CHAIN ${chainLength}` : 'MAKE A CHAIN');
-    this.chainText.setColor(chainLength >= 6 ? '#ffcc66' : '#fff4d6');
+    // Colour shifts with the combo tier (tokens.comboTiers).
+    const tierColor = chainLength >= 2 ? '#' + getComboTier(chainLength).color.toString(16).padStart(6, '0') : '#fff4d6';
+    this.chainText.setColor(tierColor);
+    if (chainLength > this.lastChain && chainLength > 0) {
+      // Chain counter pop, stronger with length.
+      const cfg = JUICE.chain;
+      const boost = Math.min(0.25, (chainLength - 1) * 0.03);
+      this.scene.tweens.killTweensOf([this.chainText, this.damageText]);
+      this.chainText.setScale(1); this.damageText.setScale(1);
+      this.scene.tweens.add({ targets: [this.chainText, this.damageText], scale: cfg.counterPopScale + boost, duration: cfg.counterPopMs, yoyo: true, ease: 'Back.out' });
+    }
+    this.lastChain = chainLength;
     this.damageText.setText(chainLength ? `DAMAGE ${totalDamage}` : '±1  •  A ↔ K');
     this.container.setVisible(true);
   }

@@ -4,6 +4,7 @@ import { getGameManager } from '../GameManager';
 import { gamePopup, popupButton } from '../design/GamePopup';
 import { AudioSystem } from '../audio/AudioSystem';
 import { showBuildPanel } from '../design/BuildPanel';
+import { ensureTouchTarget } from '../design/touch';
 
 export class EndScene extends Phaser.Scene {
   constructor() { super('EndScene'); }
@@ -21,7 +22,8 @@ export class EndScene extends Phaser.Scene {
     this.tweens.add({ targets: emblem, angle: 5, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
     content.add(this.add.text(0, top + 210, `LEVEL ${state.currentFight + 1}`, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '24px', color: '#ffffff' }).setOrigin(.5).setStroke('#1b1030', 4));
     content.add(this.add.text(0, top + 246, `🪙 ${state.player.gold} GOLD    ◆ ${state.player.relics.length} RELICS`, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#ffe0a1' }).setOrigin(.5));
-    const build = this.add.text(0, top + 280, 'VIEW YOUR BUILD', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#b6d9ff' }).setOrigin(.5).setInteractive();
+    const build = this.add.text(0, top + 280, 'VIEW YOUR BUILD', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#b6d9ff' }).setOrigin(.5);
+    ensureTouchTarget(build);
     build.on('pointerup', () => { const panel = showBuildPanel(this, state.player.relics, () => {}); panel.setDepth(3000); });
     content.add(build);
     popupButton(this, content, modal.height / 2 - 106, width - 44, 'NEW RUN', () => {

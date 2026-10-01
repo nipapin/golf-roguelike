@@ -1,32 +1,33 @@
 {
   "normal": [
     {
-      "id": "orc1-normal",
-      "name": "ORC BRUISER",
-      "hp": 10,
-      "sprite": "orc1",
-      "tier": "normal",
-      "scale": 1,
-      "crown": false,
+      "id": "slime",
+      "name": "GREEN SLIME",
+      "hp": 22,
       "intents": [
+        {
+          "type": "attack",
+          "value": 3
+        },
         {
           "type": "attack",
           "value": 4
         },
         {
-          "type": "attack",
-          "value": 5
+          "type": "defend",
+          "value": 2
         }
+      ],
+      "sprite": "slime",
+      "acts": [
+        1,
+        2
       ]
     },
     {
-      "id": "orc2-normal",
-      "name": "ORC RAIDER",
-      "hp": 10,
-      "sprite": "orc2",
-      "tier": "normal",
-      "scale": 1,
-      "crown": false,
+      "id": "mushroom",
+      "name": "SPORE SHROOM",
+      "hp": 26,
       "intents": [
         {
           "type": "attack",
@@ -35,19 +36,46 @@
         {
           "type": "attack",
           "value": 5
+        },
+        {
+          "type": "debuff",
+          "value": 2
         }
+      ],
+      "sprite": "mushroom",
+      "acts": [
+        1,
+        2
       ]
-    }
-  ],
-  "elite": [
+    },
     {
-      "id": "orc3-elite",
-      "name": "IRON EXECUTIONER",
-      "hp": 10,
-      "sprite": "orc3",
-      "tier": "elite",
-      "scale": 1,
-      "crown": false,
+      "id": "bat",
+      "name": "CAVE BAT",
+      "hp": 20,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 5
+        },
+        {
+          "type": "attack",
+          "value": 3
+        },
+        {
+          "type": "attack",
+          "value": 4
+        }
+      ],
+      "sprite": "bat",
+      "acts": [
+        1,
+        3
+      ]
+    },
+    {
+      "id": "c_goblin",
+      "name": "GOBLIN SCRAPPER",
+      "hp": 26,
       "intents": [
         {
           "type": "attack",
@@ -56,19 +84,94 @@
         {
           "type": "attack",
           "value": 5
+        },
+        {
+          "type": "defend",
+          "value": 2
         }
+      ],
+      "sprite": "c_goblin",
+      "acts": [
+        1,
+        3
       ]
-    }
-  ],
-  "boss": [
+    },
     {
-      "id": "orc3-boss",
-      "name": "THE ORC WARLORD",
-      "hp": 10,
-      "sprite": "orc3",
-      "tier": "boss",
-      "scale": 1.12,
-      "crown": true,
+      "id": "wolf",
+      "name": "DIRE WOLF",
+      "hp": 32,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 5
+        },
+        {
+          "type": "attack",
+          "value": 7
+        },
+        {
+          "type": "attack",
+          "value": 4
+        }
+      ],
+      "sprite": "wolf",
+      "acts": [
+        2,
+        4
+      ]
+    },
+    {
+      "id": "goblin",
+      "name": "GOBLIN THIEF",
+      "hp": 30,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 5
+        },
+        {
+          "type": "attack",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 4
+        }
+      ],
+      "sprite": "goblin",
+      "acts": [
+        2,
+        4
+      ]
+    },
+    {
+      "id": "zombie",
+      "name": "UNDEAD",
+      "hp": 36,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 5
+        },
+        {
+          "type": "buff",
+          "value": 3
+        }
+      ],
+      "sprite": "zombie",
+      "acts": [
+        3,
+        5
+      ]
+    },
+    {
+      "id": "bandit",
+      "name": "HIGHWAY BANDIT",
+      "hp": 38,
       "intents": [
         {
           "type": "attack",
@@ -77,15 +180,847 @@
         {
           "type": "attack",
           "value": 8
+        },
+        {
+          "type": "defend",
+          "value": 4
         }
+      ],
+      "sprite": "bandit",
+      "acts": [
+        3,
+        5
+      ]
+    },
+    {
+      "id": "c_orc",
+      "name": "ORC BRUTE",
+      "hp": 36,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 4
+        },
+        {
+          "type": "attack",
+          "value": 7
+        }
+      ],
+      "sprite": "c_orc",
+      "acts": [
+        4,
+        6
+      ]
+    },
+    {
+      "id": "c_reaper2",
+      "name": "GRAVE REAPER",
+      "hp": 32,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 5
+        },
+        {
+          "type": "attack",
+          "value": 7
+        },
+        {
+          "type": "debuff",
+          "value": 2
+        }
+      ],
+      "sprite": "c_reaper2",
+      "acts": [
+        4,
+        6
+      ]
+    },
+    {
+      "id": "c_angel2",
+      "name": "FALLEN SQUIRE",
+      "hp": 34,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 6
+        },
+        {
+          "type": "defend",
+          "value": 3
+        }
+      ],
+      "sprite": "c_angel2",
+      "acts": [
+        5,
+        6
+      ]
+    }
+  ],
+  "elite": [
+    {
+      "id": "knight",
+      "name": "DARK KNIGHT",
+      "hp": 55,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 8
+        },
+        {
+          "type": "defend",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "buff",
+          "value": 3
+        }
+      ],
+      "sprite": "knight",
+      "scale": 1.3,
+      "powerCardCount": 5,
+      "acts": [
+        1,
+        2
+      ]
+    },
+    {
+      "id": "c_ogre",
+      "name": "OGRE CRUSHER",
+      "hp": 58,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 9
+        },
+        {
+          "type": "defend",
+          "value": 5
+        },
+        {
+          "type": "attack",
+          "value": 7
+        },
+        {
+          "type": "buff",
+          "value": 3
+        }
+      ],
+      "sprite": "c_ogre",
+      "scale": 1.2,
+      "acts": [
+        2,
+        4
+      ],
+      "powerCardCount": 5
+    },
+    {
+      "id": "c_reaper1",
+      "name": "SOUL REAPER",
+      "hp": 52,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 8
+        },
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "debuff",
+          "value": 3
+        },
+        {
+          "type": "attack",
+          "value": 6
+        }
+      ],
+      "sprite": "c_reaper1",
+      "scale": 1.15,
+      "acts": [
+        3,
+        5
+      ],
+      "powerCardCount": 5
+    },
+    {
+      "id": "c_angel1",
+      "name": "FALLEN KNIGHT",
+      "hp": 56,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 9
+        },
+        {
+          "type": "defend",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 9
+        },
+        {
+          "type": "attack",
+          "value": 7
+        }
+      ],
+      "sprite": "c_angel1",
+      "scale": 1.2,
+      "acts": [
+        5,
+        6
+      ],
+      "powerCardCount": 5
+    }
+  ],
+  "boss": [
+    {
+      "id": "bandit_chief",
+      "name": "BANDIT CHIEF",
+      "hp": 70,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 8
+        },
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "buff",
+          "value": 3
+        },
+        {
+          "type": "attack",
+          "value": 7
+        }
+      ],
+      "sprite": "bandit",
+      "scale": 1.4,
+      "crown": true,
+      "acts": [
+        1,
+        1
+      ],
+      "powerCardCount": 4
+    },
+    {
+      "id": "ogre_warlord",
+      "name": "OGRE WARLORD",
+      "hp": 72,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "defend",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 12
+        },
+        {
+          "type": "attack",
+          "value": 8
+        }
+      ],
+      "sprite": "c_ogre",
+      "scale": 1.45,
+      "tint": "#ffb0a0",
+      "crown": true,
+      "acts": [
+        2,
+        2
+      ],
+      "powerCardCount": 4
+    },
+    {
+      "id": "dread_samurai",
+      "name": "DREAD SAMURAI",
+      "hp": 72,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "attack",
+          "value": 12
+        },
+        {
+          "type": "buff",
+          "value": 4
+        },
+        {
+          "type": "attack",
+          "value": 8
+        }
+      ],
+      "sprite": "samurai",
+      "scale": 1.3,
+      "tint": "#a0b8ff",
+      "crown": true,
+      "acts": [
+        3,
+        3
+      ],
+      "powerCardCount": 4
+    },
+    {
+      "id": "reaper_lord",
+      "name": "REAPER LORD",
+      "hp": 64,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 11
+        },
+        {
+          "type": "debuff",
+          "value": 3
+        },
+        {
+          "type": "attack",
+          "value": 12
+        },
+        {
+          "type": "attack",
+          "value": 9
+        }
+      ],
+      "sprite": "c_reaper3",
+      "scale": 1.45,
+      "crown": true,
+      "acts": [
+        4,
+        4
+      ],
+      "powerCardCount": 4
+    },
+    {
+      "id": "fallen_seraph",
+      "name": "FALLEN SERAPH",
+      "hp": 64,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "attack",
+          "value": 12
+        },
+        {
+          "type": "defend",
+          "value": 6
+        },
+        {
+          "type": "attack",
+          "value": 11
+        }
+      ],
+      "sprite": "c_angel3",
+      "scale": 1.45,
+      "crown": true,
+      "acts": [
+        5,
+        5
+      ],
+      "powerCardCount": 4
+    },
+    {
+      "id": "golfking",
+      "name": "THE GOLF KING",
+      "hp": 72,
+      "intents": [
+        {
+          "type": "attack",
+          "value": 10
+        },
+        {
+          "type": "attack",
+          "value": 12
+        },
+        {
+          "type": "buff",
+          "value": 4
+        },
+        {
+          "type": "attack",
+          "value": 8
+        }
+      ],
+      "sprite": "samurai",
+      "scale": 1.3,
+      "tint": "gold",
+      "crown": true,
+      "powerCardCount": 4,
+      "acts": [
+        6,
+        6
       ]
     }
   ],
   "defaults": {
     "powerCardCount": {
-      "normal": 7,
-      "elite": 7,
-      "boss": 7
+      "normal": 3,
+      "elite": 5,
+      "boss": 4
     }
+  },
+  "sprites": {
+    "slime": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "mushroom": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "bat": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "wolf": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "zombie": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "bandit": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "knight": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 0.95
+    },
+    "samurai": {
+      "frames": {
+        "idle": [
+          0,
+          11
+        ],
+        "attack": [
+          12,
+          19
+        ],
+        "hurt": [
+          20,
+          27
+        ],
+        "dead": [
+          28,
+          -1
+        ]
+      },
+      "headTop": 1.0
+    },
+    "goblin": {
+      "frames": {
+        "idle": [
+          0,
+          3
+        ],
+        "attack": [
+          4,
+          7
+        ],
+        "hurt": [
+          7,
+          7
+        ],
+        "dead": [
+          8,
+          8
+        ]
+      },
+      "headTop": 0.95
+    },
+    "c_goblin": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_orc": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_ogre": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_reaper1": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_reaper2": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_reaper3": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_angel1": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_angel2": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    },
+    "c_angel3": {
+      "frames": {
+        "idle": [
+          0,
+          5
+        ],
+        "attack": [
+          6,
+          11
+        ],
+        "hurt": [
+          12,
+          15
+        ],
+        "dead": [
+          16,
+          21
+        ]
+      },
+      "facesRight": true,
+      "headTop": 0.68
+    }
+  },
+  "acts": [
+    {
+      "name": "GREEN MEADOW",
+      "encounter": "forest",
+      "tint": null,
+      "aura": null,
+      "scale": 1
+    },
+    {
+      "name": "GOBLIN CAMP",
+      "encounter": "goblin_camp",
+      "tint": null,
+      "aura": "#ffb347",
+      "scale": 1.02
+    },
+    {
+      "name": "MOONLIT WOODS",
+      "encounter": "moonlit",
+      "tint": "#d8ddff",
+      "aura": "#8fa2ff",
+      "scale": 1.04
+    },
+    {
+      "name": "SUNKEN CRYPT",
+      "encounter": "crypt",
+      "tint": "#d6ffe6",
+      "aura": "#5fffc0",
+      "scale": 1.06
+    },
+    {
+      "name": "EMBER DOJO",
+      "encounter": "dojo",
+      "tint": "#ffe0c8",
+      "aura": "#ff8a3d",
+      "scale": 1.08
+    },
+    {
+      "name": "BLOOD CASTLE",
+      "encounter": "castle",
+      "tint": "#ffd0d6",
+      "aura": "#ff3d5a",
+      "scale": 1.1
+    }
+  ],
+  "emotions": {
+    "scaredBelow": 0.3,
+    "angryBelow": 0.5,
+    "angryAttackRatio": 1.4
   }
 }

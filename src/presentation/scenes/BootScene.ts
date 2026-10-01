@@ -3,7 +3,12 @@ import { viewport, configureViewport, getRenderDensity } from '../design/viewpor
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
-const ENEMY_SPRITES = ['orc1', 'orc2', 'orc3'];
+import enemiesData from '../../data/enemies.json';
+import type { EnemiesData } from '../../core/GameState';
+
+/** Every atlas + frame layout comes from enemies.json "sprites" (data-driven enemy defs). */
+const SPRITE_DEFS = (enemiesData as unknown as EnemiesData).sprites ?? {};
+const ENEMY_SPRITES = Object.keys(SPRITE_DEFS);
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -26,26 +31,10 @@ export class BootScene extends Phaser.Scene {
     this.load.svg('coin', '/assets/coin.svg', { width: 96, height: 96 });
 
     // Load crown overlay for boss
-    this.load.svg('crown', '/assets/enemies/crown.svg');
+    // Explicit size: SVGs without intrinsic width/height fail WebGL upload ("texImage2D: bad image data").
+    this.load.svg('crown', '/assets/enemies/crown.svg', { width: 128, height: 96 });
 
-    // Load game-icons.net icons
-    const icons = [
-      'lorc_broadsword',
-      'lorc_checked-shield',
-      'lorc_crossed-swords',
-      'delapouite_two-coins',
-      'lorc_shining-heart',
-      'lorc_sword-wound',
-      'lorc_echo-ripples',
-      'delapouite_card-joker',
-      'lorc_unlit-bomb',
-      'lorc_cog',
-      'carl-olsen_flame',
-      'lorc_horned-skull',
-    ];
-    for (const icon of icons) {
-      this.load.svg(`icon-${icon}`, `/assets/icons/${icon}.svg`);
-    }
+    // (game-icons.net SVGs are not used by any scene; they are no longer loaded at boot.)
 
     // Show loading progress
     const width = viewport(this).width;
@@ -100,11 +89,45 @@ export class BootScene extends Phaser.Scene {
         continue;
       }
 
-      for (const action of ['idle', 'attack', 'hurt', 'dead']) {
-        const names = this.textures.get(atlasKey).getFrameNames().filter(name => name.startsWith(action + '_')).sort();
-        if (names.length && !this.anims.exists(`${enemy}-${action}`)) this.anims.create({
-          key: `${enemy}-${action}`, frames: names.map(frame => ({ key: atlasKey, frame })),
-          frameRate: action === 'idle' ? 7 : 12, repeat: action === 'idle' ? -1 : 0,
+      const frames = this.textures.get(atlasKey).getFrameNames();
+      const frameCount = frames.length;
+
+      if (frameCount > 0) {
+        const frames = SPRITE_DEFS[enemy].frames;
+        for (const [name, [start, rawEnd]] of Object.entries(frames)) {
+          const end = rawEnd < 0 ? frameCount - 1 : Math.min(rawEnd, frameCount - 1);
+          this.createAnimationFromRange(atlasKey, name, enemy, start, end, name === 'idle' ? 8 : 12, name === 'idle' ? -1 : 0);
+        }
+      }
+    }
+  }
+
+  private createAnimationFromRange(
+    atlasKey: string,
+    animName: string,
+    enemy: string,
+    start: number,
+    end: number,
+    frameRate: number,
+    repeat: number
+  ): void {
+    const frames: Phaser.Types.Animations.AnimationFrame[] = [];
+
+    for (let i = start; i <= end; i++) {
+      const frameName = `${enemy}_${i.toString().padStart(3, '0')}`;
+      if (this.textures.get(atlasKey).has(frameName)) {
+        frames.push({ key: atlasKey, frame: frameName });
+      }
+    }
+
+    if (frames.length > 0) {
+      const animKey = `${enemy}-${animName}`;
+      if (!this.anims.exists(animKey)) {
+        this.anims.create({
+          key: animKey,
+          frames,
+          frameRate,
+          repeat,
         });
       }
     }
