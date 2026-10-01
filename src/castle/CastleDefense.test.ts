@@ -85,30 +85,74 @@ describe('castle siege', () => {
     expect(playCastleCard(state, covered.id, config).state).toBe(state);
     expect(playCastleCard(state, 'missing', config).state).toBe(state);
   });
-  it('grants every chain milestone, limits turrets to their magazine and lasers to bosses damage', () => {
+  it('banks all milestones until drawing, then deploys and fires the laser', () => {
     const fixture = forcedChain(5);
     let state = fixture.state;
     for (let i = 0; i < 4; i++) state = playCastleCard(state, fixture.chain[i].id, config).state;
-    expect(state.siege.units.map((u) => u.kind)).toEqual(['soldier', 'knight', 'turret', 'mortar']);
-    expect(state.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(100);
+    expect(state.siege.units).toHaveLength(0);
     state.siege.enemies = [enemy(false), { ...enemy(true, 150), id: 101 }];
-    const result = playCastleCard(state, fixture.chain[4].id, config);
+    const played = playCastleCard(state, fixture.chain[4].id, config);
+    expect(played.events.some((e) => e.type === 'deploy' || e.type === 'laser')).toBe(false);
+    expect(played.state.siege.enemies).toHaveLength(2);
+    const result = drawCastleCard(played.state, config);
+    expect(result.state.siege.units.map((u) => u.kind)).toEqual([
+      'soldier',
+      'knight',
+      'turret',
+      'mortar',
+    ]);
+    expect(result.state.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(100);
+    expect(drawCastleCard(result.state, config).state.siege.units).toHaveLength(4);
     expect(result.state.siege.enemies).toHaveLength(1);
     expect(result.state.siege.enemies[0].hp).toBe(70);
     expect(result.events.some((e) => e.type === 'laser')).toBe(true);
     expect(result.state.run.phase).toBe('battle');
   });
-  it('does not expire soldiers while they wait for an enemy', () => {
+  it('marches a 1 HP / 1 damage soldier forward and loses it in melee', () => {
     const f = forcedChain(1);
-    let state = playCastleCard(f.state, f.chain[0].id, config).state;
-    // Stop automatic spawns and keep the lane empty for a minute.
+    let state = drawCastleCard(playCastleCard(f.state, f.chain[0].id, config).state, config).state;
     state.siege.spawnIn = 1000;
-    for (let i = 0; i < 240; i++) state = stepSiege(state).state;
-    expect(state.siege.units[0].ttl).toBe(18);
-    state.siege.enemies = [enemy()];
+    const soldier = state.siege.units[0];
+    expect(soldier.hp).toBe(1);
+    expect(soldier.damage).toBe(1);
     state = stepSiege(state).state;
-    expect(state.siege.units[0].engaged).toBe(true);
-    expect(state.siege.enemies[0].hp).toBeLessThan(20);
+    expect(state.siege.units[0].progress).toBeLessThan(soldier.progress);
+    state.siege.enemies = [{ ...enemy(), progress: state.siege.units[0].progress }];
+    const result = stepSiege(state);
+    expect(result.state.siege.enemies[0].hp).toBe(19);
+    expect(result.state.siege.units).toHaveLength(0);
+    expect(result.events.some((e) => e.type === 'unit_killed')).toBe(true);
+  });
+  it('creates a dense stream of invaders in the first ten seconds', () => {
+    let state = drawCastleCard(start(), config).state;
+    for (let i = 0; i < 40; i++) state = stepSiege(state).state;
+    expect(state.siege.enemies.length).toBeGreaterThanOrEqual(6);
+  });
+  it('deploys the reached tiers only after drawing at lengths one through four', () => {
+    for (let length = 1; length <= 4; length++) {
+      const f = forcedChain(length);
+      let state = f.state;
+      for (const card of f.chain) {
+        const result = playCastleCard(state, card.id, config);
+        expect(result.events.some((e) => e.type === 'deploy')).toBe(false);
+        state = result.state;
+      }
+      expect(state.siege.units).toHaveLength(0);
+      const result = drawCastleCard(state, config);
+      expect(result.state.siege.units.map((u) => u.kind)).toEqual(
+        ['soldier', 'knight', 'turret', 'mortar'].slice(0, length)
+      );
+    }
+  });
+  it('upgrades soldier squad size without increasing individual HP or damage', () => {
+    const f = forcedChain(1);
+    f.state.upgrades.soldier = 3;
+    const state = drawCastleCard(
+      playCastleCard(f.state, f.chain[0].id, config).state,
+      config
+    ).state;
+    expect(state.siege.units).toHaveLength(4);
+    expect(state.siege.units.every((u) => u.hp === 1 && u.damage === 1)).toBe(true);
   });
   it('spawns a supermonster after every ten regular invaders', () => {
     const state = start();
@@ -191,6 +235,24 @@ describe('persistent castle upgrades', () => {
     );
     expect(service.load()).toBeNull();
   });
+  it('migrates legacy stationary troops without losing the solitaire', () => {
+    const storage = memoryStorage(),
+      service = new CastleService(storage),
+      f = forcedChain(1);
+    const state = drawCastleCard(
+      playCastleCard(f.state, f.chain[0].id, config).state,
+      config
+    ).state;
+    const old = JSON.parse(JSON.stringify(state));
+    delete old.siege.units[0].hp;
+    delete old.siege.units[0].maxHp;
+    delete old.siege.units[0].progress;
+    old.siege.units[0].damage = 3;
+    storage.setItem('golf-castle-run-v1', JSON.stringify(old));
+    const restored = service.load()!;
+    expect(restored.run).toEqual(state.run);
+    expect(restored.siege.units[0]).toMatchObject({ hp: 1, maxHp: 1, damage: 1, progress: 0.94 });
+  });
   it('permanent levels apply at the next siege and leave existing snapshots unchanged', () => {
     const upgrades = { ...emptyUpgrades(), walls: 2, magazine: 3 };
     const state = createCastleRun('upgrades', config, upgrades);
@@ -201,6 +263,7 @@ describe('persistent castle upgrades', () => {
     f.state.upgrades.magazine = 3;
     let next = f.state;
     for (const card of f.chain) next = playCastleCard(next, card.id, config).state;
+    next = drawCastleCard(next, config).state;
     expect(next.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(160);
   });
 });
