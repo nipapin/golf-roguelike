@@ -60,3 +60,51 @@ describe('castle card undo', () => {
     expect(manager.state!.run.player.gold).toBe(gold);
   });
 });
+
+describe('progress reset', () => {
+  it('clears the run, wallet, upgrades, records and undo without erasing preferences', () => {
+    const storage = memoryStorage();
+    const manager = new CastleManager(storage);
+    manager.start();
+    manager.play(nextPlay(manager));
+    manager.state!.siege.coins = 150;
+    manager.state!.run = { ...manager.state!.run, phase: 'victory' };
+    manager.service.settle(manager.state!);
+    manager.service.purchase('magazine');
+    manager.save();
+    storage.setItem('castle-interactive-training-v1', 'yes');
+    storage.setItem('golf-castle-rules-v1', 'yes');
+    storage.setItem('golf_rogue_audio_settings', '{"musicVolume":0.2}');
+    expect(manager.resetProgress()).toBe(true);
+    expect(manager.state).toBeNull();
+    expect(manager.canUndo).toBe(false);
+    expect(manager.resume()).toBe(false);
+    expect(manager.service.readMeta()).toMatchObject({
+      coins: 0,
+      bestSiege: 0,
+      bestKills: 0,
+      victories: 0,
+      siegesStarted: 0,
+      currentStreak: 0,
+      upgrades: emptyUpgrades(),
+    });
+    expect(storage.getItem('castle-interactive-training-v1')).toBeNull();
+    expect(storage.getItem('golf-castle-rules-v1')).toBeNull();
+    expect(storage.getItem('golf_rogue_audio_settings')).toBe('{"musicVolume":0.2}');
+    manager.start();
+    expect(manager.state!.siegeNumber).toBe(1);
+  });
+  it('preserves the current session and saved data when storage rejects deletion', () => {
+    const storage = memoryStorage();
+    const manager = new CastleManager(storage);
+    manager.start();
+    const before = manager.state;
+    const saved = storage.getItem('golf-castle-run-v1');
+    storage.removeItem = () => {
+      throw new Error('Storage denied');
+    };
+    expect(manager.resetProgress()).toBe(false);
+    expect(manager.state).toBe(before);
+    expect(storage.getItem('golf-castle-run-v1')).toBe(saved);
+  });
+});

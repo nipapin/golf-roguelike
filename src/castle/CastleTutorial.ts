@@ -12,6 +12,9 @@ export function trainingCompleted(): boolean {
     return false;
   }
 }
+export function resetTrainingSession(): void {
+  completedThisSession = false;
+}
 export function completeTraining(): void {
   completedThisSession = true;
   try {

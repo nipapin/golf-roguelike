@@ -10,7 +10,7 @@ import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { castleArt } from './CastleArt';
 import { showCastleWorkshop } from './CastleWorkshop';
 import { castleManager } from './CastleManager';
-import { trainingCompleted } from './CastleTutorial';
+import { trainingCompleted, resetTrainingSession } from './CastleTutorial';
 import { siegeDifficulty } from './CastleDefense';
 
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
@@ -114,9 +114,9 @@ export class CastleMenuScene extends Phaser.Scene {
       12,
       '#bfe1e3'
     );
-    const buttons = this.add.container(w / 2, safe.bottom - 165);
-    this.add.image(w / 2 - 39, safe.bottom - 223, 'coin').setDisplaySize(26, 26);
-    this.text(w / 2 + 17, safe.bottom - 223, String(meta.coins), 24, '#ffe35a');
+    const buttons = this.add.container(w / 2, safe.bottom - 227);
+    this.add.image(w / 2 - 39, safe.bottom - 285, 'coin').setDisplaySize(26, 26);
+    this.text(w / 2 + 17, safe.bottom - 285, String(meta.coins), 24, '#ffe35a');
     popupButton(
       this,
       buttons,
@@ -150,8 +150,9 @@ export class CastleMenuScene extends Phaser.Scene {
     popupButton(this, buttons, 124, (w - 60) / 2, 'CREDITS', () => this.credits(), true).setX(
       (w - 36) / 4
     );
+    popupButton(this, buttons, 186, w - 48, 'RESET PROGRESS', () => this.resetProgress(), true);
     if (saved?.run.phase === 'battle') {
-      const restart = this.text(w / 2, safe.bottom - 272, 'START A NEW SIEGE', 13, '#ffe3b2');
+      const restart = this.text(w / 2, safe.bottom - 334, 'START A NEW SIEGE', 13, '#ffe3b2');
       restart
         .setPadding(12, 12)
         .setInteractive()
@@ -225,6 +226,39 @@ export class CastleMenuScene extends Phaser.Scene {
       modal.height / 2 - 34,
       modal.width - 36,
       'BACK',
+      () => modal.root.destroy(),
+      true
+    );
+  }
+  private resetProgress(): void {
+    const modal = gamePopup(
+      this,
+      'RESET ALL PROGRESS?',
+      'Delete coins, upgrades, records and your current siege. This cannot be undone.',
+      300
+    );
+    popupButton(this, modal.content, 30, modal.width - 36, 'DELETE ALL PROGRESS', () => {
+      if (!castleManager().resetProgress()) {
+        const error = this.text(
+          0,
+          modal.top + 110,
+          'Could not reset. Please try again.',
+          14,
+          '#ff9b9b'
+        );
+        modal.content.add(error);
+        return;
+      }
+      resetTrainingSession();
+      modal.root.destroy();
+      this.scene.restart();
+    });
+    popupButton(
+      this,
+      modal.content,
+      94,
+      modal.width - 36,
+      'CANCEL',
       () => modal.root.destroy(),
       true
     );

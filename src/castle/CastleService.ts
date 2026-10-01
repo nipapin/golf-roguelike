@@ -236,6 +236,26 @@ export class CastleService {
       return null;
     }
   }
+  resetProgress(): boolean {
+    const keys = [META_KEY, RUN_KEY, 'castle-interactive-training-v1', 'golf-castle-rules-v1'];
+    const previous = new Map<string, string | null>();
+    try {
+      for (const key of keys) previous.set(key, this.storage.getItem(key));
+      for (const key of keys) this.storage.removeItem(key);
+      return true;
+    } catch {
+      // Do not leave a partially erased wallet/save if storage refuses a write.
+      for (const [key, value] of previous) {
+        try {
+          if (value === null) this.storage.removeItem(key);
+          else this.storage.setItem(key, value);
+        } catch {
+          /* Storage is unavailable. */
+        }
+      }
+      return false;
+    }
+  }
   clear(): void {
     try {
       this.storage.removeItem(RUN_KEY);

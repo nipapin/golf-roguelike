@@ -17,6 +17,12 @@ export class CastleManager {
   constructor(storage: Storage) {
     this.service = new CastleService(storage);
   }
+  resetProgress(): boolean {
+    if (!this.service.resetProgress()) return false;
+    this.state = null;
+    this.previousCard = null;
+    return true;
+  }
   start(): void {
     this.previousCard = null;
     const seed = generateSeed(),
