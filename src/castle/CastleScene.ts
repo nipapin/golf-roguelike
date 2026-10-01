@@ -12,7 +12,15 @@ import { isShakeReduced } from '../presentation/juice/fxSettings';
 import { castleArt, weaponArt } from './CastleArt';
 import { castleManager } from './CastleManager';
 import { siegeRules } from './CastleMenuScene';
-import { STEP, earnedCoins, type Invader, type Defender, type SiegeEvent } from './CastleDefense';
+import { gameConfig } from '../data/gameConfig';
+import {
+  STEP,
+  earnedCoins,
+  upgradeValue,
+  type Invader,
+  type Defender,
+  type SiegeEvent,
+} from './CastleDefense';
 
 interface EnemyView {
   root: Phaser.GameObjects.Container;
@@ -24,6 +32,8 @@ interface UnitView {
   root: Phaser.GameObjects.Container;
   body?: Phaser.GameObjects.Sprite;
   label: Phaser.GameObjects.Text;
+  weapon?: Phaser.GameObjects.Container;
+  magazine?: Phaser.GameObjects.Graphics;
 }
 const RULES_KEY = 'golf-castle-rules-v1';
 export class CastleScene extends Phaser.Scene {
@@ -48,6 +58,7 @@ export class CastleScene extends Phaser.Scene {
   private accumulator = 0;
   private saveTimer = 0;
   private nextShotSound = 0;
+  private nextHealEffect = 0;
   constructor() {
     super('CastleScene');
   }
@@ -66,6 +77,7 @@ export class CastleScene extends Phaser.Scene {
     this.ended = false;
     this.active = null;
     this.nextShotSound = 0;
+    this.nextHealEffect = 0;
     const { width: w, height: h } = viewport(this);
     this.layout = getLayoutMetrics(w, h);
     const { arenaTop, arenaHeight, tableTop, hudTop, bannerTop, relicTop } = this.layout;
@@ -91,7 +103,7 @@ export class CastleScene extends Phaser.Scene {
       Math.min(1.15, (arenaHeight - 20) / 158)
     ).setDepth(22);
     this.add.rectangle(w / 2, hudTop + 20, w - 16, 40, 0x21163a).setStrokeStyle(2, 0x654581);
-    this.text(17, hudTop + 20, 'CASTLE SIEGE', 16).setOrigin(0, 0.5);
+    this.text(17, hudTop + 20, `SIEGE #${manager.state!.siegeNumber}`, 16).setOrigin(0, 0.5);
     this.add.image(w * 0.62, hudTop + 20, 'coin').setDisplaySize(23, 23);
     this.coins = this.text(w * 0.69, hudTop + 20, '0', 17, '#ffe35a');
     const pause = this.add
@@ -110,12 +122,14 @@ export class CastleScene extends Phaser.Scene {
     this.hpText = this.text(w * 0.32, this.layout.playerHudTop + 15, '', 17);
     this.status = this.text(w * 0.76, this.layout.playerHudTop + 15, '', 11, '#aeeaff');
     this.chainText = this.text(w / 2, relicTop + 14, '', 13, '#ffe5a4');
-    const labels = ['1 SOLDIER', '2 KNIGHT', '3 TURRET', '4 MORTAR', '5 LASER'];
+    const labels = ['1 SOLDIER', '2 KNIGHT', '3 RELOAD', '4 MORTAR', '5 LASER'];
     labels.forEach((label, i) => {
       const x = 8 + ((i + 0.5) * (w - 16)) / 5;
       const box = this.add
         .rectangle(x, bannerTop + 17, (w - 20) / 5 - 3, 32, 0x25193e)
-        .setStrokeStyle(1, 0x8862ba);
+        .setStrokeStyle(1, 0x8862ba)
+        .setInteractive()
+        .on('pointerup', () => this.rewardInfo(i));
       this.steps.push(box);
       this.text(x, bannerTop + 17, label, w < 380 ? 9 : 10, '#fff1c9');
     });
@@ -294,7 +308,12 @@ export class CastleScene extends Phaser.Scene {
   }
   private unitPosition(unit: Defender) {
     return {
-      x: 10 + unit.progress * viewport(this).width * 0.78 + ((unit.id % 3) - 1) * 4,
+      x:
+        unit.kind === 'turret'
+          ? viewport(this).width * 0.75
+          : unit.kind === 'mortar'
+            ? viewport(this).width * 0.66
+            : 10 + unit.progress * viewport(this).width * 0.78 + ((unit.id % 3) - 1) * 4,
       y:
         this.groundY() -
         (unit.kind === 'turret' || unit.kind === 'mortar' ? 14 : (unit.id % 2) * 9),
@@ -481,6 +500,8 @@ export class CastleScene extends Phaser.Scene {
         const p = this.unitPosition(unit),
           root = this.add.container(p.x, p.y).setDepth(42);
         let body: Phaser.GameObjects.Sprite | undefined;
+        let weapon: Phaser.GameObjects.Container | undefined;
+        let magazine: Phaser.GameObjects.Graphics | undefined;
         if (unit.kind === 'soldier' || unit.kind === 'knight') {
           const sprite = unit.kind === 'knight' ? 'c_angel2' : 'c_angel1';
           body = this.add
@@ -490,18 +511,37 @@ export class CastleScene extends Phaser.Scene {
             .setFlipX(true);
           body.play(`${sprite}-idle`);
           root.add(body);
-        } else root.add(weaponArt(this, unit.kind === 'mortar'));
+        } else {
+          weapon = weaponArt(this, unit.kind === 'mortar');
+          root.add(weapon);
+          if (unit.kind === 'turret') {
+            magazine = this.add.graphics();
+            root.add(magazine);
+          }
+        }
         const label = this.text(0, 9, '', 9, '#bff5ff');
         root.add(label);
         root.setAlpha(0).setScale(0.45);
         this.tweens.add({ targets: root, alpha: 1, scale: 1, duration: 260, ease: 'Back.out' });
-        view = { root, body, label };
+        view = { root, body, label, weapon, magazine };
         this.defenders.set(unit.id, view);
       }
+      if (view.magazine) {
+        const capacity = upgradeValue('magazine', state.upgrades.magazine);
+        view.magazine.clear().fillStyle(0x211631).fillRoundedRect(-23, -44, 46, 7, 3);
+        view.magazine
+          .fillStyle(unit.ammo ? 0x63e6ef : 0xff5a73)
+          .fillRect(-21, -42, (42 * unit.ammo) / capacity, 3);
+        view.label.setColor(unit.ammo ? '#bff5ff' : '#ff6b84');
+      }
       view.label.setText(
-        unit.kind === 'turret' || unit.kind === 'mortar'
-          ? String(unit.ammo)
-          : `${unit.hp}/${unit.maxHp} HP`
+        unit.kind === 'turret'
+          ? unit.ammo
+            ? `${unit.ammo}/${upgradeValue('magazine', state.upgrades.magazine)}`
+            : 'EMPTY · CHAIN 3'
+          : unit.kind === 'mortar'
+            ? String(unit.ammo)
+            : `${unit.hp}/${unit.maxHp} HP`
       );
     }
   }
@@ -513,6 +553,17 @@ export class CastleScene extends Phaser.Scene {
           for (const e of event.events) {
             if (e.type === 'power_activated') {
               AudioSystem.playPower(e.powerType);
+              if (e.powerType === 'CRIT')
+                this.callout(
+                  `CRIT BANKED · NEXT DEPLOY ×${gameConfig.powerCards.CRIT.damageMultiplier}`,
+                  '#ffd789'
+                );
+              if (e.powerType === 'WILD') this.callout('WILD · ANY NEXT CARD', '#a8ffff');
+              if (e.powerType === 'BOMB') {
+                this.callout(`BOMB · ${gameConfig.powerCards.BOMB.flatDamage} DAMAGE`, '#ffb196');
+                for (const view of [...this.invaders.values()].slice(0, 8))
+                  playCombatVFX(this, 'magic', view.root.x, view.root.y - 22, 90, 0xff9964);
+              }
               const p = this.activePosition();
               playCombatVFX(
                 this,
@@ -522,13 +573,24 @@ export class CastleScene extends Phaser.Scene {
                 80
               );
             }
-            if (e.type === 'joker_activated')
+            if (e.type === 'joker_activated') {
               AudioSystem.playPower(e.color === 'red' ? 'RED_JOKER' : 'BLACK_JOKER');
+              this.callout(
+                e.color === 'red' ? 'LIFESTEAL BANKED · 30%' : 'CRITICAL BANKED · ×5',
+                e.color === 'red' ? '#ff9fba' : '#d0b6ff'
+              );
+            }
           }
           this.tweens.add({ targets: this.chainText, scale: 1.12, duration: 90, yoyo: true });
           break;
         case 'draw':
           AudioSystem.play('card_draw');
+          if (events.some((e) => e.type === 'deploy')) {
+            const troops = events.filter(
+              (e) => e.type === 'deploy' && (e.kind === 'soldier' || e.kind === 'knight')
+            ).length;
+            if (troops) this.callout(`${troops} TROOPS DEPLOYED`, '#c6ffd1');
+          }
           if (event.recycled) this.callout('STOCK RECYCLED', '#ffe3a4');
           break;
         case 'spawn':
@@ -538,12 +600,54 @@ export class CastleScene extends Phaser.Scene {
           const unit = castleManager().state!.siege.units.find((u) => u.id === event.id);
           if (unit) {
             const p = this.unitPosition(unit);
-            playCombatVFX(this, 'smoke', p.x, p.y - 18, 60);
+            this.releaseEffect(
+              p.x,
+              p.y - 18,
+              event.kind === 'soldier' ? 0x73e6ad : event.kind === 'knight' ? 0xffd56b : 0x7ceaff
+            );
+            if (event.kind === 'turret')
+              this.number(p.x, p.y - 65, `READY · ${unit.ammo}`, '#7ceaff');
+            else if (event.kind === 'mortar')
+              this.number(p.x, p.y - 65, `MORTAR · ${unit.damage} DMG`, '#d8b0ff');
           }
           AudioSystem.play('shield', {
             volume: 0.18,
             pitchShift: event.kind === 'turret' ? 0.2 : 0,
           });
+          break;
+        }
+        case 'reload': {
+          const turret = castleManager().state!.siege.units.find((u) => u.id === event.id);
+          if (turret) {
+            const p = this.unitPosition(turret);
+            this.releaseEffect(p.x, p.y - 18, 0x7ceaff);
+            this.number(p.x, p.y - 65, `RELOAD ${event.ammo}/${event.ammo}`, '#7ceaff');
+          }
+          AudioSystem.play('shield', { volume: 0.2 });
+          break;
+        }
+        case 'boost': {
+          if (event.effect === 'heal' && this.time.now < this.nextHealEffect) break;
+          if (event.effect === 'heal') this.nextHealEffect = this.time.now + 400;
+          const color =
+            event.effect === 'heal' ? '#83ffc4' : event.effect === 'armor' ? '#8ceaff' : '#ffe35a';
+          const p =
+            event.effect === 'gold'
+              ? { x: this.coins.x, y: this.coins.y }
+              : { x: this.castle.x, y: this.castle.y - 65 };
+          playCombatVFX(
+            this,
+            event.effect === 'heal' ? 'heal' : event.effect === 'armor' ? 'shield' : 'reward',
+            p.x,
+            p.y,
+            95
+          );
+          this.number(
+            p.x,
+            p.y - 30,
+            `+${Math.round(event.amount * 10) / 10} ${event.effect === 'heal' ? 'HP' : event.effect === 'armor' ? 'ARMOR' : 'COINS'}`,
+            color
+          );
           break;
         }
         case 'shot':
@@ -603,6 +707,19 @@ export class CastleScene extends Phaser.Scene {
     const unit = this.defenders.get(event.unit),
       enemy = this.invaders.get(event.target);
     if (!unit || !enemy) return;
+    if (unit.weapon) {
+      this.tweens.add({ targets: unit.weapon, x: 3, duration: 45, yoyo: true });
+      const flash = this.add
+        .ellipse(unit.root.x - 28, unit.root.y - 17, 16, 9, 0xffeda2)
+        .setDepth(120);
+      this.tweens.add({
+        targets: flash,
+        scale: 1.8,
+        alpha: 0,
+        duration: 90,
+        onComplete: () => flash.destroy(),
+      });
+    }
     const x = unit.root.x,
       y = unit.root.y - 20,
       tx = enemy.root.x,
@@ -648,6 +765,62 @@ export class CastleScene extends Phaser.Scene {
       this.nextShotSound = this.time.now + 180;
     }
     if (event.kind !== 'turret') this.number(tx, ty - 8, String(event.damage), '#fff4d2');
+  }
+  private releaseEffect(x: number, y: number, color: number): void {
+    const active = this.activePosition();
+    const spark = this.add
+      .circle(active.x + this.layout.cw / 2, active.y + 20, 6, color)
+      .setDepth(180);
+    this.tweens.add({
+      targets: spark,
+      x,
+      y,
+      duration: 320,
+      ease: 'Cubic.out',
+      onComplete: () => {
+        spark.destroy();
+        playCombatVFX(this, 'magic', x, y, 82, color);
+        const ring = this.add.circle(x, y, 12).setStrokeStyle(3, color).setDepth(180);
+        this.tweens.add({
+          targets: ring,
+          scale: 3,
+          alpha: 0,
+          duration: 380,
+          onComplete: () => ring.destroy(),
+        });
+      },
+    });
+  }
+  private rewardInfo(index: number): void {
+    if (this.paused || this.ended) return;
+    this.paused = true;
+    AudioSystem.setMusicScene('menu');
+    const state = castleManager().state!;
+    const descriptions = [
+      `${upgradeValue('soldier', state.upgrades.soldier)} soldiers march from the castle. Each has 1 HP and 1 base damage. Workshop levels add soldiers.`,
+      `A knight has ${upgradeValue('knight', state.upgrades.knight)} HP and deals ${upgradeValue('knight', state.upgrades.knight)} base damage in melee. Workshop levels increase HP and damage.`,
+      `One turret only. The first reward builds it; later rewards refill its magazine to ${upgradeValue('magazine', state.upgrades.magazine)} rounds. It fires 4 bullets per second for 2 base damage each. Workshop magazine levels add 20 rounds.`,
+      `A mortar fires 12 shells for ${upgradeValue('mortar', state.upgrades.mortar)} base damage to up to three enemies. Workshop levels increase damage.`,
+      `The laser clears regular invaders and deals ${upgradeValue('laser', state.upgrades.laser)} base damage to bosses. Every 3 extra chain cards bank another laser.`,
+    ];
+    const modal = gamePopup(
+      this,
+      ['SOLDIERS', 'KNIGHT', 'TURRET & RELOAD', 'MORTAR', 'LASER'][index],
+      'Bank the chain, then DRAW to release it.',
+      420
+    );
+    modal.root.setDepth(3000);
+    modal.content.add(
+      this.text(0, modal.top + 108, descriptions[index], 15, '#fff8e5')
+        .setOrigin(0.5, 0)
+        .setWordWrapWidth(modal.width - 44)
+    );
+    popupButton(this, modal.content, modal.height / 2 - 43, modal.width - 36, 'GOT IT', () => {
+      modal.root.destroy();
+      this.paused = false;
+      this.accumulator = 0;
+      AudioSystem.setMusicScene('battle');
+    });
   }
   private actorAnimation(id: number, action: 'attack' | 'hurt') {
     const view = this.invaders.get(id),
@@ -735,7 +908,7 @@ export class CastleScene extends Phaser.Scene {
       this.text(
         0,
         modal.top + 190,
-        `${Math.floor(state.siege.elapsed)}s · ${state.siege.spawned} invaders`,
+        `SIEGE #${state.siegeNumber} · ${Math.floor(state.siege.elapsed)}s · ${state.siege.spawned} invaders`,
         13,
         '#d9c8ed'
       )

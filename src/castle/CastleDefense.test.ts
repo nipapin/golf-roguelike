@@ -12,6 +12,7 @@ import {
   type CastleRun,
   type Invader,
   SIEGE_PACING,
+  siegeDifficulty,
 } from './CastleDefense';
 const start = (seed = 'castle-test') => createCastleRun(seed, config, emptyUpgrades());
 const enemy = (boss = false, hp = 20): Invader => ({
@@ -203,6 +204,45 @@ describe('castle siege', () => {
     expect(state.siege.units).toHaveLength(4);
     expect(state.siege.units.every((u) => u.hp === 1 && u.damage === 1)).toBe(true);
   });
+  it('keeps exactly one empty turret and reloads that same cannon to the upgraded capacity', () => {
+    const f = forcedChain(3);
+    f.state.upgrades.magazine = 3;
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    const id = state.siege.units.find((u) => u.kind === 'turret')!.id;
+    state.siege.units = state.siege.units.filter((u) => u.kind === 'turret');
+    state.siege.units[0].ammo = 0;
+    state.siege.units[0].ttl = 0;
+    state.siege.spawnIn = 1000;
+    state = stepSiege(state).state;
+    expect(state.siege.units).toHaveLength(1);
+    const next = forcedChain(3);
+    next.state.siege = state.siege;
+    next.state.upgrades.magazine = 3;
+    state = next.state;
+    for (const card of next.chain) state = playCastleCard(state, card.id, config).state;
+    expect(state.siege.units[0].ammo).toBe(0);
+    const result = drawCastleCard(state, config);
+    const turrets = result.state.siege.units.filter((u) => u.kind === 'turret');
+    expect(turrets).toHaveLength(1);
+    expect(turrets[0]).toMatchObject({ id, ammo: 160 });
+    expect(result.events).toContainEqual({ type: 'reload', id, ammo: 160 });
+  });
+  it('increases health, speed and wave pressure between new sieges', () => {
+    const first = createCastleRun('pressure', config, emptyUpgrades(), 'first', 1);
+    const later = createCastleRun('pressure', config, emptyUpgrades(), 'later', 8);
+    for (const state of [first, later]) {
+      state.siege.started = true;
+      state.siege.spawnIn = 0;
+    }
+    const a = stepSiege(first).state,
+      b = stepSiege(later).state;
+    expect(b.siege.enemies[0].maxHp).toBeGreaterThan(a.siege.enemies[0].maxHp);
+    expect(b.siege.enemies[0].speed).toBeGreaterThan(a.siege.enemies[0].speed);
+    expect(b.siege.spawnIn).toBeLessThan(a.siege.spawnIn);
+    expect(siegeDifficulty(1).hp).toBe(1);
+  });
   it('spawns a supermonster after every twenty regular invaders', () => {
     const state = start();
     state.siege.started = true;
@@ -302,11 +342,36 @@ describe('persistent castle upgrades', () => {
     expect(restored.run).toEqual(state.run);
     expect(restored.siege.units[0]).toMatchObject({ hp: 1, maxHp: 1, damage: 1, progress: 0.94 });
   });
+  it('persists the new-siege count and preserves difficulty when reopening a save', () => {
+    const storage = memoryStorage(),
+      service = new CastleService(storage);
+    expect(service.beginSiege().siegesStarted).toBe(1);
+    expect(new CastleService(storage).beginSiege().siegesStarted).toBe(2);
+    const state = createCastleRun('saved-pressure', config, emptyUpgrades(), 'save', 2);
+    service.save(state);
+    expect(service.load()?.siegeNumber).toBe(2);
+    expect(service.readMeta().siegesStarted).toBe(2);
+  });
+  it('merges old duplicate turrets without adding their ammunition', () => {
+    const storage = memoryStorage(),
+      service = new CastleService(storage),
+      f = forcedChain(3);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    const turret = state.siege.units.find((u) => u.kind === 'turret')!;
+    state.siege.units.push({ ...turret, id: 90, ammo: 30 });
+    turret.ammo = 45;
+    service.save(state);
+    const restored = service.load()!;
+    expect(restored.siege.units.filter((u) => u.kind === 'turret')).toHaveLength(1);
+    expect(restored.siege.units.find((u) => u.kind === 'turret')!.ammo).toBe(45);
+  });
   it('permanent levels apply at the next siege and leave existing snapshots unchanged', () => {
     const upgrades = { ...emptyUpgrades(), walls: 2, magazine: 3 };
     const state = createCastleRun('upgrades', config, upgrades);
     upgrades.walls = 10;
-    expect(state.run.player.maxHp).toBe(40);
+    expect(state.run.player.maxHp).toBe(46);
     expect(state.upgrades.walls).toBe(2);
     const f = forcedChain(3);
     f.state.upgrades.magazine = 3;
@@ -314,6 +379,45 @@ describe('persistent castle upgrades', () => {
     for (const card of f.chain) next = playCastleCard(next, card.id, config).state;
     next = drawCastleCard(next, config).state;
     expect(next.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(160);
+  });
+});
+describe('siege progression balance', () => {
+  it('gives workshop levels a measurable advantage against later siege pressure', () => {
+    const wins = [0, 0, 0];
+    for (let seed = 0; seed < 20; seed++)
+      for (let sample = 0; sample < 3; sample++) {
+        const levels =
+          sample === 2
+            ? { walls: 5, soldier: 5, knight: 5, magazine: 5, mortar: 5, laser: 5 }
+            : emptyUpgrades();
+        let state = createCastleRun(
+          `progression-${seed}`,
+          config,
+          levels,
+          `sample-${seed}`,
+          sample === 0 ? 1 : 8
+        );
+        for (let action = 0; action < 400 && state.run.phase === 'battle'; action++) {
+          const id = chooseGreedyCard(state.run, config);
+          state = id
+            ? playCastleCard(state, id, config).state
+            : drawCastleCard(state, config).state;
+          for (let tick = 0; tick < 8 && state.run.phase === 'battle'; tick++)
+            state = stepSiege(state).state;
+        }
+        if (state.run.phase === 'victory') wins[sample]++;
+      }
+    console.log(
+      JSON.stringify({
+        progressionSamples: 20,
+        actionSeconds: 2,
+        firstSiege: wins[0],
+        eighthSiege: wins[1],
+        upgradedEighthSiege: wins[2],
+      })
+    );
+    expect(wins[1]).toBeLessThan(wins[0]);
+    expect(wins[2]).toBeGreaterThan(wins[1]);
   });
 });
 describe('deterministic castle balance sample', () => {

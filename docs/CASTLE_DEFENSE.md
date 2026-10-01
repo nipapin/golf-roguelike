@@ -10,14 +10,14 @@ The first card or draw starts the siege. Enemies arrive from the left and attack
 |---|---|---|
 | 1 | Soldier | 1 HP, 1 damage once per second, marches left and fights in melee; 18 seconds after engagement |
 | 2 | Knight | 6 damage every 1.5 seconds; 6 HP, marches left; 24 seconds after engagement |
-| 3 | Turret | 100 rounds, 2 damage per bullet, 4 bullets/second, targets the closest enemy to the castle after it travels 40% of the road |
+| 3 | Build/reload the single turret | 100 rounds, 2 damage per bullet, 4 bullets/second, targets the closest enemy to the castle after it travels 40% of the road |
 | 4 | Mortar | 12 shells, 9 damage to up to three leading enemies, one shot every 2 seconds, starts firing after enemies travel 22% of the road |
 | 5 | Laser | Deletes normal invaders, deals 80 damage to supermonsters |
 | 8, 11, 14… | Another laser | Same effect; rewards never downgrade when extending a chain |
 
 A chain banks every intermediate reward. No defender or chain laser appears during card selection. Drawing releases all banked rewards once, then resets the chain; it does not cause an instant enemy hit. Time keeps passing while the player thinks. The stock recycles the waste when exhausted, preserving every physical card and the tableau.
 
-Thirty-two defenders can occupy the field. Beyond that limit, the matching defender is refreshed rather than discarding a reward. Infantry waits without expiring until an enemy enters range. Turrets stop firing at zero ammunition; their counts are displayed on the field.
+Thirty-two defenders can occupy the field. Beyond that limit, the matching defender is refreshed rather than discarding a reward. Infantry waits without expiring until an enemy enters range. The turret persists when empty and stops shooting. Every chain of three or more cards reloads that same turret to its full upgraded capacity; ammunition never sums across reloads and duplicate turrets are never built. A magazine bar and current/full count show its state. Legacy saves merge duplicate turrets into the fullest single cannon.
 
 Hearts repair castle HP; clubs provide armor; diamonds add bankable coins. Existing HEAL, GUARD, GOLD and WILD powers work. BOMB damages the lane and CRIT boosts the new defender. Black joker multiplies newly deployed damage by five; red joker grants lifesteal. The multiplier captured at red activation preserves the requested red/black order: red→black heals from damage before the critical multiplier, black→red heals from the critical damage. Units retain their deployment stats while the next chain is built.
 
@@ -31,15 +31,21 @@ Normal invaders reach the castle in roughly 23–30 seconds if unopposed. Contac
 
 The prototype favors readable decisions over frantic tapping. Automated seeded simulations check board completion and the effect of upgrades; human pacing feedback should guide the next tuning pass.
 
+## Difficulty across sieges and feedback
+
+Every new siege reserves a persistent number, including restarts after defeat. Continuing an existing save does not reserve a new number. Siege #1 starts at the base tuning. Each subsequent siege adds 8% enemy HP, 1.5% movement speed (capped at +30%) and 3% spawn pressure (capped at +60%). Difficulty and workshop levels are captured in the run save; old saves start at siege #1. Wallet, upgrades and previous settlement records migrate unchanged. The menu previews the next siege number and enemy HP increase; the battle/result show the current number.
+
+The ladder buttons open paused explanations with current upgrade values and stock-draw timing. Colored sparks travel from the active card to the deployed unit, followed by an expanding ring. Turret shots flash at the muzzle and recoil; reloads show a refill burst and explicit full-magazine count. Healing, armor and gold show distinct effects and amounts at the castle/HUD. BOMB, WILD, critical and joker cards show contextual combat callouts; mortar and laser retain distinct projectiles/blasts.
+
 ## Permanent progression
 
 Kills pay one coin; supermonsters pay five; completing the tableau pays ten extra. Diamond income is also banked. Defeat retains earned coins. Settlement records the run ID to prevent duplicate rewards after reopening/reloading a result screen.
 
 | Workshop upgrade | Baseline | Each level |
 |---|---|---|
-| Castle walls | 30 HP | +5 HP |
+| Castle walls | 30 HP | +8 HP |
 | Soldiers per deployment (each 1 HP / 1 damage) | 1 | +1 soldier |
-| Knight damage | 6 | +2 |
+| Knight health and damage | 6 HP / 6 damage | +2 HP and +2 damage |
 | Turret magazine | 100 rounds | +20 rounds |
 | Mortar damage | 9 | +2 |
 | Laser damage against supermonsters | 80 | +20 |

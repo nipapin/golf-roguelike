@@ -17,7 +17,7 @@ export const DEFENDER_STATS: Record<
   mortar: { damage: 9, interval: 2, range: 0.22, ttl: 45, ammo: 12 },
 };
 export const UPGRADE_VALUES: Record<UpgradeKey, { base: number; step: number }> = {
-  walls: { base: 30, step: 5 },
+  walls: { base: 30, step: 8 },
   soldier: { base: 1, step: 1 },
   knight: { base: 6, step: 2 },
   magazine: { base: 100, step: 20 },
@@ -97,6 +97,7 @@ export interface SiegeState {
 export interface CastleRun {
   version: 1;
   id: string;
+  siegeNumber: number;
   run: RunState;
   siege: SiegeState;
   upgrades: Upgrades;
@@ -104,6 +105,8 @@ export interface CastleRun {
 export type SiegeEvent =
   | { type: 'spawn'; enemy: Invader }
   | { type: 'deploy'; kind: UnitKind; id: number }
+  | { type: 'reload'; id: number; ammo: number }
+  | { type: 'boost'; effect: 'heal' | 'armor' | 'gold'; amount: number }
   | { type: 'shot'; kind: UnitKind; unit: number; target: number; damage: number }
   | { type: 'killed'; enemy: Invader }
   | { type: 'unit_killed'; unit: Defender }
@@ -129,13 +132,15 @@ export function createCastleRun(
   seed: string,
   config: GameConfig,
   upgrades: Upgrades,
-  id = seed
+  id = seed,
+  siegeNumber = 1
 ): CastleRun {
   const maxHp = upgradeValue('walls', upgrades.walls);
   const initial = setupBattle(startRun(seed, config), sentinel, 7, config);
   return {
     version: 1,
     id,
+    siegeNumber,
     upgrades: { ...upgrades },
     run: { ...initial, player: { ...initial.player, hp: maxHp, maxHp } },
     siege: {
@@ -153,6 +158,15 @@ export function createCastleRun(
     },
   };
 }
+/** Difficulty is saved with the siege; reopening never increases it. */
+export const siegeDifficulty = (siegeNumber: number) => {
+  const tier = Math.max(0, siegeNumber - 1);
+  return {
+    hp: 1 + tier * 0.08,
+    speed: 1 + Math.min(0.3, tier * 0.015),
+    spawn: 1 / (1 + Math.min(0.6, tier * 0.03)),
+  };
+};
 const clone = (state: CastleRun): CastleRun => ({
   ...state,
   run: { ...state.run, player: { ...state.run.player } },
@@ -177,6 +191,7 @@ function laser(state: CastleRun, events: SiegeEvent[], final = false) {
     upgradeValue('laser', state.upgrades.laser) * (state.run.battle?.jokerMultiplier ?? 1);
   const ratio =
     ((state.run.battle?.lifestealMultiplier ?? 0) / (state.run.battle?.jokerMultiplier ?? 1)) * 0.3;
+  const previousHp = state.run.player.hp;
   let healing = 0;
   for (const enemy of state.siege.enemies) {
     healing += Math.min(enemy.hp, damage) * ratio;
@@ -190,6 +205,8 @@ function laser(state: CastleRun, events: SiegeEvent[], final = false) {
         hp: Math.min(state.run.player.maxHp, state.run.player.hp + healing),
       },
     };
+  const restored = state.run.player.hp - previousHp;
+  if (restored > 0) events.push({ type: 'boost', effect: 'heal', amount: restored });
   events.push({ type: 'laser', damage, final });
   killDead(state, events);
   state.siege.laserCharge = 0;
@@ -203,22 +220,46 @@ function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
       ? stats.damage
       : upgradeValue(kind, state.upgrades[kind]);
   const unit: Defender = {
-    id: state.siege.nextId++,
+    id:
+      kind === 'turret'
+        ? (state.siege.units.find((u) => u.kind === 'turret')?.id ?? state.siege.nextId++)
+        : state.siege.nextId++,
     kind,
     damage: base * multiplier,
     heal: ((b.lifestealMultiplier ?? 0) / multiplier) * 0.3,
     cooldown: 0,
     engaged: false,
-    hp: kind === 'soldier' ? 1 : 6,
-    maxHp: kind === 'soldier' ? 1 : 6,
+    hp:
+      kind === 'soldier'
+        ? 1
+        : kind === 'knight'
+          ? upgradeValue('knight', state.upgrades.knight)
+          : 6,
+    maxHp:
+      kind === 'soldier'
+        ? 1
+        : kind === 'knight'
+          ? upgradeValue('knight', state.upgrades.knight)
+          : 6,
     progress: 0.94,
     ttl: stats.ttl,
     ammo: kind === 'turret' ? upgradeValue('magazine', state.upgrades.magazine) : stats.ammo,
   };
+  if (kind === 'turret') {
+    const turret = state.siege.units.find((u) => u.kind === 'turret');
+    if (turret) {
+      Object.assign(turret, unit, { cooldown: Math.max(0, turret.cooldown) });
+      events.push({ type: 'reload', id: turret.id, ammo: turret.ammo });
+      return;
+    }
+  }
   // Thirty-two visible defenders maximum. A new deployment refreshes a matching unit
   // once all slots are occupied; it never silently throws away a combo reward.
   if (state.siege.units.length >= 32) {
-    const existing = state.siege.units.find((u) => u.kind === kind) ?? state.siege.units[0];
+    const existing =
+      state.siege.units.find((u) => u.kind === kind) ??
+      state.siege.units.find((u) => u.kind !== 'turret') ??
+      state.siege.units[0];
     Object.assign(existing, unit, { id: existing.id });
     events.push({ type: 'deploy', kind, id: existing.id });
   } else {
@@ -254,6 +295,13 @@ export function playCastleCard(
       ),
     },
   ];
+  const changes = [
+    ['heal', state.run.player.hp - current.run.player.hp],
+    ['armor', state.run.player.armor - current.run.player.armor],
+    ['gold', state.run.player.gold - current.run.player.gold],
+  ] as const;
+  for (const [effect, amount] of changes)
+    if (amount > 0) events.push({ type: 'boost', effect, amount });
   // BOMB blasts the whole lane; CRIT improves the newly deployed unit.
   if (played.events.some((e) => e.type === 'power_activated' && e.powerType === 'BOMB')) {
     state.siege.enemies.forEach((e) => {
@@ -287,7 +335,7 @@ export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeRes
   );
   if (critical)
     for (const event of events) {
-      if (event.type === 'deploy') {
+      if (event.type === 'deploy' || event.type === 'reload') {
         const unit = state.siege.units.find((u) => u.id === event.id);
         if (unit) unit.damage *= config.powerCards.CRIT.damageMultiplier;
       }
@@ -324,6 +372,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
   const state = clone(current),
     siege = state.siege,
     events: SiegeEvent[] = [];
+  const difficulty = siegeDifficulty(state.siegeNumber);
   siege.elapsed += STEP;
   siege.spawnIn -= STEP;
   if (siege.spawnIn <= 0 && siege.enemies.length < SIEGE_PACING.maxEnemies) {
@@ -333,7 +382,10 @@ export function stepSiege(current: CastleRun): SiegeResult {
     for (let i = 0; i < size && siege.enemies.length < SIEGE_PACING.maxEnemies; i++) {
       siege.spawned++;
       const boss = siege.spawned % SIEGE_PACING.bossEvery === 0;
-      const hp = boss ? 100 + level * 20 : SIEGE_PACING.enemyHp + level * SIEGE_PACING.hpGrowth;
+      const hp = Math.ceil(
+        (boss ? 100 + level * 20 : SIEGE_PACING.enemyHp + level * SIEGE_PACING.hpGrowth) *
+          difficulty.hp
+      );
       const sprites = boss ? ['c_ogre', 'c_reaper1'] : ['c_orc', 'c_goblin', 'c_reaper2'];
       const enemy: Invader = {
         id: siege.nextId++,
@@ -342,7 +394,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
         hp,
         maxHp: hp,
         progress: i * 0.035,
-        speed: (boss ? 0.025 : 0.032) + rng.next() * 0.006,
+        speed: ((boss ? 0.025 : 0.032) + rng.next() * 0.006) * difficulty.speed,
         damage: boss ? 4 : 1 + Math.floor(level / 2),
         cooldown: 0,
       };
@@ -350,13 +402,15 @@ export function stepSiege(current: CastleRun): SiegeResult {
       events.push({ type: 'spawn', enemy: { ...enemy } });
     }
     siege.rngState = rng.getState();
-    siege.spawnIn = Math.max(
-      SIEGE_PACING.intervalFloor,
-      SIEGE_PACING.interval - Math.floor(siege.elapsed / 2) * SIEGE_PACING.acceleration
-    );
+    siege.spawnIn =
+      difficulty.spawn *
+      Math.max(
+        SIEGE_PACING.intervalFloor,
+        SIEGE_PACING.interval - Math.floor(siege.elapsed / 2) * SIEGE_PACING.acceleration
+      );
   }
   for (const unit of siege.units) {
-    if (unit.engaged) unit.ttl -= STEP;
+    if (unit.engaged && unit.kind !== 'turret') unit.ttl -= STEP;
     unit.cooldown -= STEP;
     const mobile = unit.kind === 'soldier' || unit.kind === 'knight';
     const nearby = siege.enemies.some(
@@ -392,7 +446,9 @@ export function stepSiege(current: CastleRun): SiegeResult {
     }
   }
   killDead(state, events);
-  siege.units = siege.units.filter((u) => u.ttl > 0 && u.ammo > 0 && u.hp > 0);
+  siege.units = siege.units.filter(
+    (u) => u.hp > 0 && (u.kind === 'turret' || (u.ttl > 0 && u.ammo > 0))
+  );
   for (const enemy of siege.enemies) {
     const opponent = siege.units.find(
       (u) =>
@@ -426,6 +482,8 @@ export function stepSiege(current: CastleRun): SiegeResult {
     }
   }
   siege.units = siege.units.filter((u) => u.hp > 0);
+  const healing = state.run.player.hp - current.run.player.hp;
+  if (healing > 0) events.push({ type: 'boost', effect: 'heal', amount: healing });
   if (state.run.player.hp <= 0) {
     state.run = { ...state.run, phase: 'defeat' };
     events.push({ type: 'ended', victory: false });

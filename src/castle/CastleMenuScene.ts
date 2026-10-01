@@ -15,6 +15,7 @@ import {
   UPGRADE_LIMIT,
   upgradeCost,
   upgradeValue,
+  siegeDifficulty,
   type UpgradeKey,
 } from './CastleDefense';
 
@@ -27,7 +28,7 @@ const LABELS: Record<UpgradeKey, string> = {
   laser: 'LASER CORE',
 };
 const values = (key: UpgradeKey, n: number) =>
-  `${upgradeValue(key, n)} ${key === 'walls' ? 'HP' : key === 'magazine' ? 'rounds' : key === 'soldier' ? 'troops (1 HP / 1 damage)' : 'damage'}`;
+  `${upgradeValue(key, n)} ${key === 'walls' ? 'HP' : key === 'magazine' ? 'rounds' : key === 'soldier' ? 'troops' : key === 'knight' ? 'HP / damage' : 'damage'}`;
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const modal = gamePopup(scene, 'DEFEND THE CASTLE', 'One solitaire. A whole siege.', 560);
   modal.root.setDepth(3000);
@@ -38,7 +39,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'BUILD A CHAIN',
-      '1: soldier · 2: knight · 3: turret (100 rounds)\n4: mortar · 5: laser. Rewards stay banked until you DRAW from stock. Then all reached rewards deploy. Soldiers march: 1 HP / 1 damage.',
+      '1: soldier · 2: knight · 3: build / reload ONE turret\n4: mortar · 5: laser. Rewards stay banked until you DRAW from stock. Then all reached rewards deploy. Soldiers march: 1 HP / 1 damage.',
     ],
     [
       'THE ROAD IS REAL TIME',
@@ -50,7 +51,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'FINISH TO WIN',
-      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop.',
+      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop. Each NEW siege raises enemy HP and pressure; continuing a save keeps its difficulty.',
     ],
   ];
   const available = modal.height - 166,
@@ -113,6 +114,15 @@ export class CastleMenuScene extends Phaser.Scene {
     });
     const meta = manager.service.readMeta(),
       saved = manager.service.load();
+    const next = meta.siegesStarted + 1;
+    const threat = siegeDifficulty(next);
+    this.text(
+      w / 2,
+      safe.top + 140,
+      `NEXT SIEGE #${next} · ENEMY HP +${Math.round((threat.hp - 1) * 100)}%`,
+      13,
+      '#ffda9a'
+    );
     const buttons = this.add.container(w / 2, safe.bottom - 165);
     this.add.image(w / 2 - 39, safe.bottom - 223, 'coin').setDisplaySize(26, 26);
     this.text(w / 2 + 17, safe.bottom - 223, String(meta.coins), 24, '#ffe35a');
@@ -227,7 +237,7 @@ export class CastleMenuScene extends Phaser.Scene {
     const modal = gamePopup(
       this,
       'WORKSHOP',
-      `${meta.coins} coins · Next siege · Max level ${UPGRADE_LIMIT}`,
+      `${meta.coins} coins · Siege #${meta.siegesStarted + 1} · Upgrades apply next run`,
       530
     );
     const cellW = (modal.width - 48) / 2,
@@ -248,7 +258,7 @@ export class CastleMenuScene extends Phaser.Scene {
         this.text(
           0,
           55,
-          maxed ? values(key, level) : `${values(key, level)} → ${values(key, level + 1)}`,
+          maxed ? values(key, level) : `${values(key, level)}\n→ ${values(key, level + 1)}`,
           10,
           '#35204d'
         )
