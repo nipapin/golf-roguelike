@@ -249,6 +249,17 @@ export class CastleScene extends Phaser.Scene {
       castleManager().save();
       this.saveTimer = 0;
     }
+    for (const unit of castleManager().state?.siege.units ?? []) {
+      const view = this.defenders.get(unit.id);
+      if (!view) continue;
+      const target = this.unitPosition(unit);
+      view.root.x += (target.x - view.root.x) * Math.min(1, delta / 90);
+      view.root.y =
+        target.y +
+        (unit.kind === 'soldier' || unit.kind === 'knight'
+          ? Math.sin(this.time.now / 100 + unit.id) * 1.5
+          : 0);
+    }
     for (const enemy of castleManager().state?.siege.enemies ?? []) {
       const view = this.invaders.get(enemy.id);
       if (!view) continue;
@@ -282,16 +293,8 @@ export class CastleScene extends Phaser.Scene {
     return { x: viewport(this).width * 0.78 - this.layout.cw / 2, y: this.layout.trayTop + 7 };
   }
   private unitPosition(unit: Defender) {
-    const fraction =
-      unit.kind === 'soldier'
-        ? 0.63
-        : unit.kind === 'knight'
-          ? 0.56
-          : unit.kind === 'turret'
-            ? 0.8
-            : 0.74;
     return {
-      x: viewport(this).width * fraction + ((unit.id % 3) - 1) * 9,
+      x: 10 + unit.progress * viewport(this).width * 0.78 + ((unit.id % 3) - 1) * 4,
       y:
         this.groundY() -
         (unit.kind === 'turret' || unit.kind === 'mortar' ? 14 : (unit.id % 2) * 9),
@@ -409,13 +412,8 @@ export class CastleScene extends Phaser.Scene {
     this.hpText.setText(`CASTLE ${Math.ceil(player.hp)} / ${player.maxHp}`);
     this.coins.setText(String(state.siege.coins + player.gold));
     this.status.setText(`ARMOR ${player.armor}\nKILLS ${state.siege.kills}`);
-    const names = ['SOLDIER', 'KNIGHT', 'TURRET', 'MORTAR', 'LASER'];
-    const next =
-      chain < 5
-        ? `${names[chain]} AT ${chain + 1}`
-        : `LASER AT ${5 + (Math.floor((chain - 5) / 3) + 1) * 3}`;
     this.chainText.setText(
-      state.siege.started ? `CHAIN ${chain} · NEXT ${next}` : 'FIRST MOVE STARTS THE SIEGE'
+      state.siege.started ? `CHAIN ${chain} · DRAW TO DEPLOY` : 'FIRST MOVE STARTS THE SIEGE'
     );
     this.steps.forEach((box, i) =>
       box
@@ -423,7 +421,9 @@ export class CastleScene extends Phaser.Scene {
         .setStrokeStyle(chain > i ? 2 : 1, chain > i ? 0xffda64 : 0x8862ba)
     );
     const left = state.run.battle!.tableau.reduce((n, col) => n + col.cards.length, 0);
-    this.stockText.setText(`${state.run.battle!.deck.length} in stock\n${left} cards to victory`);
+    this.stockText.setText(
+      `${chain ? 'DRAW TO DEPLOY' : 'No chain banked'}\n${state.run.battle!.deck.length} stock · ${left} cards left`
+    );
     this.activeLabel.setText(
       state.run.battle!.wildActive
         ? 'WILD · ANY CARD'
@@ -497,9 +497,7 @@ export class CastleScene extends Phaser.Scene {
       view.label.setText(
         unit.kind === 'turret' || unit.kind === 'mortar'
           ? String(unit.ammo)
-          : unit.engaged
-            ? `${Math.ceil(unit.ttl)}s`
-            : 'READY'
+          : `${unit.hp}/${unit.maxHp} HP`
       );
     }
   }
@@ -547,6 +545,19 @@ export class CastleScene extends Phaser.Scene {
         case 'shot':
           this.shot(event);
           break;
+        case 'unit_killed': {
+          const view = this.defenders.get(event.unit.id);
+          if (!view) break;
+          this.defenders.delete(event.unit.id);
+          view.body?.play(`${event.unit.kind === 'knight' ? 'c_angel2' : 'c_angel1'}-dead`);
+          this.tweens.add({
+            targets: view.root,
+            alpha: 0,
+            duration: 400,
+            onComplete: () => view.root.destroy(),
+          });
+          break;
+        }
         case 'killed': {
           const view = this.invaders.get(event.enemy.id);
           if (!view) break;

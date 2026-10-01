@@ -27,7 +27,7 @@ const LABELS: Record<UpgradeKey, string> = {
   laser: 'LASER CORE',
 };
 const values = (key: UpgradeKey, n: number) =>
-  `${upgradeValue(key, n)} ${key === 'walls' ? 'HP' : key === 'magazine' ? 'rounds' : 'damage'}`;
+  `${upgradeValue(key, n)} ${key === 'walls' ? 'HP' : key === 'magazine' ? 'rounds' : key === 'soldier' ? 'troops (1 HP / 1 damage)' : 'damage'}`;
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const modal = gamePopup(scene, 'DEFEND THE CASTLE', 'One solitaire. A whole siege.', 560);
   modal.root.setDepth(3000);
@@ -38,7 +38,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'BUILD A CHAIN',
-      '1: soldier · 2: knight · 3: turret (100 rounds)\n4: mortar · 5: laser. Each extra 3 cards fires another laser. You earn every reached reward.',
+      '1: soldier · 2: knight · 3: turret (100 rounds)\n4: mortar · 5: laser. Rewards stay banked until you DRAW from stock. Then all reached rewards deploy. Soldiers march: 1 HP / 1 damage.',
     ],
     [
       'THE ROAD IS REAL TIME',

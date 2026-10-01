@@ -65,7 +65,7 @@ function validRun(v: unknown): v is CastleRun {
     typeof s.spawnIn === 'number' &&
     Number.isFinite(s.spawnIn) &&
     Array.isArray(s.enemies) &&
-    s.enemies.length <= 16 &&
+    s.enemies.length <= 32 &&
     s.enemies.every(
       (e) =>
         record(e) &&
@@ -80,14 +80,17 @@ function validRun(v: unknown): v is CastleRun {
         Number.isFinite(e.cooldown)
     ) &&
     Array.isArray(s.units) &&
-    s.units.length <= 8 &&
+    s.units.length <= 32 &&
     s.units.every(
       (u) =>
         record(u) &&
         integer(u.id) &&
         ['soldier', 'knight', 'turret', 'mortar'].includes(String(u.kind)) &&
         typeof u.engaged === 'boolean' &&
-        ['damage', 'heal', 'ttl', 'ammo'].every((k) => finite(u[k])) &&
+        ['damage', 'heal', 'ttl', 'ammo', 'hp', 'maxHp', 'progress'].every((k) => finite(u[k])) &&
+        (u.progress as number) <= 0.94 &&
+        (u.hp as number) > 0 &&
+        (u.hp as number) <= (u.maxHp as number) &&
         typeof u.cooldown === 'number' &&
         Number.isFinite(u.cooldown)
     )
@@ -153,6 +156,20 @@ export class CastleService {
   load(): CastleRun | null {
     try {
       const v: unknown = JSON.parse(this.storage.getItem(RUN_KEY) ?? 'null');
+      // Existing saves predate marching infantry; preserve their board and wallet.
+      if (record(v) && record(v.siege) && Array.isArray(v.siege.units)) {
+        v.siege.units = v.siege.units.map((u) =>
+          record(u)
+            ? {
+                ...u,
+                hp: u.hp ?? (u.kind === 'soldier' ? 1 : 6),
+                maxHp: u.maxHp ?? (u.kind === 'soldier' ? 1 : 6),
+                progress: u.progress ?? 0.94,
+                damage: u.hp === undefined && u.kind === 'soldier' ? 1 : u.damage,
+              }
+            : u
+        );
+      }
       return validRun(v) ? v : null;
     } catch {
       return null;
