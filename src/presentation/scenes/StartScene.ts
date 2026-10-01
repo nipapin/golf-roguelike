@@ -132,11 +132,11 @@ export class StartScene extends Phaser.Scene {
     this.add.text(cx, height - 40, 'HOW TO PLAY', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#ffe35a' }).setOrigin(.5).setInteractive().on('pointerup', () => showRules(this));
 
     // Mascot (small slime in corner)
-    if (this.textures.exists('enemy-slime')) {
-      const mascot = this.add.sprite(40, height - 60, 'enemy-slime');
+    if (this.textures.exists('enemy-orc1')) {
+      const mascot = this.add.sprite(40, height - 60, 'enemy-orc1');
       mascot.setOrigin(0.5, 1);
       mascot.setScale(0.4);
-      const idleKey = 'slime-idle';
+      const idleKey = 'orc1-idle';
       if (this.anims.exists(idleKey)) {
         mascot.play(idleKey);
       }

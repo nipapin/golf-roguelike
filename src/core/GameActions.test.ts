@@ -566,7 +566,7 @@ describe('run progression', () => {
   it('should reach victory after defeating boss', () => {
     const state: RunState = {
       ...createTestBattleState('boss-win'),
-      currentFight: 2, // Last fight (index 2 in 3-fight run)
+      currentFight: 2, // Boss is opened by clearing the solitaire.
       phase: 'battle',
     };
 
@@ -575,6 +575,7 @@ describe('run progression', () => {
       ...state,
       battle: {
         ...state.battle!,
+        mode: 'boss',
         enemy: { ...state.battle!.enemy, hp: 0 },
         accumulatedDamage: 1,
         chain: [state.battle!.tableau[0].cards[0]],

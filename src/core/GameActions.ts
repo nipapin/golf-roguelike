@@ -17,6 +17,7 @@ import {
   isTableauEmpty,
   hasLegalMoves,
   setupBattle,
+  createEnemy,
   EnemiesData,
 } from './GameState';
 import { calculateCardDamage } from './DamageCalculator';
@@ -62,9 +63,14 @@ export function playCard(
   }
 
   // Remove card from tableau
-  const newTableau: TableauColumn[] = battle.tableau.map((col, i) =>
+  let newTableau: TableauColumn[] = battle.tableau.map((col, i) =>
     i === colIndex ? { cards: col.cards.slice(0, -1) } : col
   );
+
+  const remainingDeck = [...battle.deck];
+  if (battle.mode === 'boss' && remainingDeck.length) {
+    newTableau = newTableau.map((col, i) => i === colIndex ? { cards: [remainingDeck.shift()!] } : col);
+  }
 
   // Add previous active card to discard
   const newDiscard = battle.activeCard ? [...battle.discard, battle.activeCard] : battle.discard;
@@ -197,6 +203,7 @@ export function playCard(
   const newBattle: BattleState = {
     ...battle,
     tableau: newTableau,
+    deck: remainingDeck,
     discard: newDiscard,
     activeCard: card,
     chain: [...battle.chain, card],
@@ -383,7 +390,13 @@ function resolveTableauCleared(
 
   events.push({ type: 'tableau_cleared', bonusReward: true });
 
-  // Instant victory
+  // Clearing the solitaire opens the boss; an exhausted boss hand is recycled
+  // rather than awarding a victory without dealing its remaining HP.
+  if (newState.battle?.mode === 'boss' && newState.battle.enemy.hp > 0) {
+    return { state: refillBossHand(newState), events };
+  }
+
+  // The last ordinary opponent yields when the solitaire is completed.
   if (newState.battle) {
     const newEnemy = { ...newState.battle.enemy, hp: 0 };
     newState = {
@@ -470,6 +483,9 @@ function reshuffleDeck(state: RunState, _config: GameConfig): ActionResult {
     chain: [],
     accumulatedDamage: 0,
     wildActive: false,
+    chainBaseDamage: 0,
+    jokerMultiplier: newActiveCard?.joker === 'black' ? 5 : 1,
+    lifestealMultiplier: newActiveCard?.joker === 'red' ? 1 : 0,
   };
 
   return {
@@ -487,7 +503,8 @@ function handleEnemyDeath(
   events.push({ type: 'enemy_died' });
   events.push({ type: 'battle_won' });
 
-  const isFinalBoss = state.currentFight >= config.runStructure.length - 1;
+  const isFinalBoss = state.battle?.mode === 'boss';
+  void config;
 
   if (isFinalBoss) {
     events.push({ type: 'run_won' });
@@ -498,7 +515,7 @@ function handleEnemyDeath(
   }
 
   return {
-    state: { ...state, phase: 'reward', battle: null },
+    state: { ...state, phase: 'reward', battle: state.battle ? { ...state.battle, chain: [], accumulatedDamage: 0, chainBaseDamage: 0, jokerMultiplier: state.battle.activeCard?.joker === 'black' ? 5 : 1, lifestealMultiplier: state.battle.activeCard?.joker === 'red' ? 1 : 0 } : null },
     events,
   };
 }
@@ -705,40 +722,35 @@ export function startNextBattle(
   enemiesData: EnemiesData,
   config: GameConfig
 ): RunState {
-  if (state.currentFight >= config.runStructure.length) {
-    return { ...state, phase: 'victory' };
-  }
-
   const rng = RNG.fromState(state.rngState);
-  const fightConfig = config.runStructure[state.currentFight];
-  const tier = fightConfig.enemyTier;
+  const enteringBoss = !!state.battle && isTableauEmpty(state.battle.tableau);
+  const tier: 'normal' | 'elite' | 'boss' = enteringBoss ? 'boss' : state.currentFight > 0 && state.currentFight % 3 === 0 ? 'elite' : 'normal';
+  const data = rng.pickOne(enemiesData[tier]);
+  const levelHp = 10 + state.currentFight * 6;
+  const remaining = state.battle?.tableau.flatMap(col => col.cards);
+  // Each ordinary card deals at least one damage even when banked alone.
+  // Powers, spades, combos and relics only increase this conservative allowance.
+  const budget = remaining?.filter(card => !card.joker).length ?? config.tableau.columns * config.tableau.rows - 2;
+  const hp = enteringBoss ? 48 : Math.max(1, Math.min(levelHp, budget));
+  const enemyData = { ...data, id: `${data.id}-level-${state.currentFight + 1}`, hp, tier };
+  if (state.battle) {
+    const next = { ...state, rngState: rng.getState(), phase: 'battle' as const,
+      battle: { ...state.battle, enemy: createEnemy(enemyData), isFirstChain: true } };
+    return enteringBoss ? refillBossHand({ ...next, battle: { ...next.battle, mode: 'boss' } }) : next;
+  }
+  const extra = state.player.relics.find(r => r.effect.type === 'extraPowerCards');
+  return setupBattle({ ...state, rngState: rng.getState() }, enemyData,
+    (data.powerCardCount ?? enemiesData.defaults.powerCardCount[tier]) + (typeof extra?.effect.value === 'number' ? extra.effect.value : 0), config);
+}
 
-  const enemyPool = enemiesData[tier];
-  const enemyData = rng.pickOne(enemyPool);
-
-  const powerCardCount =
-    enemyData.powerCardCount ?? enemiesData.defaults.powerCardCount[tier];
-
-  // Apply extra power cards from relics
-  const extraPowerRelic = state.player.relics.find(
-    (r) => r.effect.type === 'extraPowerCards'
-  );
-  const finalPowerCardCount =
-    powerCardCount +
-    (extraPowerRelic && typeof extraPowerRelic.effect.value === 'number'
-      ? extraPowerRelic.effect.value
-      : 0);
-
-  const newState = setupBattle(
-    { ...state, rngState: rng.getState() },
-    enemyData,
-    finalPowerCardCount,
-    config
-  );
-
-  // Reset armor at battle start
-  return {
-    ...newState,
-    player: { ...newState.player, armor: 0 },
-  };
+/** Reuse the collected physical pack as seven open boss slots, never a new solitaire. */
+function refillBossHand(state: RunState): RunState {
+  if (!state.battle) return state;
+  const battle = state.battle;
+  const rng = RNG.fromState(state.rngState);
+  const cards = rng.shuffle([...battle.discard, ...battle.deck, ...battle.tableau.flatMap(col => col.cards)]);
+  const tableau = Array.from({ length: 7 }, () => ({ cards: cards.length ? [cards.shift()!] : [] }));
+  return { ...state, rngState: rng.getState(), battle: { ...battle, tableau, deck: cards, discard: [], mode: 'boss',
+    chain: [], accumulatedDamage: 0, chainBaseDamage: 0, jokerMultiplier: battle.activeCard?.joker === 'black' ? 5 : 1,
+    lifestealMultiplier: battle.activeCard?.joker === 'red' ? 1 : 0 } };
 }

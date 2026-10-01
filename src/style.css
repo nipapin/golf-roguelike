@@ -25,8 +25,8 @@ body {
 
 #game {
   position: absolute;
-  top: env(safe-area-inset-top, 0px);
-  bottom: env(safe-area-inset-bottom, 0px);
+  top: 0;
+  bottom: 0;
   left: env(safe-area-inset-left, 0px);
   right: env(safe-area-inset-right, 0px);
   width: auto;
@@ -40,4 +40,12 @@ canvas {
   width: 100% !important;
   height: 100% !important;
   image-rendering: auto;
+}
+
+#safe-area-probe {
+  position: fixed;
+  visibility: hidden;
+  pointer-events: none;
+  padding-top: env(safe-area-inset-top, 0px);
+  padding-bottom: env(safe-area-inset-bottom, 0px);
 }

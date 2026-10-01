@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import './style.css';
+import { viewportHeight } from './presentation/design/safeArea';
 import { setRenderDensity, getRenderDensity } from './presentation/design/viewport';
 
 import { loadFonts } from './presentation/design/fontLoader';
@@ -36,8 +37,7 @@ async function initGame() {
 
   const host = document.getElementById('game')!;
   const syncViewportHeight = () => {
-    const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
-    const height = standalone ? window.innerHeight : (window.visualViewport?.height ?? window.innerHeight);
+    const height = viewportHeight({ innerWidth: window.innerWidth, innerHeight: window.innerHeight, screenWidth: screen.width, screenHeight: screen.height, visualHeight: window.visualViewport?.height, iosStandalone: (navigator as Navigator & { standalone?: boolean }).standalone === true });
     document.documentElement.style.setProperty('--viewport-height', height + 'px');
   };
   syncViewportHeight();

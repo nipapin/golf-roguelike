@@ -3,17 +3,7 @@ import { viewport, configureViewport, getRenderDensity } from '../design/viewpor
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
-const ENEMY_SPRITES = [
-  'slime',
-  'mushroom',
-  'bat',
-  'wolf',
-  'zombie',
-  'goblin',
-  'bandit',
-  'knight',
-  'samurai',
-];
+const ENEMY_SPRITES = ['orc1', 'orc2', 'orc3'];
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -110,48 +100,11 @@ export class BootScene extends Phaser.Scene {
         continue;
       }
 
-      const frames = this.textures.get(atlasKey).getFrameNames();
-      const frameCount = frames.length;
-
-      if (frameCount > 0) {
-        // Goblin's generated atlas has repeated placeholder frames after frame 8.
-        // Keep idle out of the death pose; all actors also receive motion tweens.
-        const ranges = enemy === 'goblin'
-          ? { idle: [0, 3], attack: [4, 7], hurt: [7, 7], dead: [8, 8] }
-          : { idle: [0, Math.min(11, frameCount - 1)], attack: [12, Math.min(19, frameCount - 1)], hurt: [20, Math.min(27, frameCount - 1)], dead: [28, frameCount - 1] };
-        for (const [name, [start, end]] of Object.entries(ranges)) {
-          this.createAnimationFromRange(atlasKey, name, enemy, start, end, name === 'idle' ? 8 : 12, name === 'idle' ? -1 : 0);
-        }
-      }
-    }
-  }
-
-  private createAnimationFromRange(
-    atlasKey: string,
-    animName: string,
-    enemy: string,
-    start: number,
-    end: number,
-    frameRate: number,
-    repeat: number
-  ): void {
-    const frames: Phaser.Types.Animations.AnimationFrame[] = [];
-
-    for (let i = start; i <= end; i++) {
-      const frameName = `${enemy}_${i.toString().padStart(3, '0')}`;
-      if (this.textures.get(atlasKey).has(frameName)) {
-        frames.push({ key: atlasKey, frame: frameName });
-      }
-    }
-
-    if (frames.length > 0) {
-      const animKey = `${enemy}-${animName}`;
-      if (!this.anims.exists(animKey)) {
-        this.anims.create({
-          key: animKey,
-          frames,
-          frameRate,
-          repeat,
+      for (const action of ['idle', 'attack', 'hurt', 'dead']) {
+        const names = this.textures.get(atlasKey).getFrameNames().filter(name => name.startsWith(action + '_')).sort();
+        if (names.length && !this.anims.exists(`${enemy}-${action}`)) this.anims.create({
+          key: `${enemy}-${action}`, frames: names.map(frame => ({ key: atlasKey, frame })),
+          frameRate: action === 'idle' ? 7 : 12, repeat: action === 'idle' ? -1 : 0,
         });
       }
     }

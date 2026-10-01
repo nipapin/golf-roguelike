@@ -1,3 +1,4 @@
+import { readSafeArea } from './safeArea';
 /**
  * Design tokens from visual/STYLE.md
  * "Яркий мультяшный премиум в духе Supercell"
@@ -138,9 +139,10 @@ export function getCardMetrics(screenWidth: number) {
  */
 export function getLayoutMetrics(width: number, height: number) {
   const metrics = getCardMetrics(width);
-  // #game is already inset by the actual CSS safe areas. No guessed notch offsets.
-  const safeTop = 8;
-  const safeBottom = 8;
+  // Paint to the screen edges; keep controls clear of the notch/home indicator.
+  const insets = readSafeArea();
+  const safeTop = insets.top + 8;
+  const safeBottom = insets.bottom + 8;
   const hudHeight = 40;
   const playerHudHeight = 30;
   const relicHeight = 28;
@@ -164,7 +166,7 @@ export function getLayoutMetrics(width: number, height: number) {
     ...metrics, strip,
     safeTop, safeBottom, hudHeight, hudTop, playerHudTop, playerHudHeight,
     relicTop, relicHeight, arenaTop, arenaHeight, bannerTop, bannerHeight,
-    tableTop, tableHeight: height - safeBottom - tableTop,
+    tableTop, tableHeight: height - tableTop,
     tableauTop, tableauHeight, trayTop, trayHeight,
     enemyHeight: Math.max(40, Math.min(arenaHeight - 66, 185)),
     activeScale, activeW, activeH, isCompact: height <= 760,

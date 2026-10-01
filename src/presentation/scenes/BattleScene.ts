@@ -171,7 +171,7 @@ export class BattleScene extends Phaser.Scene {
     const manager = getGameManager();
     this.topHUD = this.add.container(0, hudTop).setDepth(100);
     const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
-    const progress = this.add.text(16, hudHeight / 2, `FIGHT ${manager.getCurrentFightNumber()} / ${manager.getTotalFights()}`, {
+    const progress = this.add.text(16, hudHeight / 2, manager.getState()?.battle?.mode === 'boss' ? 'BOSS FIGHT' : `LEVEL ${manager.getCurrentFightNumber()}`, {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
     }).setOrigin(0, 0.5);
     const coin = this.add.image(width * 0.58 - 20, hudHeight / 2, 'coin').setDisplaySize(24, 24);
@@ -205,7 +205,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private createTableBackground(): void {
-    const { tableTop, safeBottom } = this.layout;
+    const { tableTop } = this.layout;
     const width = viewport(this).width;
     const height = viewport(this).height;
 
@@ -224,7 +224,7 @@ export class BattleScene extends Phaser.Scene {
       0,
       tableTop,
       width,
-      height - tableTop - safeBottom + 10,
+      height - tableTop + 10,
       { tl: 22, tr: 22, bl: 0, br: 0 }
     );
 
@@ -325,7 +325,8 @@ export class BattleScene extends Phaser.Scene {
       this.enemySprite.destroy();
     }
 
-    const atlasKey = `enemy-${enemy.sprite || 'goblin'}`;
+    const monster = enemy.sprite?.startsWith('orc') ? enemy.sprite : enemy.tier === 'boss' ? 'orc3' : 'orc1';
+    const atlasKey = `enemy-${monster}`;
     if (this.textures.exists(atlasKey)) {
       this.enemySprite = this.add.sprite(enemyX, enemyY, atlasKey);
       this.enemySprite.setOrigin(0.5, 1);
@@ -338,7 +339,7 @@ export class BattleScene extends Phaser.Scene {
       
       this.enemySprite.setScale(scale);
       this.enemySprite.setDepth(20);
-      this.enemyKey = enemy.sprite || 'goblin';
+      this.enemyKey = monster;
       this.enemyScale = scale;
       this.enemyBaseY = enemyY;
       this.startEnemyIdle();
@@ -348,7 +349,7 @@ export class BattleScene extends Phaser.Scene {
       this.enemyShadow.setSize(shadowWidth, shadowWidth * 0.2);
 
       // Play idle animation
-      const idleKey = `${enemy.sprite || 'goblin'}-idle`;
+      const idleKey = `${monster}-idle`;
       if (this.anims.exists(idleKey)) {
         this.enemySprite.play(idleKey);
       }
@@ -428,7 +429,7 @@ export class BattleScene extends Phaser.Scene {
   private renderTableau(battle: BattleState): void {
     const existing = new Map(this.cardVisuals.map((visual) => [visual.getCard().id, visual]));
     const next: CardVisual[] = [];
-    const firstDeal = !this.dealt;
+    const firstDeal = !this.dealt && battle.enemy.id.endsWith('-level-1') && battle.mode !== 'boss';
     this.dealt = true;
     const { tableauTop, cw, strip, side, gap } = this.layout;
     const powers = new Map(battle.powerCards.map((power) => [power.cardId, power.type]));
@@ -767,6 +768,8 @@ export class BattleScene extends Phaser.Scene {
 
     if (!this.enemyDying) {
       const sprite = this.enemySprite;
+      sprite.play(`${this.enemyKey}-hurt`, true);
+      sprite.once('animationcomplete', () => { if (sprite.active && !this.enemyDying) sprite.play(`${this.enemyKey}-idle`); });
       sprite.setTint(0xff8c8c);
       this.time.delayedCall(150, () => { if (sprite.active) sprite.clearTint(); });
       this.tweens.add({ targets: sprite, x: viewport(this).width / 2 + 7, duration: 45, yoyo: true, repeat: 2, onComplete: () => sprite.setX(viewport(this).width / 2) });

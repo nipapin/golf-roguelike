@@ -57,6 +57,9 @@ export interface EnemyData {
   intents: { type: 'attack' | 'defend' | 'buff' | 'debuff'; value: number }[];
   sprite: string;
   powerCardCount?: number;
+  tier?: Enemy['tier'];
+  scale?: number;
+  crown?: boolean;
 }
 
 export interface EnemiesData {
@@ -81,6 +84,9 @@ export function createEnemy(data: EnemyData): Enemy {
     intents: data.intents,
     currentIntentIndex: 0,
     sprite: data.sprite,
+    tier: data.tier,
+    scale: data.scale,
+    crown: data.crown,
   };
 }
 
@@ -117,6 +123,7 @@ export function setupBattle(
   }));
 
   const battle: BattleState = {
+    mode: 'solitaire',
     tableau,
     deck,
     discard: [],
