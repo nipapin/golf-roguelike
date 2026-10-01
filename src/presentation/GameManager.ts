@@ -243,14 +243,12 @@ export class GameManager {
 
   isEliteFight(): boolean {
     if (!this.state) return false;
-    const fight = this.config.runStructure[this.state.currentFight];
-    return fight?.enemyTier === 'elite';
+    return this.state.battle?.enemy.tier === 'elite';
   }
 
   isBossFight(): boolean {
     if (!this.state) return false;
-    const fight = this.config.runStructure[this.state.currentFight];
-    return fight?.enemyTier === 'boss';
+    return this.state.battle?.mode === 'boss';
   }
 }
 

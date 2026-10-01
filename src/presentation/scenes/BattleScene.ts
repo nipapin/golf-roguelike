@@ -139,7 +139,7 @@ export class BattleScene extends Phaser.Scene {
     this.enemyDying = false;
     AudioSystem.setMusicScene('battle');
     this.refreshState();
-    this.showActBanner();
+
     // No timed input lock at battle start: a game-clock delayedCall stretched to
     // 1-3s whenever the first frames were slow (Phaser clamps delta after a long
     // frame), silently eating the first tap. Instead, only reject pointerups whose
@@ -239,8 +239,7 @@ export class BattleScene extends Phaser.Scene {
     band.fillStyle(0x654581, 1).fillRect(0, hudTop + hudHeight + 3, width, 1);
     this.topHUD = this.add.container(0, hudTop).setDepth(100);
     const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
-    const actInfo = manager.getActInfo();
-    const progress = this.add.text(16, hudHeight / 2, `ACT ${actInfo.act} · FIGHT ${actInfo.fightInAct}/${actInfo.fightsPerAct}`, {
+    const progress = this.add.text(16, hudHeight / 2, manager.isBossFight() ? 'BOSS FIGHT' : `LEVEL ${manager.getCurrentFightNumber()}`, {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
     }).setOrigin(0, 0.5);
     const coin = this.add.image(width * 0.58 - 20, hudHeight / 2, 'coin').setDisplaySize(24, 24);
@@ -570,24 +569,6 @@ export class BattleScene extends Phaser.Scene {
     this.updateEmotion(battle);
   }
 
-  /** Non-blocking "ACT n · NAME" banner on the first fight of an act. */
-  private showActBanner(): void {
-    const state = this.currentState;
-    const info = getGameManager().getActInfo();
-    if (!state?.battle || info.fightInAct !== 1 || state.battle.turnNumber !== 0 || state.battle.chain.length) return;
-    const def = this.getActDef(info.act);
-    const { width } = viewport(this);
-    const y = this.layout.arenaTop + this.layout.arenaHeight * .32;
-    const title = this.add.text(width / 2, y, `ACT ${info.act}`, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '40px', color: '#ffe27a' })
-      .setOrigin(.5).setStroke('#1b1030', 8).setDepth(150);
-    const sub = this.add.text(width / 2, y + 36, def?.name ?? '', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff' })
-      .setOrigin(.5).setStroke('#1b1030', 5).setDepth(150);
-    for (const [i, t] of [title, sub].entries()) {
-      t.setAlpha(0).setScale(.6);
-      this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 260, delay: i * 90, ease: 'Back.out' });
-      this.tweens.add({ targets: t, alpha: 0, y: t.y - 20, duration: 360, delay: 1500 + i * 60, onComplete: () => t.destroy() });
-    }
-  }
 
   private getActDef(act: number | undefined): ActDef | undefined {
     return getGameManager().getEnemiesData().acts?.[(act ?? 1) - 1];
@@ -662,7 +643,7 @@ export class BattleScene extends Phaser.Scene {
   private renderTableau(battle: BattleState): void {
     const existing = new Map(this.cardVisuals.map((visual) => [visual.getCard().id, visual]));
     const next: CardVisual[] = [];
-    const firstDeal = !this.dealt;
+    const firstDeal = !this.dealt && battle.turnNumber === 0 && battle.mode !== 'boss';
     this.dealt = true;
     const { tableauTop, cw, strip, side, gap } = this.layout;
     const powers = new Map(battle.powerCards.map((power) => [power.cardId, power.type]));

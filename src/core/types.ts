@@ -56,6 +56,7 @@ export interface TableauColumn {
 }
 
 export interface BattleState {
+  readonly mode?: 'solitaire' | 'boss';
   readonly tableau: TableauColumn[];
   readonly deck: Card[];
   readonly discard: Card[];

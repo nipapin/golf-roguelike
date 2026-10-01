@@ -20,7 +20,7 @@ export class EndScene extends Phaser.Scene {
     const emblem = this.add.text(0, top + 139, won ? '♛' : '♠', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '66px', color: won ? '#ffe35a' : '#ff7d92' }).setOrigin(.5).setStroke('#1b1030', 5);
     content.add(emblem);
     this.tweens.add({ targets: emblem, angle: 5, duration: 1200, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
-    content.add(this.add.text(0, top + 210, `ACT ${manager.getActInfo().act} · FIGHT ${manager.getActInfo().fightInAct}/${manager.getActInfo().fightsPerAct}`, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '24px', color: '#ffffff' }).setOrigin(.5).setStroke('#1b1030', 4));
+    content.add(this.add.text(0, top + 210, `LEVEL ${state.currentFight + 1}`, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '24px', color: '#ffffff' }).setOrigin(.5).setStroke('#1b1030', 4));
     content.add(this.add.text(0, top + 246, `🪙 ${state.player.gold} GOLD    ◆ ${state.player.relics.length} RELICS`, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#ffe0a1' }).setOrigin(.5));
     const build = this.add.text(0, top + 280, 'VIEW YOUR BUILD', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '15px', color: '#b6d9ff' }).setOrigin(.5);
     ensureTouchTarget(build);

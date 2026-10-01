@@ -2,12 +2,9 @@ import { RunState } from '../core/types';
 import { isSavedRun } from './validateSave';
 
 const SAVE_KEY = 'golf-rogue-save';
-/**
- * v2: 6 acts x 7 fights. v1 saves (single 7-fight act) migrate as-is: fight indices 0-6 are
- * the same positions in act 1 and the in-progress battle is self-contained.
- */
-export const SAVE_VERSION = 2;
-const MIGRATABLE_VERSIONS = [1];
+/** v3 keeps one solitaire across fights. Legacy in-flight boards remain usable. */
+export const SAVE_VERSION = 3;
+const MIGRATABLE_VERSIONS = [1, 2];
 
 export function migrateSave(version: unknown, state: unknown): unknown {
   if (version === SAVE_VERSION) return state;

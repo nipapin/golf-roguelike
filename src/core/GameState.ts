@@ -180,6 +180,7 @@ export function setupBattle(
   }));
 
   const battle: BattleState = {
+    mode: 'solitaire',
     tableau,
     deck,
     discard: [],

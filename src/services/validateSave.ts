@@ -47,7 +47,8 @@ export function isSavedRun(value: unknown): value is RunState {
     !record(value) ||
     !text(value.seed) ||
     !integer(value.currentFight) ||
-    value.currentFight >= config.runStructure.length ||
+    value.currentFight > 100 ||
+
     !integer(value.rngState) ||
     !['start', 'battle', 'reward', 'shop', 'victory', 'defeat'].includes(String(value.phase)) ||
     !arrayOf(value.availableRewards, relic) ||
@@ -68,9 +69,10 @@ export function isSavedRun(value: unknown): value is RunState {
     return false;
   if (value.phase !== 'defeat' && player.hp <= 0) return false;
   if (value.battle === null) return value.phase !== 'battle';
-  if (value.phase !== 'battle' || !record(value.battle)) return false;
+  if (!['battle', 'reward', 'shop'].includes(String(value.phase)) || !record(value.battle)) return false;
   const battle = value.battle;
   if (
+    (battle.mode !== undefined && !['solitaire', 'boss'].includes(String(battle.mode))) ||
     !Array.isArray(battle.tableau) ||
     battle.tableau.length !== config.tableau.columns ||
     !battle.tableau.every(
@@ -100,7 +102,9 @@ export function isSavedRun(value: unknown): value is RunState {
     !text(enemy.sprite) ||
     !number(enemy.hp) ||
     !number(enemy.maxHp) ||
-    enemy.hp <= 0 ||
+    enemy.maxHp <= 0 ||
+    enemy.hp < 0 ||
+    (value.phase === 'battle' && enemy.hp === 0) ||
     enemy.hp > enemy.maxHp ||
     !integer(enemy.currentIntentIndex) ||
     !arrayOf(

@@ -1,8 +1,8 @@
 import { describe, it, expect } from 'vitest';
 import { buildRunStructure, getActInfo, resolveConfig } from './RunStructure';
 import { config, enemies } from '../test/fixtures';
-import { startRun, startNextBattle, leaveShop } from './GameActions';
-import { enemiesForAct } from './GameState';
+import { startRun, leaveShop } from './GameActions';
+import { enemiesForAct, createEnemy } from './GameState';
 import rawConfig from '../data/config.json';
 
 describe('run structure (6 acts x 7 fights)', () => {
@@ -33,12 +33,11 @@ describe('run structure (6 acts x 7 fights)', () => {
     expect(getActInfo(41, config.runStructure, config.run)).toMatchObject({ act: 6, fightInAct: 7 });
   });
 
-  it('scales the spawned enemy by the fight multipliers and picks from the act pool', () => {
-    const state = startNextBattle({ ...startRun('scale', config), currentFight: 22 }, enemies, config);
+  it('preserves scaling helpers for legacy encounter data and balance simulations', () => {
     const spec = config.runStructure[22];
-    const enemy = state.battle!.enemy;
     const pool = enemiesForAct(enemies.normal, spec.act!);
-    const base = pool.find((e) => e.id === enemy.id)!;
+    const base = pool[0];
+    const enemy = createEnemy(base, { tier: 'normal', act: spec.act, hpMultiplier: spec.hpMultiplier, attackMultiplier: spec.attackMultiplier });
     expect(base).toBeDefined();
     expect(enemy.maxHp).toBe(Math.round(base.hp * spec.hpMultiplier!));
     expect(enemy.act).toBe(4);
