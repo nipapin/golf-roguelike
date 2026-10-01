@@ -3,7 +3,9 @@ import { createCastleRun, emptyUpgrades } from './CastleDefense';
 import { gameConfig } from '../data/gameConfig';
 
 const KEY = 'castle-interactive-training-v1';
+let completedThisSession = false;
 export function trainingCompleted(): boolean {
+  if (completedThisSession) return true;
   try {
     return localStorage.getItem(KEY) === 'yes';
   } catch {
@@ -11,6 +13,7 @@ export function trainingCompleted(): boolean {
   }
 }
 export function completeTraining(): void {
+  completedThisSession = true;
   try {
     localStorage.setItem(KEY, 'yes');
   } catch {
