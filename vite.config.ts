@@ -26,7 +26,8 @@ export default defineConfig({
         // Pre-cache static assets for offline play. Short SFX (.mp3) are precached;
         // .ogg fallbacks and the large music loop are runtime-cached on first use.
         globPatterns: ['**/*.{js,css,svg,png,webp,json,ttf,woff2,mp3}'],
-        globIgnores: ['**/node_modules/**', 'audio/battle-orchestral.mp3', '**/*.ogg', 'icons/icon-maskable-*.png'],
+        // Original art is an optional pack; cache its images when actually requested.
+        globIgnores: ['**/node_modules/**', 'audio/battle-orchestral.mp3', '**/*.ogg', 'icons/icon-maskable-*.png', 'assets/cardboard/**'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
 
         // Don't pre-cache HTML - fetch from network first

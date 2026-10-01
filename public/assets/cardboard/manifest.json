@@ -1,0 +1,519 @@
+{
+  "version": 1,
+  "style": "cardboard-diorama",
+  "animation": "Static paper puppets; animate transforms at runtime. No baked animation frames.",
+  "assets": {
+    "castle": {
+      "key": "cardboard-castle",
+      "url": "/assets/cardboard/buildings/castle.png",
+      "category": "buildings",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        45,
+        26,
+        1215,
+        1205
+      ],
+      "origin": {
+        "x": 0.5023923444976076,
+        "y": 0.9609250398724083
+      },
+      "facing": "neutral",
+      "sha256": "b80d4086b7334688b6f0b4a6c443e6d0431af47b9c170f06ddca21cb22e9a80f"
+    },
+    "soldier": {
+      "key": "cardboard-soldier",
+      "url": "/assets/cardboard/actors/soldier.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        111,
+        15,
+        1138,
+        1231
+      ],
+      "origin": {
+        "x": 0.49800637958532695,
+        "y": 0.981658692185008
+      },
+      "facing": "left",
+      "sha256": "23bd89f331585ec6151e2e87301585a1ebd4c93642b61495760e22aa4bb28348"
+    },
+    "archer": {
+      "key": "cardboard-archer",
+      "url": "/assets/cardboard/actors/archer.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        44,
+        35,
+        1233,
+        1199
+      ],
+      "origin": {
+        "x": 0.509170653907496,
+        "y": 0.956140350877193
+      },
+      "facing": "left",
+      "sha256": "7d6f5a541f06c0efb4c23f75ea0dd3a2c7fc1fb6e547846abba5db8a3f1ea4d8"
+    },
+    "orc": {
+      "key": "cardboard-orc",
+      "url": "/assets/cardboard/actors/orc.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        31,
+        92,
+        1241,
+        1144
+      ],
+      "origin": {
+        "x": 0.507177033492823,
+        "y": 0.9122807017543859
+      },
+      "facing": "right",
+      "sha256": "bbe4d3ecdeafabd89c670b7f6f1756523bba4df797b10573f0b223a2f95e1569"
+    },
+    "goblin": {
+      "key": "cardboard-goblin",
+      "url": "/assets/cardboard/actors/goblin.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        135,
+        65,
+        1175,
+        1190
+      ],
+      "origin": {
+        "x": 0.5223285486443381,
+        "y": 0.94896331738437
+      },
+      "facing": "right",
+      "sha256": "70e706fb65d69258fd44d3981a779c7f7c0d7bac7b61af712a43c5828d7afe66"
+    },
+    "reaper": {
+      "key": "cardboard-reaper",
+      "url": "/assets/cardboard/actors/reaper.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        151,
+        123,
+        1166,
+        1123
+      ],
+      "origin": {
+        "x": 0.5251196172248804,
+        "y": 0.8955342902711324
+      },
+      "facing": "right",
+      "sha256": "3d30860aba1e2614b576d2a2a0198a56ec2761ed58d3a61de003008911f35ec5"
+    },
+    "ogre-boss": {
+      "key": "cardboard-ogre-boss",
+      "url": "/assets/cardboard/actors/ogre-boss.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        17,
+        68,
+        1247,
+        1171
+      ],
+      "origin": {
+        "x": 0.5039872408293461,
+        "y": 0.9338118022328549
+      },
+      "facing": "right",
+      "sha256": "d9a57436b7362cf91de46ae342e7c0c22bbb903b08e0fa2ffee8ed0b63913e52"
+    },
+    "reaper-boss": {
+      "key": "cardboard-reaper-boss",
+      "url": "/assets/cardboard/actors/reaper-boss.png",
+      "category": "actors",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        25,
+        29,
+        1247,
+        1208
+      ],
+      "origin": {
+        "x": 0.507177033492823,
+        "y": 0.9633173843700159
+      },
+      "facing": "right",
+      "sha256": "9903b890e6695c6a443b4b2642da18e2b155c15134334925b220a3924c200ec8"
+    },
+    "turret": {
+      "key": "cardboard-turret",
+      "url": "/assets/cardboard/buildings/turret.png",
+      "category": "buildings",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        64,
+        175,
+        1195,
+        1110
+      ],
+      "origin": {
+        "x": 0.501993620414673,
+        "y": 0.8851674641148325
+      },
+      "facing": "left",
+      "sha256": "e8dc49ac4e4ffc1004678179113b9ff145997813ec5d82fd4b9736b54cee1540"
+    },
+    "mortar": {
+      "key": "cardboard-mortar",
+      "url": "/assets/cardboard/buildings/mortar.png",
+      "category": "buildings",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        55,
+        94,
+        1196,
+        1147
+      ],
+      "origin": {
+        "x": 0.4988038277511962,
+        "y": 0.9146730462519936
+      },
+      "facing": "left",
+      "sha256": "e8a87c4b206bef231482ae2a328ff3228239148a905e0be8b4e477b2852245d0"
+    },
+    "laser": {
+      "key": "cardboard-laser",
+      "url": "/assets/cardboard/buildings/laser.png",
+      "category": "buildings",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        42,
+        154,
+        1222,
+        1110
+      ],
+      "origin": {
+        "x": 0.5039872408293461,
+        "y": 0.8851674641148325
+      },
+      "facing": "left",
+      "sha256": "8f4fb7c7f4dde0567bd4c5f8069c586e9d82d0568eb06291186d18ce21f7fcfd"
+    },
+    "heal": {
+      "key": "cardboard-heal",
+      "url": "/assets/cardboard/powers/heal.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        108,
+        160,
+        1144,
+        1080
+      ],
+      "origin": {
+        "x": 0.49920255183413076,
+        "y": 0.4944178628389155
+      },
+      "facing": "neutral",
+      "sha256": "105928a4b4ba1a84f13084907872a02137dc80e54ee665c81482d6218eb0668f"
+    },
+    "guard": {
+      "key": "cardboard-guard",
+      "url": "/assets/cardboard/powers/guard.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        142,
+        31,
+        1113,
+        1222
+      ],
+      "origin": {
+        "x": 0.5003987240829346,
+        "y": 0.4996012759170654
+      },
+      "facing": "neutral",
+      "sha256": "0e162571706558ac0025786451b0c613cec44d6a097112c365e09db5f720dddd"
+    },
+    "crit": {
+      "key": "cardboard-crit",
+      "url": "/assets/cardboard/powers/crit.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        102,
+        94,
+        1154,
+        1111
+      ],
+      "origin": {
+        "x": 0.5007974481658692,
+        "y": 0.48046251993620415
+      },
+      "facing": "neutral",
+      "sha256": "25f8059131d37d79b2e193d94e34d46fd3f47066ad93d0793a4909d0b8e63191"
+    },
+    "gold": {
+      "key": "cardboard-gold",
+      "url": "/assets/cardboard/powers/gold.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        77,
+        275,
+        1199,
+        1009
+      ],
+      "origin": {
+        "x": 0.5087719298245614,
+        "y": 0.5119617224880383
+      },
+      "facing": "neutral",
+      "sha256": "801cd1d0570b485c8aa8f8aec995675e8dd571886631880486b7e389ff8fa26b"
+    },
+    "bomb": {
+      "key": "cardboard-bomb",
+      "url": "/assets/cardboard/powers/bomb.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        189,
+        18,
+        1201,
+        1222
+      ],
+      "origin": {
+        "x": 0.5542264752791068,
+        "y": 0.4944178628389155
+      },
+      "facing": "neutral",
+      "sha256": "28ff579d404508d51ecd342af1a5bc9afc6f0c12fe71523f8348e929693a7d48"
+    },
+    "wild": {
+      "key": "cardboard-wild",
+      "url": "/assets/cardboard/powers/wild.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        61,
+        156,
+        1217,
+        1094
+      ],
+      "origin": {
+        "x": 0.5095693779904307,
+        "y": 0.4984051036682616
+      },
+      "facing": "neutral",
+      "sha256": "442b7b12318ca458decdda71a7c5e1a09cee1b929744479dce346ec29e1ecbce"
+    },
+    "echo": {
+      "key": "cardboard-echo",
+      "url": "/assets/cardboard/powers/echo.png",
+      "category": "powers",
+      "width": 1254,
+      "height": 1254,
+      "alpha": true,
+      "bounds": [
+        70,
+        182,
+        1190,
+        1092
+      ],
+      "origin": {
+        "x": 0.5023923444976076,
+        "y": 0.5079744816586922
+      },
+      "facing": "neutral",
+      "sha256": "bcb1a47ba2f91c86f8b7746465adcbffc0cc4813c070e2a93f1acec6d470b312"
+    },
+    "crown": {
+      "key": "cardboard-crown",
+      "url": "/assets/cardboard/props/crown.png",
+      "category": "props",
+      "width": 1419,
+      "height": 1108,
+      "alpha": true,
+      "bounds": [
+        71,
+        100,
+        1354,
+        1003
+      ],
+      "origin": {
+        "x": 0.5021141649048626,
+        "y": 0.49774368231046934
+      },
+      "facing": "neutral",
+      "sha256": "be54b0491c12515ea4dd2892b6c992239b36da042052a99d3e21238c48493468"
+    },
+    "arrow": {
+      "key": "cardboard-arrow",
+      "url": "/assets/cardboard/props/arrow.png",
+      "category": "props",
+      "width": 1774,
+      "height": 887,
+      "alpha": true,
+      "bounds": [
+        35,
+        260,
+        1753,
+        653
+      ],
+      "origin": {
+        "x": 0.503945885005637,
+        "y": 0.5146561443066516
+      },
+      "facing": "left",
+      "sha256": "7d0c483f6508d030687bb6b6a080a1a9060c20ed7e577d61ccb35bd01e7d7a11"
+    },
+    "shell": {
+      "key": "cardboard-shell",
+      "url": "/assets/cardboard/props/shell.png",
+      "category": "props",
+      "width": 1312,
+      "height": 1199,
+      "alpha": true,
+      "bounds": [
+        156,
+        102,
+        1179,
+        1099
+      ],
+      "origin": {
+        "x": 0.508765243902439,
+        "y": 0.5008340283569641
+      },
+      "facing": "neutral",
+      "sha256": "aff435eb673487f6f9e81a40680d4407b7013721dbc322a511fd6385d5e6f0c4"
+    },
+    "forest": {
+      "key": "cardboard-forest",
+      "url": "/assets/cardboard/environment/forest.png",
+      "category": "environment",
+      "width": 1774,
+      "height": 887,
+      "alpha": true,
+      "bounds": [
+        74,
+        51,
+        1714,
+        838
+      ],
+      "origin": {
+        "x": 0.503945885005637,
+        "y": 0.5011273957158963
+      },
+      "facing": "neutral",
+      "sha256": "87759daedd950e953c2a8f63bf3056b2a028bbf0e7b2a4d45ffd975c1ab29b06"
+    },
+    "hills": {
+      "key": "cardboard-hills",
+      "url": "/assets/cardboard/environment/hills.png",
+      "category": "environment",
+      "width": 1774,
+      "height": 887,
+      "alpha": true,
+      "bounds": [
+        22,
+        122,
+        1757,
+        808
+      ],
+      "origin": {
+        "x": 0.5014092446448704,
+        "y": 0.52423900789177
+      },
+      "facing": "neutral",
+      "sha256": "c65a8edddc4fa195573b0f50567fa4f296820766370a453dbaebc930c23b62c1"
+    },
+    "battlefield": {
+      "key": "cardboard-battlefield",
+      "url": "/assets/cardboard/environment/battlefield.png",
+      "category": "environment",
+      "width": 2172,
+      "height": 724,
+      "alpha": false,
+      "bounds": [
+        0,
+        0,
+        2172,
+        724
+      ],
+      "origin": {
+        "x": 0.5,
+        "y": 0.5
+      },
+      "facing": "neutral",
+      "sha256": "712a4919217f19a337b00a61ab3ede3fceada2ccd778b8a5ad170f41e0293415"
+    }
+  },
+  "siegeSprites": {
+    "c_angel1": "soldier",
+    "c_angel2": "archer",
+    "c_orc": "orc",
+    "c_goblin": "goblin",
+    "c_reaper2": "reaper",
+    "c_ogre": "ogre-boss",
+    "c_reaper1": "reaper-boss"
+  },
+  "unitKinds": {
+    "soldier": "soldier",
+    "archer": "archer",
+    "turret": "turret",
+    "mortar": "mortar"
+  },
+  "powers": {
+    "CRIT": "crit",
+    "HEAL": "heal",
+    "GUARD": "guard",
+    "GOLD": "gold",
+    "BOMB": "bomb",
+    "WILD": "wild",
+    "ECHO": "echo"
+  },
+  "upgradeKeys": {
+    "walls": "castle",
+    "soldier": "soldier",
+    "knight": "archer",
+    "magazine": "turret",
+    "mortar": "mortar",
+    "laser": "laser"
+  }
+}
