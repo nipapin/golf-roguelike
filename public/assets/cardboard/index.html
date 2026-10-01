@@ -1,0 +1,32 @@
+<!doctype html>
+<html lang="ru">
+<meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Картонная осада — каталог ассетов</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#eee7d7;color:#233c40;font:16px system-ui,sans-serif}main{max-width:1200px;margin:auto;padding:24px}h1{font-size:clamp(27px,5vw,48px);margin:0 0 10px}p{line-height:1.5}button{border:1px solid #8c9e91;background:#fffbec;color:#233c40;border-radius:10px;padding:10px 14px;cursor:pointer}button.active{background:#236972;color:white}nav{display:flex;gap:8px;flex-wrap:wrap;margin:24px 0}.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:16px}article{background:#fffbed;border:1px solid #d6c8a7;border-radius:16px;overflow:hidden}article a{display:block;color:inherit;text-decoration:none}.picture{height:210px;background-color:#d5dfcb;background-image:linear-gradient(45deg,#c8d3bb 25%,transparent 25%),linear-gradient(-45deg,#c8d3bb 25%,transparent 25%),linear-gradient(45deg,transparent 75%,#c8d3bb 75%),linear-gradient(-45deg,transparent 75%,#c8d3bb 75%);background-size:24px 24px;background-position:0 0,0 12px,12px -12px,-12px 0;display:grid;place-items:center}.picture img{width:92%;height:92%;object-fit:contain}.info{padding:14px}.info strong{display:block;font-size:18px}.info small{color:#556c6b}.game-size{height:90px;display:flex;align-items:end;justify-content:center;padding:10px;background:#264852}.game-size img{height:64px;width:90px;object-fit:contain}.scene{position:relative;width:100%;aspect-ratio:3/1;overflow:hidden;border-radius:20px;border:6px solid #ad8051;background:#f6edcd}.scene>img.bg{position:absolute;width:100%;height:100%;object-fit:fill}.puppet{position:absolute;bottom:11%;object-fit:contain;transform-origin:50% 95%;height:38%;width:12%;animation:rock 0.7s ease-in-out infinite alternate}.castle{position:absolute;bottom:10%;right:1%;height:78%;width:23%;object-fit:contain}.scene.paused .puppet{animation:none}@keyframes rock{from{transform:rotate(-3deg)}to{transform:rotate(3deg)}}@media(prefers-reduced-motion:reduce){.puppet{animation:none}}.controls{display:flex;gap:10px;margin:12px 0}.error{color:#9f2f39}
+.dark .picture{background-image:none;background-color:#264852}
+</style>
+<main>
+<h1>Картонная осада</h1>
+<p>Отдельные фигурки, постройки и усиления. Нажми на ассет, чтобы открыть оригинальный PNG. Нижняя полоса каждой карточки показывает его в небольшом игровом размере.</p>
+<div class="scene" id="scene" aria-label="Предпросмотр сочетания ассетов"></div>
+<div class="controls"><button id="motion">Остановить покачивание</button><button id="theme">Тёмный фон карточек</button></div>
+<p id="status">Загрузка каталога…</p><nav id="filters" aria-label="Категории"></nav><div class="grid" id="grid"></div>
+</main>
+<script type="module">
+const names={castle:'Замок',soldier:'Солдат',archer:'Лучник',orc:'Орк',goblin:'Гоблин',reaper:'Жнец','ogre-boss':'Огр — босс','reaper-boss':'Жнец — босс',turret:'Туррель',mortar:'Пушка',laser:'Лазер',heal:'Лечение',guard:'Защита',crit:'Критический урон',gold:'Золото',bomb:'Бомба',wild:'Дикая карта',echo:'Эхо',crown:'Корона',arrow:'Стрела',shell:'Снаряд',forest:'Лес',hills:'Холмы',battlefield:'Поле боя'};
+const categories={all:'Все',actors:'Персонажи',buildings:'Постройки',powers:'Усиления',props:'Предметы',environment:'Окружение'};
+const localUrl=asset=>asset.url.replace('/assets/cardboard/','./');
+try{
+ const manifest=await fetch('./manifest.json').then(r=>{if(!r.ok)throw Error(r.status);return r.json()});
+ const assets=manifest.assets, scene=document.querySelector('#scene'),grid=document.querySelector('#grid');
+ document.querySelector('#status').textContent=`${Object.keys(assets).length} ассета · PNG с прозрачностью, кроме фона · покачивание фигурок показано средствами CSS`;
+ const add=(id,cls,left)=>{const img=new Image();img.src=localUrl(assets[id]);img.alt=names[id];img.className=cls;if(left!==undefined)img.style.left=left+'%';scene.append(img)};
+ add('battlefield','bg');add('castle','castle');add('goblin','puppet',8);add('orc','puppet',23);add('reaper','puppet',36);add('soldier','puppet',53);add('archer','puppet',64);
+ const draw=category=>{grid.replaceChildren();for(const [id,a]of Object.entries(assets)){if(category!=='all'&&a.category!==category)continue;const article=document.createElement('article');const link=document.createElement('a');link.href=localUrl(a);link.target='_blank';link.rel='noopener';const pic=document.createElement('div');pic.className='picture';const img=new Image();img.src=localUrl(a);img.alt=names[id];img.loading='lazy';pic.append(img);const info=document.createElement('div');info.className='info';const title=document.createElement('strong');title.textContent=names[id];const small=document.createElement('small');small.textContent=`${id} · ${a.width}×${a.height} · ${a.alpha?'alpha':'фон'}`;info.append(title,small);const actual=document.createElement('div');actual.className='game-size';const thumb=new Image();thumb.src=img.src;thumb.alt='';thumb.loading='lazy';actual.append(thumb);link.append(pic,info,actual);article.append(link);grid.append(article)}};
+ for(const [key,title]of Object.entries(categories)){const b=document.createElement('button');b.textContent=title;b.classList.toggle('active',key==='all');b.onclick=()=>{document.querySelectorAll('nav button').forEach(x=>x.classList.remove('active'));b.classList.add('active');draw(key)};document.querySelector('#filters').append(b)}draw('all');
+ document.querySelector('#motion').onclick=e=>{scene.classList.toggle('paused');e.target.textContent=scene.classList.contains('paused')?'Включить покачивание':'Остановить покачивание'};
+ let dark=false;document.querySelector('#theme').onclick=e=>{dark=!dark;document.body.classList.toggle('dark',dark);e.target.textContent=dark?'Светлый фон карточек':'Тёмный фон карточек'};
+}catch(e){document.querySelector('#status').textContent='Не удалось загрузить каталог: '+e.message;document.querySelector('#status').className='error'}
+</script>
+</html>

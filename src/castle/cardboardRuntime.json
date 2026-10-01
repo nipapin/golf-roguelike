@@ -1,0 +1,98 @@
+{
+  "castle": {
+    "width": 640,
+    "height": 636
+  },
+  "soldier": {
+    "width": 381,
+    "height": 384
+  },
+  "archer": {
+    "width": 384,
+    "height": 382
+  },
+  "orc": {
+    "width": 384,
+    "height": 370
+  },
+  "goblin": {
+    "width": 369,
+    "height": 384
+  },
+  "reaper": {
+    "width": 379,
+    "height": 384
+  },
+  "ogre-boss": {
+    "width": 384,
+    "height": 367
+  },
+  "reaper-boss": {
+    "width": 384,
+    "height": 374
+  },
+  "turret": {
+    "width": 374,
+    "height": 384
+  },
+  "mortar": {
+    "width": 376,
+    "height": 384
+  },
+  "laser": {
+    "width": 384,
+    "height": 384
+  },
+  "heal": {
+    "width": 123,
+    "height": 128
+  },
+  "guard": {
+    "width": 127,
+    "height": 128
+  },
+  "crit": {
+    "width": 122,
+    "height": 128
+  },
+  "gold": {
+    "width": 125,
+    "height": 128
+  },
+  "bomb": {
+    "width": 118,
+    "height": 128
+  },
+  "wild": {
+    "width": 128,
+    "height": 118
+  },
+  "echo": {
+    "width": 128,
+    "height": 125
+  },
+  "crown": {
+    "width": 128,
+    "height": 101
+  },
+  "arrow": {
+    "width": 128,
+    "height": 60
+  },
+  "shell": {
+    "width": 128,
+    "height": 120
+  },
+  "forest": {
+    "width": 384,
+    "height": 191
+  },
+  "hills": {
+    "width": 384,
+    "height": 191
+  },
+  "battlefield": {
+    "width": 1280,
+    "height": 427
+  }
+}

@@ -1,3 +1,4 @@
+import { cardboardActor, cardboardArt, type siegeActors } from './CardboardArt';
 import Phaser from 'phaser';
 import { viewport, configureViewport, getRenderDensity } from '../presentation/design/viewport';
 import { getCastleLayoutMetrics } from '../presentation/design/tokens';
@@ -106,7 +107,7 @@ export class CastleScene extends Phaser.Scene {
     this.layout = getCastleLayoutMetrics(w, h);
     const { arenaTop, arenaHeight, tableTop, hudTop, bannerTop, relicTop } = this.layout;
     this.add
-      .image(w / 2, arenaTop + arenaHeight / 2, 'battlefield-kenney')
+      .image(w / 2, arenaTop + arenaHeight / 2, 'cardboard-battlefield')
       .setDisplaySize(w, arenaHeight);
     this.cameras.main.setBackgroundColor('#213e48');
     const felt = this.add
@@ -361,6 +362,7 @@ export class CastleScene extends Phaser.Scene {
     const key = body.anims.currentAnim?.key ?? '';
     if (body.anims.isPlaying && (key.endsWith('-attack') || key.endsWith('-hurt'))) return;
     body.play(`${sprite}-walk`, true);
+    body.setAngle(Math.sin(this.time.now / 100 + body.x) * 3);
   }
   private animateReshuffle(done: () => void): void {
     this.locked = true;
@@ -736,10 +738,7 @@ export class CastleScene extends Phaser.Scene {
         const p = this.enemyPosition(enemy),
           root = this.add.container(p.x, p.y).setDepth(39 - (enemy.id % 4));
         const size = Math.min(enemy.boss ? 104 : 72, this.layout.arenaHeight * 0.6);
-        const body = this.add
-          .sprite(0, 0, `enemy-${enemy.sprite}`)
-          .setDisplaySize(size, size)
-          .setOrigin(0.5, 1);
+        const body = cardboardActor(this, enemy.sprite as keyof typeof siegeActors, 0, 0, size);
         body.play(`${enemy.sprite}-idle`);
         const hp = this.add.graphics(),
           label = this.text(0, -size - 9, enemy.boss ? 'BOSS' : '', 10, '#ffe1a0');
@@ -777,28 +776,9 @@ export class CastleScene extends Phaser.Scene {
         let magazine: Phaser.GameObjects.Graphics | undefined;
         if (unit.kind === 'soldier' || unit.kind === 'archer') {
           const sprite = unit.kind === 'archer' ? 'c_angel2' : 'c_angel1';
-          body = this.add
-            .sprite(0, 0, `enemy-${sprite}`)
-            .setOrigin(0.5, 1)
-            .setDisplaySize(unit.kind === 'archer' ? 67 : 58, unit.kind === 'archer' ? 67 : 58)
-            .setFlipX(true);
+          body = cardboardActor(this, sprite, 0, 0, unit.kind === 'archer' ? 67 : 58);
           body.play(`${sprite}-idle`);
           root.add([this.add.ellipse(0, -2, 28, 8, 0x17313a, 0.24), body]);
-          if (unit.kind === 'archer') {
-            const bow = this.add.graphics();
-            bow
-              .lineStyle(3, 0xb9793d)
-              .beginPath()
-              .moveTo(0, -15)
-              .lineTo(-8, -8)
-              .lineTo(-10, 0)
-              .lineTo(-8, 8)
-              .lineTo(0, 15)
-              .strokePath();
-            bow.lineStyle(1, 0xffedcc).lineBetween(0, -15, 0, 15);
-            weapon = this.add.container(-16, -26, [bow]);
-            root.add(weapon);
-          }
         } else {
           weapon = weaponArt(this, unit.kind === 'mortar');
           root.add(weapon);
@@ -968,6 +948,7 @@ export class CastleScene extends Phaser.Scene {
           this.invaders.delete(event.enemy.id);
           view.hp.destroy();
           view.label.destroy();
+          view.body.setAngle(20);
           view.body.play(`${event.enemy.sprite}-dead`);
           this.tweens.add({
             targets: view.root,
@@ -1028,27 +1009,18 @@ export class CastleScene extends Phaser.Scene {
         if (unit.body?.active) unit.body.play(`${sprite}-idle`);
       });
     }
-    if (event.kind === 'archer' && unit.weapon)
-      this.tweens.add({ targets: unit.weapon, scaleX: 0.75, duration: 80, yoyo: true });
+    if (unit.body) this.tweens.add({ targets: unit.body, angle: -10, duration: 80, yoyo: true });
     if (event.kind === 'soldier') playCombatVFX(this, 'slash', tx, ty, 44, 0xaffaff);
     else {
       const projectile =
         event.kind === 'archer'
-          ? this.add
-              .container(x, y, [
-                this.add.rectangle(0, 0, 17, 2, 0xc98b49),
-                this.add.triangle(-8, 0, 0, -3, -6, 0, 0, 3, 0xfff1b3),
-              ])
-              .setRotation(Math.atan2(ty - y, tx - x))
+          ? cardboardArt(this, 'arrow', x, y, 8)
+              .setOrigin(0.5)
+              .setRotation(Math.atan2(ty - y, tx - x) - Math.PI)
               .setDepth(100)
-          : this.add
-              .circle(
-                x,
-                y,
-                event.kind === 'mortar' ? 5 : 2,
-                event.kind === 'mortar' ? 0x94efff : 0xffe579
-              )
-              .setDepth(100);
+          : event.kind === 'mortar'
+            ? cardboardArt(this, 'shell', x, y, 11).setOrigin(0.5).setDepth(100)
+            : this.add.circle(x, y, 2, 0xffe579).setDepth(100);
       const flight = { t: 0 };
       this.tweens.add({
         targets: flight,
@@ -1147,6 +1119,12 @@ export class CastleScene extends Phaser.Scene {
     const view = this.invaders.get(id),
       enemy = this.manager.state!.siege.enemies.find((e) => e.id === id);
     if (!view || !enemy || view.body.anims.currentAnim?.key === `${enemy.sprite}-${action}`) return;
+    this.tweens.add({
+      targets: view.body,
+      angle: action === 'attack' ? 12 : -8,
+      duration: 90,
+      yoyo: true,
+    });
     view.body.play(`${enemy.sprite}-${action}`);
     view.body.once('animationcomplete', () => {
       if (this.invaders.get(id) === view) view.body.play(`${enemy.sprite}-idle`);
@@ -1155,6 +1133,16 @@ export class CastleScene extends Phaser.Scene {
   private laserEffect(final: boolean): void {
     const { width: w } = viewport(this),
       y = this.groundY() - 32;
+    const emitter = cardboardArt(this, 'laser', this.castle.x - 10, this.groundY(), 58).setDepth(
+      50
+    );
+    this.tweens.add({
+      targets: emitter,
+      alpha: 0,
+      duration: 300,
+      delay: 450,
+      onComplete: () => emitter.destroy(),
+    });
     const beam = this.add.graphics().setDepth(180);
     beam.lineStyle(24, 0x27cbea, 0.35).lineBetween(w * 0.9, y, -20, y);
     beam.lineStyle(10, 0x8cffff, 0.8).lineBetween(w * 0.9, y, -20, y);

@@ -1,3 +1,4 @@
+import { cardboardActor } from './CardboardArt';
 import Phaser from 'phaser';
 import {
   viewport,
@@ -76,17 +77,20 @@ export class CastleMenuScene extends Phaser.Scene {
       safe = safeArea(this),
       manager = castleManager();
     this.cameras.main.setBackgroundColor('#213e48');
-    this.add.image(w / 2, h * 0.32, 'battlefield-kenney').setDisplaySize(w, h * 0.64);
+    this.add.image(w / 2, h * 0.32, 'cardboard-battlefield').setDisplaySize(w, h * 0.64);
     this.add.rectangle(w / 2, h * 0.77, w, h * 0.46, 0x254650).setStrokeStyle(3, 0x6d989e);
     this.text(w / 2, safe.top + 38, 'CASTLE\nSOLITAIRE', 38, '#fff1b3')
       .setAlign('center')
       .setStroke('#1b1030', 7);
     this.text(w / 2, safe.top + 108, 'Build a chain. Hold the castle.', 16, '#fff8eb');
     castleArt(this, w * 0.68, safe.top + Math.min(335, safe.height * 0.49), 1.35);
-    const enemy = this.add
-      .sprite(w * 0.2, safe.top + Math.min(335, safe.height * 0.49), 'enemy-c_orc')
-      .setOrigin(0.5, 1)
-      .setDisplaySize(85, 85);
+    const enemy = cardboardActor(
+      this,
+      'c_orc',
+      w * 0.2,
+      safe.top + Math.min(335, safe.height * 0.49),
+      85
+    );
     enemy.play('c_orc-idle');
     this.tweens.add({
       targets: enemy,
