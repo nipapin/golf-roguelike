@@ -51,3 +51,19 @@ Made for Golf Rogue in this mockup and owned by the project (can go into the rep
 
 ## Reference screenshots (`visual/refs/`): **do not ship, do not commit**
 Balatro, Slay the Spire 1/2, Marvel Snap (Steam store screenshots) and Clash Royale, Brawl Stars, Hearthstone, Marvel Snap (App Store screenshots). All © their publishers, downloaded only for internal art-direction research. Add `visual/refs/` to `.gitignore`.
+
+## Game enemy atlases: CraftPix chibi monsters (`public/assets/enemies/atlases/c_*.webp`)
+Author: **CraftPix.net**, published by the official CraftPix account on OpenGameArt. License: **OGA-BY 3.0** (https://static.opengameart.org/OGA-BY-3.0.txt). Commercial use and redistribution allowed with attribution.
+**Required credit** (CREDITS.md + credits screen):
+> Chibi monster sprites by CraftPix.net (https://craftpix.net), via OpenGameArt.org, licensed OGA-BY 3.0: Orc, Ogre and Goblin Chibi Sprites; Reaper Man Chibi Sprites; Fallen Angel Chibi Sprites.
+
+| Atlas | Source character | OGA page |
+|---|---|---|
+| `c_goblin` | Goblin | https://opengameart.org/content/orc-ogre-and-goblin-chibi-sprites |
+| `c_orc` | Orc | https://opengameart.org/content/orc-ogre-and-goblin-chibi-sprites |
+| `c_ogre` | Ogre | https://opengameart.org/content/orc-ogre-and-goblin-chibi-sprites |
+| `c_reaper1..3` | Reaper_Man_1..3 | https://opengameart.org/content/reaper-man-chibi-sprites |
+| `c_angel1..3` | Fallen_Angels_1..3 | https://opengameart.org/content/fallen-angel-chibi-sprites |
+
+Frames: idle 0-5, attack (Slashing) 6-11, hurt 12-15, dying 16-21; 160 px cells, built by `scripts/build-chibi-atlases.sh`. The CraftPix "2D fantasy" pack is **not** used.
+

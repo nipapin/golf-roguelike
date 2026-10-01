@@ -3,17 +3,12 @@ import { viewport, configureViewport, getRenderDensity } from '../design/viewpor
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
-const ENEMY_SPRITES = [
-  'slime',
-  'mushroom',
-  'bat',
-  'wolf',
-  'zombie',
-  'goblin',
-  'bandit',
-  'knight',
-  'samurai',
-];
+import enemiesData from '../../data/enemies.json';
+import type { EnemiesData } from '../../core/GameState';
+
+/** Every atlas + frame layout comes from enemies.json "sprites" (data-driven enemy defs). */
+const SPRITE_DEFS = (enemiesData as unknown as EnemiesData).sprites ?? {};
+const ENEMY_SPRITES = Object.keys(SPRITE_DEFS);
 
 export class BootScene extends Phaser.Scene {
   constructor() {
@@ -98,12 +93,9 @@ export class BootScene extends Phaser.Scene {
       const frameCount = frames.length;
 
       if (frameCount > 0) {
-        // Goblin's generated atlas has repeated placeholder frames after frame 8.
-        // Keep idle out of the death pose; all actors also receive motion tweens.
-        const ranges = enemy === 'goblin'
-          ? { idle: [0, 3], attack: [4, 7], hurt: [7, 7], dead: [8, 8] }
-          : { idle: [0, Math.min(11, frameCount - 1)], attack: [12, Math.min(19, frameCount - 1)], hurt: [20, Math.min(27, frameCount - 1)], dead: [28, frameCount - 1] };
-        for (const [name, [start, end]] of Object.entries(ranges)) {
+        const frames = SPRITE_DEFS[enemy].frames;
+        for (const [name, [start, rawEnd]] of Object.entries(frames)) {
+          const end = rawEnd < 0 ? frameCount - 1 : Math.min(rawEnd, frameCount - 1);
           this.createAnimationFromRange(atlasKey, name, enemy, start, end, name === 'idle' ? 8 : 12, name === 'idle' ? -1 : 0);
         }
       }

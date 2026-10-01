@@ -3,9 +3,10 @@ import { readFileSync } from 'node:fs';
 import { startRun, startNextBattle } from '../../src/core/GameActions';
 import type { GameConfig } from '../../src/core/types';
 import type { EnemiesData } from '../../src/core/GameState';
-const config = JSON.parse(
+import { resolveConfig } from '../../src/core/RunStructure';
+const config = resolveConfig(JSON.parse(
   readFileSync(new URL('../../src/data/config.json', import.meta.url), 'utf8')
-) as GameConfig;
+) as GameConfig);
 const enemies = JSON.parse(
   readFileSync(new URL('../../src/data/enemies.json', import.meta.url), 'utf8')
 ) as EnemiesData;

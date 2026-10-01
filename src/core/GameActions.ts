@@ -1,3 +1,5 @@
+import { RelicManager } from './RelicManager';
+import { enemiesForAct } from './GameState';
 import { MIN_ATTACK_CHAIN } from './GameRules';
 import {
   Relic,
@@ -22,8 +24,7 @@ import {
 import { calculateCardDamage } from './DamageCalculator';
 
 function getFirstChainBonus(relics: Relic[]): number {
-  const relic = relics.find((r) => r.effect.type === 'firstChainBonus');
-  return relic && typeof relic.effect.value === 'number' ? relic.effect.value : 0;
+  return RelicManager.of(relics).firstChainBonus();
 }
 
 /**
@@ -110,18 +111,13 @@ export function playCard(
 
   // Handle immediate suit effects (hearts, clubs, diamonds)
   let newPlayer = state.player;
+  const relicManager = RelicManager.of(state.player.relics);
 
   if (!card.joker && card.suit === 'hearts') {
     let healAmount = config.combat.baseHeartHeal;
-    const heartBonus = state.player.relics.find((r) => r.effect.type === 'heartHealBonus');
-    if (heartBonus && typeof heartBonus.effect.value === 'number') {
-      healAmount += heartBonus.effect.value;
-    }
+    healAmount += relicManager.suitBonus('hearts');
     if (powerType === 'HEAL') {
-      const doublePower = state.player.relics.find(
-        (r) => r.effect.type === 'doublePower' && r.effect.powerType === 'HEAL'
-      );
-      healAmount += config.powerCards.HEAL.healAmount * (doublePower ? 2 : 1);
+      healAmount += config.powerCards.HEAL.healAmount * relicManager.powerMultiplier('HEAL');
     }
     const newHp = Math.min(newPlayer.maxHp, newPlayer.hp + healAmount);
     newPlayer = { ...newPlayer, hp: newHp };
@@ -131,15 +127,9 @@ export function playCard(
 
   if (!card.joker && card.suit === 'clubs') {
     let armorAmount = config.combat.baseClubArmor;
-    const clubBonus = state.player.relics.find((r) => r.effect.type === 'clubArmorBonus');
-    if (clubBonus && typeof clubBonus.effect.value === 'number') {
-      armorAmount += clubBonus.effect.value;
-    }
+    armorAmount += relicManager.suitBonus('clubs');
     if (powerType === 'GUARD') {
-      const doublePower = state.player.relics.find(
-        (r) => r.effect.type === 'doublePower' && r.effect.powerType === 'GUARD'
-      );
-      armorAmount += config.powerCards.GUARD.armorAmount * (doublePower ? 2 : 1);
+      armorAmount += config.powerCards.GUARD.armorAmount * relicManager.powerMultiplier('GUARD');
     }
     newPlayer = { ...newPlayer, armor: newPlayer.armor + armorAmount };
     events.push({ type: 'armor_gained', amount: armorAmount });
@@ -148,15 +138,9 @@ export function playCard(
 
   if (!card.joker && card.suit === 'diamonds') {
     let goldAmount = config.combat.baseDiamondGold;
-    const diamondBonus = state.player.relics.find((r) => r.effect.type === 'diamondGoldBonus');
-    if (diamondBonus && typeof diamondBonus.effect.value === 'number') {
-      goldAmount += diamondBonus.effect.value;
-    }
+    goldAmount += relicManager.suitBonus('diamonds');
     if (powerType === 'GOLD') {
-      const doublePower = state.player.relics.find(
-        (r) => r.effect.type === 'doublePower' && r.effect.powerType === 'GOLD'
-      );
-      goldAmount += config.powerCards.GOLD.goldAmount * (doublePower ? 2 : 1);
+      goldAmount += config.powerCards.GOLD.goldAmount * relicManager.powerMultiplier('GOLD');
     }
     newPlayer = { ...newPlayer, gold: newPlayer.gold + goldAmount };
     events.push({ type: 'gold_gained', amount: goldAmount });
@@ -166,20 +150,17 @@ export function playCard(
   // A power is independent of its card's suit. Matching suits were combined
   // above to preserve their existing event amounts and avoid double application.
   if (powerType === 'HEAL' && card.suit !== 'hearts') {
-    const doubled = state.player.relics.some((r) => r.effect.type === 'doublePower' && r.effect.powerType === 'HEAL');
-    const amount = config.powerCards.HEAL.healAmount * (doubled ? 2 : 1);
+    const amount = config.powerCards.HEAL.healAmount * relicManager.powerMultiplier('HEAL');
     newPlayer = { ...newPlayer, hp: Math.min(newPlayer.maxHp, newPlayer.hp + amount) };
     events.push({ type: 'player_healed', amount });
   }
   if (powerType === 'GUARD' && card.suit !== 'clubs') {
-    const doubled = state.player.relics.some((r) => r.effect.type === 'doublePower' && r.effect.powerType === 'GUARD');
-    const amount = config.powerCards.GUARD.armorAmount * (doubled ? 2 : 1);
+    const amount = config.powerCards.GUARD.armorAmount * relicManager.powerMultiplier('GUARD');
     newPlayer = { ...newPlayer, armor: newPlayer.armor + amount };
     events.push({ type: 'armor_gained', amount });
   }
   if (powerType === 'GOLD' && card.suit !== 'diamonds') {
-    const doubled = state.player.relics.some((r) => r.effect.type === 'doublePower' && r.effect.powerType === 'GOLD');
-    const amount = config.powerCards.GOLD.goldAmount * (doubled ? 2 : 1);
+    const amount = config.powerCards.GOLD.goldAmount * relicManager.powerMultiplier('GOLD');
     newPlayer = { ...newPlayer, gold: newPlayer.gold + amount };
     events.push({ type: 'gold_gained', amount });
   }
@@ -331,10 +312,9 @@ function resolveChain(state: RunState, _config: GameConfig): ActionResult {
   // Red joker captures the multiplier at activation, preserving joker order.
   const jokerHeal = Math.floor((state.battle.chainBaseDamage ?? damage) * (state.battle.lifestealMultiplier ?? 0) * .3);
   // Vampiric healing
-  const vampiricRelic = state.player.relics.find((r) => r.effect.type === 'vampiric');
   let newPlayer = state.player;
-  if (vampiricRelic && typeof vampiricRelic.effect.ratio === 'number') {
-    const healAmount = Math.floor(damage / vampiricRelic.effect.ratio);
+  {
+    const healAmount = RelicManager.of(state.player.relics).chainHeal(damage);
     if (healAmount > 0) {
       newPlayer = {
         ...newPlayer,
@@ -640,18 +620,32 @@ export function buyRelic(
 /**
  * Leave shop and proceed to next battle
  */
-export function leaveShop(state: RunState): ActionResult {
+export function leaveShop(state: RunState, config?: GameConfig): ActionResult {
   if (state.phase !== 'shop') {
     return { state, events: [] };
+  }
+
+  const nextFight = state.currentFight + 1;
+  const spec = config?.runStructure[nextFight];
+  const events: GameEvent[] = [];
+  let player = state.player;
+  // Entering a new act: max HP grows and the player is healed (config.run.actStart).
+  if (config?.run && spec && spec.fightInAct === 1 && (spec.act ?? 1) > 1) {
+    const { maxHpBonus, healPercent } = config.run.actStart;
+    const maxHp = player.maxHp + maxHpBonus;
+    const heal = Math.max(0, Math.min(maxHp, player.hp + maxHpBonus + Math.round(maxHp * healPercent)) - player.hp);
+    player = { ...player, maxHp, hp: player.hp + heal };
+    events.push({ type: 'act_started', act: spec.act ?? 1, maxHpBonus, healed: heal });
   }
 
   return {
     state: {
       ...state,
-      currentFight: state.currentFight + 1,
+      player,
+      currentFight: nextFight,
       phase: 'battle',
     },
-    events: [],
+    events,
   };
 }
 
@@ -713,27 +707,22 @@ export function startNextBattle(
   const fightConfig = config.runStructure[state.currentFight];
   const tier = fightConfig.enemyTier;
 
-  const enemyPool = enemiesData[tier];
+  const act = fightConfig.act ?? 1;
+  const enemyPool = enemiesForAct(enemiesData[tier], act);
   const enemyData = rng.pickOne(enemyPool);
 
   const powerCardCount =
     enemyData.powerCardCount ?? enemiesData.defaults.powerCardCount[tier];
 
   // Apply extra power cards from relics
-  const extraPowerRelic = state.player.relics.find(
-    (r) => r.effect.type === 'extraPowerCards'
-  );
-  const finalPowerCardCount =
-    powerCardCount +
-    (extraPowerRelic && typeof extraPowerRelic.effect.value === 'number'
-      ? extraPowerRelic.effect.value
-      : 0);
+  const finalPowerCardCount = powerCardCount + RelicManager.of(state.player.relics).extraPowerCards();
 
   const newState = setupBattle(
     { ...state, rngState: rng.getState() },
     enemyData,
     finalPowerCardCount,
-    config
+    config,
+    { tier, act, hpMultiplier: fightConfig.hpMultiplier, attackMultiplier: fightConfig.attackMultiplier }
   );
 
   // Reset armor at battle start

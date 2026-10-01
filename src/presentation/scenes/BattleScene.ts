@@ -3,7 +3,9 @@ import { viewport, configureViewport, getRenderDensity } from '../design/viewpor
 import Phaser from 'phaser';
 import { getGameManager, setTestHook } from '../GameManager';
 import { colors, getLayoutMetrics, getCardMetrics } from '../design/tokens';
-import { ArenaBackground, getEncounterForEnemy } from '../design/ArenaBackground';
+import { ArenaBackground, getEncounterForEnemy, type EncounterType } from '../design/ArenaBackground';
+import type { ActDef } from '../../core/GameState';
+import { getEmotion, type Emotion } from './enemyEmotion';
 import { HPBar, ComboBanner, createIntentBubble } from '../design/HudComponents';
 import { CardVisual, createCardBack } from '../design/CardVisual';
 import { showBuildPanel } from '../design/BuildPanel';
@@ -14,6 +16,8 @@ import { AudioSystem } from '../audio/AudioSystem';
 import { Juice } from '../juice/Juice';
 import { JUICE, classifyHit, hitStopMs, shakeIntensity } from '../juice/juiceConfig';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
+
+const parseHex = (value: string): number => parseInt(value.replace('#', ''), 16);
 
 const POWER_TINTS: Record<PowerType, number> = {
   CRIT: 0xff6633, HEAL: 0x3aef98, GUARD: 0x50bfff, GOLD: 0xffd34a, BOMB: 0xff9a30, WILD: 0x80eaff, ECHO: 0xc58aff,
@@ -77,6 +81,12 @@ export class BattleScene extends Phaser.Scene {
   /** While an enemy attack animates, the player HP bar keeps showing the pre-hit value until contact. */
   private heldPlayerHp: number | null = null;
   private chainHadCrit = false;
+  private enemyBaseTint: number | null = null;
+  private enemyAura: Phaser.GameObjects.Image | null = null;
+  private emotion: Emotion = 'calm';
+  private enemyHeadTop = 0.9;
+  private emoteMark: Phaser.GameObjects.Graphics | null = null;
+  private emoteTimer: number | null = null;
 
   constructor() {
     super('BattleScene');
@@ -119,12 +129,17 @@ export class BattleScene extends Phaser.Scene {
 
     // Juice toolkit (pooled particles/numbers, hit-stop, shake)
     this.juice = new Juice(this);
+    // Crown / emote marks follow the bobbing enemy sprite.
+    const follow = () => this.positionEmote();
+    this.events.on(Phaser.Scenes.Events.UPDATE, follow);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.events.off(Phaser.Scenes.Events.UPDATE, follow));
 
     // Initial render
     this.dealt = false;
     this.enemyDying = false;
     AudioSystem.setMusicScene('battle');
     this.refreshState();
+    this.showActBanner();
     // No timed input lock at battle start: a game-clock delayedCall stretched to
     // 1-3s whenever the first frames were slow (Phaser clamps delta after a long
     // frame), silently eating the first tap. Instead, only reject pointerups whose
@@ -224,7 +239,8 @@ export class BattleScene extends Phaser.Scene {
     band.fillStyle(0x654581, 1).fillRect(0, hudTop + hudHeight + 3, width, 1);
     this.topHUD = this.add.container(0, hudTop).setDepth(100);
     const bg = this.add.rectangle(width / 2, hudHeight / 2, width - 16, hudHeight, 0x21163a).setStrokeStyle(1, 0x654581);
-    const progress = this.add.text(16, hudHeight / 2, `FIGHT ${manager.getCurrentFightNumber()} / ${manager.getTotalFights()}`, {
+    const actInfo = manager.getActInfo();
+    const progress = this.add.text(16, hudHeight / 2, `ACT ${actInfo.act} · FIGHT ${actInfo.fightInAct}/${actInfo.fightsPerAct}`, {
       resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '14px', fontStyle: 'bold', color: '#fff3d1',
     }).setOrigin(0, 0.5);
     const coin = this.add.image(width * 0.58 - 20, hudHeight / 2, 'coin').setDisplaySize(24, 24);
@@ -392,7 +408,8 @@ export class BattleScene extends Phaser.Scene {
 
     // Update arena background based on enemy
     if (state.battle) {
-      const encounter = getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
+      const actDef = this.getActDef(state.battle.enemy.act);
+      const encounter = (actDef?.encounter as EncounterType | undefined) ?? getEncounterForEnemy(state.battle.enemy.sprite || 'goblin');
       if (!previousState?.battle || previousState.battle.enemy.id !== state.battle.enemy.id) this.arenaBackground.draw(
         viewport(this).width,
         this.layout.arenaTop,
@@ -421,6 +438,7 @@ export class BattleScene extends Phaser.Scene {
       this.lastEnemyMaxHp = enemy.maxHp;
       this.enemyHPBar.setHp(enemy.hp, enemy.maxHp);
       this.enemyHPBar.setPendingDamage(battle.accumulatedDamage);
+      this.updateEmotion(battle);
       if (this.renderedIntentKey !== intentKey) {
         this.updateIntent(battle);
       }
@@ -428,6 +446,9 @@ export class BattleScene extends Phaser.Scene {
     }
     this.renderedEnemyId = enemy.id;
     this.lastEnemyMaxHp = enemy.maxHp;
+    this.emotion = 'calm';
+    this.clearEmote();
+    if (!enemy.crown) { this.crownSprite?.destroy(); this.crownSprite = null; }
     const enemyX = width / 2;
     const enemyY = arenaTop + arenaHeight - 70;
 
@@ -455,12 +476,18 @@ export class BattleScene extends Phaser.Scene {
       const frame = this.textures.getFrame(atlasKey);
       const baseHeight = frame ? frame.height : 180;
       const baseScale = targetEnemyHeight / baseHeight;
-      const scale = baseScale * (enemy.scale || 1);
+      const actDef = this.getActDef(enemy.act);
+      const scale = baseScale * (enemy.scale || 1) * (actDef?.scale ?? 1);
+      const spriteDef = getGameManager().getEnemiesData().sprites?.[enemy.sprite];
+      this.enemySprite.setFlipX(!!spriteDef?.facesRight);
+      this.enemyHeadTop = spriteDef?.headTop ?? 0.9;
       
-      this.enemySprite.setScale(scale);
+      // Never taller than ~82% of the arena (big bosses at high act scale).
+      const maxScale = (this.layout.arenaHeight * 0.82) / baseHeight;
+      this.enemySprite.setScale(Math.min(scale, maxScale));
       this.enemySprite.setDepth(20);
       this.enemyKey = enemy.sprite || 'goblin';
-      this.enemyScale = scale;
+      this.enemyScale = Math.min(scale, maxScale);
       this.enemyBaseY = enemyY;
       this.startEnemyIdle();
 
@@ -474,20 +501,32 @@ export class BattleScene extends Phaser.Scene {
         this.enemySprite.play(idleKey);
       }
 
-      // Boss gold tint
-      if (enemy.tint === 'gold') {
-        this.enemySprite.setTint(0xffd700);
+      // Tint: enemy override (boss gold etc.) > act tint.
+      const tint = enemy.tint === 'gold' ? 0xffd700 : enemy.tint ? parseHex(enemy.tint) : actDef?.tint ? parseHex(actDef.tint) : null;
+      this.enemyBaseTint = tint;
+      if (tint !== null) this.enemySprite.setTint(tint); else this.enemySprite.clearTint();
+
+      // Act aura: soft additive glow behind the enemy.
+      this.enemyAura?.destroy();
+      this.enemyAura = null;
+      const auraColor = actDef?.aura ? parseHex(actDef.aura) : enemy.tier === 'boss' ? 0xffd34a : null;
+      if (auraColor !== null) {
+        const auraSize = this.enemySprite.displayHeight * (enemy.tier === 'boss' ? 1.25 : 1.05);
+        this.enemyAura = this.add.image(enemyX, enemyY - this.enemySprite.displayHeight * .45, 'fx-dot')
+          .setDisplaySize(auraSize, auraSize).setTint(auraColor).setAlpha(enemy.tier === 'normal' ? .28 : .42)
+          .setBlendMode(Phaser.BlendModes.ADD).setDepth(18);
+        this.tweens.add({ targets: this.enemyAura, alpha: (enemy.tier === 'normal' ? .28 : .42) * .55, duration: 1100, yoyo: true, repeat: -1, ease: 'Sine.inOut' });
       }
 
       // Crown for boss
       if (enemy.crown) {
-        if (this.crownSprite) this.crownSprite.destroy();
+        this.crownSprite?.destroy();
         this.crownSprite = this.add.image(
           enemyX,
           enemyY - this.enemySprite.displayHeight - 10,
           'crown'
         );
-        this.crownSprite.setScale(0.5);
+        this.crownSprite.setScale(0.5).setOrigin(0.5, 0.85);
         this.crownSprite.setDepth(21);
       }
     }
@@ -528,6 +567,80 @@ export class BattleScene extends Phaser.Scene {
     this.enemyHPBar.setDepth(30);
 
     this.updateIntent(battle);
+    this.updateEmotion(battle);
+  }
+
+  /** Non-blocking "ACT n · NAME" banner on the first fight of an act. */
+  private showActBanner(): void {
+    const state = this.currentState;
+    const info = getGameManager().getActInfo();
+    if (!state?.battle || info.fightInAct !== 1 || state.battle.turnNumber !== 0 || state.battle.chain.length) return;
+    const def = this.getActDef(info.act);
+    const { width } = viewport(this);
+    const y = this.layout.arenaTop + this.layout.arenaHeight * .32;
+    const title = this.add.text(width / 2, y, `ACT ${info.act}`, { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '40px', color: '#ffe27a' })
+      .setOrigin(.5).setStroke('#1b1030', 8).setDepth(150);
+    const sub = this.add.text(width / 2, y + 36, def?.name ?? '', { resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '20px', color: '#ffffff' })
+      .setOrigin(.5).setStroke('#1b1030', 5).setDepth(150);
+    for (const [i, t] of [title, sub].entries()) {
+      t.setAlpha(0).setScale(.6);
+      this.tweens.add({ targets: t, alpha: 1, scale: 1, duration: 260, delay: i * 90, ease: 'Back.out' });
+      this.tweens.add({ targets: t, alpha: 0, y: t.y - 20, duration: 360, delay: 1500 + i * 60, onComplete: () => t.destroy() });
+    }
+  }
+
+  private getActDef(act: number | undefined): ActDef | undefined {
+    return getGameManager().getEnemiesData().acts?.[(act ?? 1) - 1];
+  }
+
+  /** Calm / angry / scared from HP and intent (thresholds in enemies.json "emotions"). */
+  private updateEmotion(battle: BattleState): void {
+    const next = getEmotion(battle.enemy, getGameManager().getEnemiesData().emotions);
+    if (next === this.emotion || this.enemyDying) return;
+    this.emotion = next;
+    this.clearEmote();
+    const sprite = this.enemySprite;
+    if (!sprite) return;
+    sprite.anims.timeScale = next === 'calm' ? 1 : next === 'angry' ? 1.35 : 1.6;
+    if (next === 'calm') return;
+    const mark = this.add.graphics().setDepth(26);
+    if (next === 'angry') {
+      // Anime anger vein: four red curved strokes.
+      mark.lineStyle(5, 0xff2a3d, 1);
+      for (const [dx, dy] of [[-1, -1], [1, -1], [-1, 1], [1, 1]]) {
+        mark.beginPath(); mark.arc(dx * 9, dy * 9, 7, Math.atan2(-dy, -dx) - .9, Math.atan2(-dy, -dx) + .9); mark.strokePath();
+      }
+    } else {
+      // Sweat drop.
+      mark.fillStyle(0x7fd4ff, 1).lineStyle(3, 0x1b1030, 1);
+      mark.beginPath(); mark.moveTo(0, -14); mark.lineTo(9, 3); mark.arc(0, 4, 9, 0, Math.PI); mark.lineTo(0, -14); mark.closePath(); mark.fillPath(); mark.strokePath();
+    }
+    this.emoteMark = mark;
+    this.positionEmote();
+    this.tweens.add({ targets: mark, scale: { from: 0, to: 1 }, duration: 220, ease: 'Back.out' });
+    if (next === 'angry') this.tweens.add({ targets: mark, scale: 1.18, duration: 380, yoyo: true, repeat: -1, delay: 220 });
+    else this.tweens.add({ targets: mark, y: '+=6', alpha: .6, duration: 700, yoyo: true, repeat: -1, delay: 220 });
+    // Scared enemies shiver; angry ones puff steam.
+    this.emoteTimer = window.setInterval(() => {
+      if (!this.sys.isActive() || !this.enemySprite || this.enemyDying) return;
+      const x = this.enemySprite.x; const top = this.enemySprite.y - this.enemySprite.displayHeight * .8;
+      if (this.emotion === 'angry') this.juice.dustPuff(x + Phaser.Math.Between(-20, 20), top, 3, 0xffffff);
+      else this.juice.sparkBurst(x + 24, top + 10, 2, 0x7fd4ff);
+    }, 900);
+  }
+
+  private positionEmote(): void {
+    const sprite = this.enemySprite;
+    if (!sprite) return;
+    const head = sprite.y - sprite.displayHeight * this.enemyHeadTop;
+    this.emoteMark?.setPosition(sprite.x + sprite.displayWidth * .2, head + 14);
+    this.crownSprite?.setPosition(sprite.x, head + 6);
+  }
+
+  private clearEmote(): void {
+    if (this.emoteMark) { this.tweens.killTweensOf(this.emoteMark); this.emoteMark.destroy(); this.emoteMark = null; }
+    if (this.emoteTimer !== null) { window.clearInterval(this.emoteTimer); this.emoteTimer = null; }
+    if (this.enemySprite) this.enemySprite.anims.timeScale = 1;
   }
 
   private updateIntent(battle: BattleState): void {
@@ -932,8 +1045,13 @@ export class BattleScene extends Phaser.Scene {
     playCombatVFX(this, 'slash', x, y, Math.min(195, this.layout.arenaHeight * .75), tier !== 'routine' ? 0xffb43b : undefined, -20);
     const sprite = this.enemySprite;
     if (sprite && !this.enemyDying) {
-      const restore = sprite.isTinted && !sprite.tintFill ? sprite.tintTopLeft : undefined;
-      this.juice.flashWhite(sprite, E.flashMs, restore);
+      this.juice.flashWhite(sprite, E.flashMs, this.enemyBaseTint ?? undefined);
+      // Hurt animation state, then back to idle.
+      const hurtKey = `${this.enemyKey}-hurt`;
+      if (!killing && this.anims.exists(hurtKey)) {
+        sprite.play(hurtKey, true);
+        sprite.once(Phaser.Animations.Events.ANIMATION_COMPLETE, () => { if (sprite.active && !this.enemyDying) sprite.play(`${this.enemyKey}-idle`, true); });
+      }
       const kb = Math.min(E.knockbackMax, E.knockbackPx + damage * E.knockbackPerDamage);
       const sq = E.squash * (tier === 'routine' ? 0.6 : tier === 'big' ? 1 : 1.4);
       this.tweens.killTweensOf(sprite);
@@ -962,7 +1080,9 @@ export class BattleScene extends Phaser.Scene {
     this.enemyDying = true;
     this.tweens.killTweensOf(sprite);
     sprite.play(`${this.enemyKey}-dead`, true);
-    this.juice.flashWhite(sprite, 110);
+    this.juice.flashWhite(sprite, 110, this.enemyBaseTint ?? undefined);
+    this.clearEmote();
+    for (const extra of [this.enemyAura, this.crownSprite]) if (extra) { this.tweens.killTweensOf(extra); this.tweens.add({ targets: extra, alpha: 0, duration: 300 }); }
     const ms = JUICE.death.fallMs;
     this.tweens.add({ targets: sprite, y: this.enemyBaseY + 20, angle: 22, alpha: 0, scaleY: this.enemyScale * .4, duration: ms, delay: 120, ease: 'Cubic.in' });
     if (this.enemyShadow) this.tweens.add({ targets: this.enemyShadow, alpha: 0, scaleX: .3, duration: ms, delay: 120 });
@@ -1107,6 +1227,9 @@ export class BattleScene extends Phaser.Scene {
     this.enemySprite = null;
     this.enemyShadow = null;
     this.crownSprite = null;
+    this.clearEmote();
+    this.enemyAura = null;
+    this.emotion = 'calm';
     this.intentBubble = null;
     this.buildPanel?.destroy();
     this.buildPanel = null;
