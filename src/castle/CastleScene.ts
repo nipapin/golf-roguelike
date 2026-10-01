@@ -237,7 +237,7 @@ export class CastleScene extends Phaser.Scene {
       onRestart: () => {
         this.bankAbandoned();
         manager.start();
-        this.scene.restart();
+        this.scene.restart({ tutorial: false });
       },
       onMainMenu: () => {
         manager.save();
@@ -596,7 +596,12 @@ export class CastleScene extends Phaser.Scene {
     this.showTraining();
   }
   private finishTraining(): void {
+    if (!this.training || this.locked) return;
+    this.locked = true;
     completeTraining();
+    // Phaser retains previous scene data when start/restart receives no data.
+    // Clear it immediately so a queued resize or later menu launch cannot revive training.
+    this.sys.settings.data = { tutorial: false };
     this.lessonUI?.destroy();
     this.training = undefined;
     if (this.tutorialFinish === 'menu') {
@@ -1203,7 +1208,7 @@ export class CastleScene extends Phaser.Scene {
     );
     popupButton(this, modal.content, 63, modal.width - 36, 'NEW SIEGE', () => {
       manager.start();
-      this.scene.restart();
+      this.scene.restart({ tutorial: false });
     });
     popupButton(
       this,

@@ -134,7 +134,7 @@ export class CastleMenuScene extends Phaser.Scene {
         }
         if (saved?.run.phase === 'battle') manager.resume();
         else manager.start();
-        this.scene.start('CastleScene');
+        this.scene.start('CastleScene', { tutorial: false });
       }
     );
     popupButton(this, buttons, 62, w - 48, 'WORKSHOP', () => this.workshop(), true);
@@ -169,7 +169,7 @@ export class CastleMenuScene extends Phaser.Scene {
               manager.service.settle(manager.state);
             }
             manager.start();
-            this.scene.start('CastleScene');
+            this.scene.start('CastleScene', { tutorial: false });
           });
           popupButton(
             this,
