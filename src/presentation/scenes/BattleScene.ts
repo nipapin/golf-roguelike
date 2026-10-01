@@ -558,7 +558,7 @@ export class BattleScene extends Phaser.Scene {
           else this.rejectCard(visual, exposed);
         };
         visual.setInteractive(onTap);
-        if (exposed) this.exposedSlots.set(card.id, { x, y, width: cw, height: this.cardMetrics.ch, onTap });
+        if (exposed) this.exposedSlots.set(card.id, { x, y, width: cw, height: this.layout.ch, onTap });
         visual.setDepth((playable ? 60 : 15) + cardIndex);
         if (isNew && firstDeal) {
           const container = visual.getContainer();
