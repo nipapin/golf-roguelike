@@ -29,10 +29,11 @@ const DETAILS: Record<
       'Chain 1 recruits this many soldiers. Each marches forward with 1 HP and 1 damage.',
   },
   knight: {
-    tab: 'KNIGHT',
-    title: 'ARMORED KNIGHT',
-    unit: 'HP & DAMAGE',
-    description: 'Chain 2 recruits a knight. This upgrade improves both its health and damage.',
+    tab: 'ARCHER',
+    title: 'CASTLE ARCHER',
+    unit: 'ARROW DAMAGE',
+    description:
+      'Chain 2 recruits a stationary archer with 1 HP. Increase the damage of each arrow.',
   },
   magazine: {
     tab: 'TURRET',
@@ -42,17 +43,18 @@ const DETAILS: Record<
       'Chain 3 builds your one turret or refills it to this capacity. More rounds, longer defense.',
   },
   mortar: {
-    tab: 'MORTAR',
-    title: 'HEAVY MORTAR',
+    tab: 'CANNON',
+    title: 'ARC CANNON',
     unit: 'DAMAGE / SHOT',
-    description: 'Chain 4 deploys a mortar. Increase the damage of every shell it fires.',
+    description:
+      'Chain 4 deploys a cannon that lobs explosive shells at groups of up to three enemies.',
   },
   laser: {
     tab: 'LASER',
     title: 'LASER CORE',
-    unit: 'BOSS DAMAGE',
+    unit: 'DAMAGE / ENEMY',
     description:
-      'Chain 5 sweeps regular invaders away. This upgrade increases its damage against bosses.',
+      'Chain 5 fires a beam across the road. Increase its damage to every enemy; tough enemies can survive.',
   },
 };
 
