@@ -1,9 +1,14 @@
 import Phaser from 'phaser';
-/** Kenney models rendered under directional light, with live ground shadows. */
+/** Kenney models rendered under directional light. */
 export function castleArt(scene: Phaser.Scene, x: number, y: number, scale = 1) {
   const root = scene.add.container(x, y).setScale(scale);
-  root.add(scene.add.ellipse(0, 1, 112, 20, 0x152b31, 0.24));
-  root.add(scene.add.image(0, 9, 'castle-kenney').setDisplaySize(168, 168).setOrigin(0.5, 1));
+  // The rendered base ends at pixel 580; ignore transparent bottom padding.
+  root.add(
+    scene.add
+      .image(0, 0, 'castle-kenney')
+      .setDisplaySize(168, 168)
+      .setOrigin(0.5, 580 / 640)
+  );
   return root;
 }
 export function weaponArt(scene: Phaser.Scene, mortar: boolean) {

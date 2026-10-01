@@ -8,26 +8,10 @@ import {
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { castleArt } from './CastleArt';
+import { showCastleWorkshop } from './CastleWorkshop';
 import { castleManager } from './CastleManager';
-import {
-  UPGRADE_KEYS,
-  UPGRADE_LIMIT,
-  upgradeCost,
-  upgradeValue,
-  siegeDifficulty,
-  type UpgradeKey,
-} from './CastleDefense';
+import { siegeDifficulty } from './CastleDefense';
 
-const LABELS: Record<UpgradeKey, string> = {
-  walls: 'CASTLE WALLS',
-  soldier: 'SOLDIERS',
-  knight: 'KNIGHTS',
-  magazine: 'TURRET MAGAZINE',
-  mortar: 'MORTAR',
-  laser: 'LASER CORE',
-};
-const values = (key: UpgradeKey, n: number) =>
-  `${upgradeValue(key, n)} ${key === 'walls' ? 'HP' : key === 'magazine' ? 'rounds' : key === 'soldier' ? 'troops' : key === 'knight' ? 'HP / damage' : 'damage'}`;
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const modal = gamePopup(scene, 'DEFEND THE CASTLE', 'One solitaire. A whole siege.', 560);
   modal.root.setDepth(3000);
@@ -238,73 +222,6 @@ export class CastleMenuScene extends Phaser.Scene {
     );
   }
   private workshop(): void {
-    const manager = castleManager(),
-      meta = manager.service.readMeta();
-    const modal = gamePopup(
-      this,
-      'WORKSHOP',
-      `${meta.coins} coins · Siege #${meta.siegesStarted + 1} · Upgrades apply next run`,
-      530
-    );
-    const cellW = (modal.width - 48) / 2,
-      rowH = (modal.height - 180) / 3;
-    UPGRADE_KEYS.forEach((key, i) => {
-      const level = meta.upgrades[key],
-        cost = upgradeCost(level),
-        maxed = level >= UPGRADE_LIMIT;
-      const x = ((i % 2 ? 1 : -1) * (cellW + 12)) / 2,
-        y = modal.top + 112 + Math.floor(i / 2) * rowH;
-      const tile = this.add.container(x, y);
-      tile.add(
-        this.add.rectangle(0, rowH / 2 - 6, cellW, rowH - 12, 0xfff0cf).setStrokeStyle(3, 0x1b1030)
-      );
-      tile.add(this.text(0, 13, LABELS[key], 12, '#35204d'));
-      tile.add(this.text(0, 34, `LEVEL ${level} / ${UPGRADE_LIMIT}`, 11, '#77558b'));
-      tile.add(
-        this.text(
-          0,
-          55,
-          maxed ? values(key, level) : `${values(key, level)}\n→ ${values(key, level + 1)}`,
-          10,
-          '#35204d'
-        )
-      );
-      tile.add(
-        this.text(
-          0,
-          rowH - 27,
-          maxed ? 'MAXED' : `${cost} COINS`,
-          13,
-          meta.coins >= cost ? '#96600b' : '#927981'
-        )
-      );
-      tile
-        .setSize(cellW, rowH - 12)
-        .setInteractive(
-          new Phaser.Geom.Rectangle(-cellW / 2, 0, cellW, rowH - 12),
-          Phaser.Geom.Rectangle.Contains
-        )
-        .on('pointerup', () => {
-          AudioSystem.unlock();
-          if (!manager.service.purchase(key)) {
-            AudioSystem.play('invalid_tap');
-            this.tweens.add({ targets: tile, x: x + 4, duration: 45, yoyo: true, repeat: 2 });
-            return;
-          }
-          AudioSystem.play('reward_pick');
-          modal.root.destroy();
-          this.workshop();
-        });
-      modal.content.add(tile);
-    });
-    popupButton(
-      this,
-      modal.content,
-      modal.height / 2 - 34,
-      modal.width - 36,
-      'BACK TO CASTLE',
-      () => this.scene.restart(),
-      true
-    );
+    showCastleWorkshop(this, () => this.scene.restart());
   }
 }
