@@ -3,6 +3,7 @@
  * Shows in-app update prompt for iOS PWA users who can't easily reload
  */
 
+import { castleManager } from '../castle/CastleManager';
 import { registerSW } from 'virtual:pwa-register';
 import { saveGame } from '../services/SaveService';
 import { getGameManager } from '../presentation/GameManager';
@@ -37,6 +38,7 @@ export function initPWAUpdateHandler(): void {
         if (state) {
           saveGame(state);
         }
+        castleManager().save();
         // Trigger skipWaiting + reload
         updateSW(true);
       });

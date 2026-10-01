@@ -7,12 +7,8 @@ import { loadFonts } from './presentation/design/fontLoader';
 import { AudioSystem } from './presentation/audio/AudioSystem';
 import { initPWAUpdateHandler } from './pwa/updateHandler';
 import { BootScene } from './presentation/scenes/BootScene';
-import { StartScene } from './presentation/scenes/StartScene';
-import { BattleScene } from './presentation/scenes/BattleScene';
-import { RewardScene } from './presentation/scenes/RewardScene';
-import { ShopScene } from './presentation/scenes/ShopScene';
-import { EndScene } from './presentation/scenes/EndScene';
-import { CreditsScene } from './presentation/scenes/CreditsScene';
+import { CastleMenuScene } from './castle/CastleMenuScene';
+import { CastleScene } from './castle/CastleScene';
 
 async function initGame() {
   // Load fonts before Phaser starts (per STYLE.md section 13)
@@ -57,7 +53,7 @@ async function initGame() {
       height: Math.round(bounds.height * density),
       zoom: 1 / density,
     },
-    scene: [BootScene, StartScene, BattleScene, RewardScene, ShopScene, EndScene, CreditsScene],
+    scene: [BootScene, CastleMenuScene, CastleScene],
     render: {
       antialias: true,
       pixelArt: false,

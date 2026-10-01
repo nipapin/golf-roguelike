@@ -1,0 +1,258 @@
+import { describe, expect, it } from 'vitest';
+import { config, memoryStorage } from '../test/fixtures';
+import { getPlayableCards } from '../core/GameRules';
+import { chooseGreedyCard } from '../core/Simulation';
+import { CastleService } from './CastleService';
+import {
+  createCastleRun,
+  emptyUpgrades,
+  playCastleCard,
+  drawCastleCard,
+  stepSiege,
+  type CastleRun,
+  type Invader,
+} from './CastleDefense';
+const start = (seed = 'castle-test') => createCastleRun(seed, config, emptyUpgrades());
+const enemy = (boss = false, hp = 20): Invader => ({
+  id: 100,
+  sprite: 'c_orc',
+  boss,
+  hp,
+  maxHp: hp,
+  progress: 0.6,
+  speed: 0.03,
+  damage: 3,
+  cooldown: 0,
+});
+const ids = (s: CastleRun) =>
+  [
+    ...s.run.battle!.tableau.flatMap((c) => c.cards),
+    ...s.run.battle!.deck,
+    ...s.run.battle!.discard,
+    s.run.battle!.activeCard!,
+  ]
+    .map((c) => c.id)
+    .sort();
+function forcedChain(length: number) {
+  let state = start();
+  const pack = [
+    ...state.run.battle!.tableau.flatMap((c) => c.cards),
+    ...state.run.battle!.deck,
+    state.run.battle!.activeCard!,
+  ];
+  const active = pack.find((c) => c.rank === 4 && c.suit === 'clubs')!;
+  const chain = Array.from({ length }, (_, i) =>
+    pack.find((c) => c.rank === i + 5 && c.suit === 'clubs')!
+  );
+  const rest = pack.filter((c) => c.id !== active.id && !chain.some((x) => x.id === c.id));
+  state = {
+    ...state,
+    run: {
+      ...state.run,
+      battle: {
+        ...state.run.battle!,
+        activeCard: active,
+        tableau: [
+          { cards: chain.slice().reverse() },
+          { cards: rest.splice(0, 3) },
+          ...Array.from({ length: 5 }, () => ({ cards: [] })),
+        ],
+        deck: rest,
+        discard: [],
+        powerCards: [],
+      },
+    },
+  };
+  return { state, chain };
+}
+describe('castle siege', () => {
+  it('waits for the first move and preserves all 54 physical cards', () => {
+    const state = start();
+    expect(stepSiege(state).state).toBe(state);
+    let played = state;
+    const original = ids(state);
+    for (let i = 0; i < 80 && played.run.phase === 'battle'; i++) {
+      const card = getPlayableCards(played.run.battle!)[0];
+      played = card
+        ? playCastleCard(played, card.id, config).state
+        : drawCastleCard(played, config).state;
+      expect(ids(played)).toEqual(original);
+    }
+  });
+  it('rejects illegal and covered cards without granting a defender', () => {
+    const state = start();
+    const covered = state.run.battle!.tableau[0].cards[0];
+    expect(playCastleCard(state, covered.id, config).state).toBe(state);
+    expect(playCastleCard(state, 'missing', config).state).toBe(state);
+  });
+  it('grants every chain milestone, limits turrets to their magazine and lasers to bosses damage', () => {
+    const fixture = forcedChain(5);
+    let state = fixture.state;
+    for (let i = 0; i < 4; i++) state = playCastleCard(state, fixture.chain[i].id, config).state;
+    expect(state.siege.units.map((u) => u.kind)).toEqual(['soldier', 'knight', 'turret', 'mortar']);
+    expect(state.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(100);
+    state.siege.enemies = [enemy(false), { ...enemy(true, 150), id: 101 }];
+    const result = playCastleCard(state, fixture.chain[4].id, config);
+    expect(result.state.siege.enemies).toHaveLength(1);
+    expect(result.state.siege.enemies[0].hp).toBe(70);
+    expect(result.events.some((e) => e.type === 'laser')).toBe(true);
+    expect(result.state.run.phase).toBe('battle');
+  });
+  it('does not expire soldiers while they wait for an enemy', () => {
+    const f = forcedChain(1);
+    let state = playCastleCard(f.state, f.chain[0].id, config).state;
+    // Stop automatic spawns and keep the lane empty for a minute.
+    state.siege.spawnIn = 1000;
+    for (let i = 0; i < 240; i++) state = stepSiege(state).state;
+    expect(state.siege.units[0].ttl).toBe(18);
+    state.siege.enemies = [enemy()];
+    state = stepSiege(state).state;
+    expect(state.siege.units[0].engaged).toBe(true);
+    expect(state.siege.enemies[0].hp).toBeLessThan(20);
+  });
+  it('spawns a supermonster after every ten regular invaders', () => {
+    const state = start();
+    state.siege.started = true;
+    state.siege.spawned = 10;
+    state.siege.spawnIn = 0;
+    const result = stepSiege(state);
+    expect(result.state.siege.enemies[0].boss).toBe(true);
+    expect(result.state.siege.enemies[0].maxHp).toBeGreaterThan(80);
+  });
+  it('enemy contact damages castle armor first, then causes defeat', () => {
+    let state = start();
+    state.siege.started = true;
+    state.siege.enemies = [{ ...enemy(), progress: 0.94, damage: 9 }];
+    state.run = { ...state.run, player: { ...state.run.player, armor: 4, hp: 5 } };
+    state = stepSiege(state).state;
+    expect(state.run.player.armor).toBe(0);
+    expect(state.run.player.hp).toBe(0);
+    expect(state.run.phase).toBe('defeat');
+  });
+  it('stock recycle keeps the tableau and resets the chain even with playable moves', () => {
+    let state = start();
+    state = {
+      ...state,
+      run: {
+        ...state.run,
+        battle: {
+          ...state.run.battle!,
+          deck: [],
+          discard: state.run.battle!.deck,
+          chain: [state.run.battle!.tableau[0].cards[0]],
+        },
+      },
+    };
+    const original = ids(state),
+      board = state.run.battle!.tableau;
+    const result = drawCastleCard(state, config);
+    expect(result.state.run.battle!.chain).toHaveLength(0);
+    expect(result.state.run.battle!.tableau).toEqual(board);
+    expect(ids(result.state)).toEqual(original);
+  });
+  it('deterministically resumes a siege including movement, shots and RNG', () => {
+    let state = drawCastleCard(start(), config).state;
+    for (let i = 0; i < 40; i++) state = stepSiege(state).state;
+    const restored = JSON.parse(JSON.stringify(state)) as CastleRun;
+    expect(stepSiege(restored)).toEqual(stepSiege(state));
+    expect(state.siege.elapsed).toBe(10); // stepping never mutates the input
+  });
+});
+describe('persistent castle upgrades', () => {
+  it('banks a terminal run once across reloads, includes diamond coins, and spends atomically', () => {
+    const storage = memoryStorage(),
+      service = new CastleService(storage);
+    const state = start();
+    state.siege.coins = 11;
+    state.run = { ...state.run, phase: 'victory', player: { ...state.run.player, gold: 4 } };
+    expect(service.settle(state)).toBe(true);
+    expect(new CastleService(storage).settle(state)).toBe(true);
+    expect(service.readMeta().coins).toBe(25);
+    expect(service.readMeta().victories).toBe(1);
+    expect(service.purchase('magazine')).toBe(true);
+    expect(service.readMeta().coins).toBe(15);
+    expect(service.purchase('magazine')).toBe(false);
+    expect(service.readMeta().coins).toBe(15);
+    expect(service.readMeta().upgrades.magazine).toBe(1);
+  });
+  it('validates saved armies and roundtrips the complete board', () => {
+    const storage = memoryStorage(),
+      service = new CastleService(storage),
+      f = forcedChain(1);
+    const state = playCastleCard(f.state, f.chain[0].id, config).state;
+    service.save(state);
+    expect(service.load()).toEqual(state);
+    storage.setItem(
+      'golf-castle-run-v1',
+      JSON.stringify({
+        ...state,
+        siege: { ...state.siege, enemies: [{ ...enemy(), progress: 12 }] },
+      })
+    );
+    expect(service.load()).toBeNull();
+  });
+  it('permanent levels apply at the next siege and leave existing snapshots unchanged', () => {
+    const upgrades = { ...emptyUpgrades(), walls: 2, magazine: 3 };
+    const state = createCastleRun('upgrades', config, upgrades);
+    upgrades.walls = 10;
+    expect(state.run.player.maxHp).toBe(40);
+    expect(state.upgrades.walls).toBe(2);
+    const f = forcedChain(3);
+    f.state.upgrades.magazine = 3;
+    let next = f.state;
+    for (const card of f.chain) next = playCastleCard(next, card.id, config).state;
+    expect(next.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(160);
+  });
+});
+describe('deterministic castle balance sample', () => {
+  it('allows a deliberate player to complete a useful proportion of runs without upgraded gear', () => {
+    let wins = 0,
+      totalCards = 0,
+      bossRuns = 0;
+    for (let seed = 0; seed < 40; seed++) {
+      let state = start(`siege-balance-${seed}`),
+        count = 0;
+      for (let action = 0; action < 400 && state.run.phase === 'battle'; action++) {
+        const id = chooseGreedyCard(state.run, config);
+        if (id) {
+          state = playCastleCard(state, id, config).state;
+          count++;
+        } else state = drawCastleCard(state, config).state;
+        // One action per second, not a frame-perfect tapping bot.
+        for (let step = 0; step < 4 && state.run.phase === 'battle'; step++)
+          state = stepSiege(state).state;
+      }
+      if (state.run.phase === 'victory') wins++;
+      if (state.siege.spawned >= 11) bossRuns++;
+      totalCards += count;
+    }
+    console.log(JSON.stringify({ seeds: 40, wins, averageCards: totalCards / 40, bossRuns }));
+    let slowWins = 0,
+      upgradedWins = 0;
+    for (let seed = 0; seed < 40; seed++) {
+      for (const upgraded of [false, true]) {
+        const levels = upgraded
+          ? { walls: 5, soldier: 5, knight: 5, magazine: 5, mortar: 5, laser: 5 }
+          : emptyUpgrades();
+        let state = createCastleRun(`siege-balance-${seed}`, config, levels);
+        for (let action = 0; action < 400 && state.run.phase === 'battle'; action++) {
+          const id = chooseGreedyCard(state.run, config);
+          state = id
+            ? playCastleCard(state, id, config).state
+            : drawCastleCard(state, config).state;
+          for (let step = 0; step < 12 && state.run.phase === 'battle'; step++)
+            state = stepSiege(state).state;
+        }
+        if (state.run.phase === 'victory') {
+          if (upgraded) upgradedWins++;
+          else slowWins++;
+        }
+      }
+    }
+    console.log(JSON.stringify({ slowWins, upgradedWins, actionSeconds: 3 }));
+    expect(upgradedWins).toBeGreaterThanOrEqual(slowWins);
+    expect(wins).toBeGreaterThanOrEqual(12);
+    expect(bossRuns).toBeGreaterThan(0);
+    expect(totalCards / 40).toBeGreaterThan(20);
+  });
+});
