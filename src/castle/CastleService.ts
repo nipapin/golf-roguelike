@@ -5,6 +5,7 @@ import {
   UPGRADE_LIMIT,
   upgradeCost,
   earnedCoins,
+  SIEGE_PACING,
   type CastleRun,
   type Upgrades,
   type UpgradeKey,
@@ -65,7 +66,7 @@ function validRun(v: unknown): v is CastleRun {
     typeof s.spawnIn === 'number' &&
     Number.isFinite(s.spawnIn) &&
     Array.isArray(s.enemies) &&
-    s.enemies.length <= 32 &&
+    s.enemies.length <= SIEGE_PACING.maxEnemies &&
     s.enemies.every(
       (e) =>
         record(e) &&

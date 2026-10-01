@@ -13,8 +13,8 @@ export const DEFENDER_STATS: Record<
 > = {
   soldier: { damage: 1, interval: 1, range: 0.52, ttl: 18, ammo: 100 },
   knight: { damage: 6, interval: 1.5, range: 0.38, ttl: 24, ammo: 100 },
-  turret: { damage: 2, interval: 0.25, range: 0, ttl: 600, ammo: 100 },
-  mortar: { damage: 9, interval: 2, range: 0, ttl: 45, ammo: 12 },
+  turret: { damage: 2, interval: 0.25, range: 0.4, ttl: 600, ammo: 100 },
+  mortar: { damage: 9, interval: 2, range: 0.22, ttl: 45, ammo: 12 },
 };
 export const UPGRADE_VALUES: Record<UpgradeKey, { base: number; step: number }> = {
   walls: { base: 30, step: 5 },
@@ -28,12 +28,15 @@ export const upgradeValue = (key: UpgradeKey, level: number) =>
   UPGRADE_VALUES[key].base + UPGRADE_VALUES[key].step * level;
 export const SIEGE_PACING = {
   firstSpawn: 1,
-  interval: 1.5,
-  intervalFloor: 0.75,
-  acceleration: 0.015,
-  bossEvery: 11,
-  enemyHp: 5,
-  hpGrowth: 0.25,
+  interval: 2,
+  intervalFloor: 1.25,
+  acceleration: 0.0125,
+  bossEvery: 21,
+  enemyHp: 6,
+  hpGrowth: 2,
+  groupSize: 3,
+  maxGroupSize: 5,
+  maxEnemies: 48,
 };
 export const emptyUpgrades = (): Upgrades => ({
   walls: 0,
@@ -323,32 +326,34 @@ export function stepSiege(current: CastleRun): SiegeResult {
     events: SiegeEvent[] = [];
   siege.elapsed += STEP;
   siege.spawnIn -= STEP;
-  if (siege.spawnIn <= 0 && siege.enemies.length < 32) {
-    siege.spawned++;
-    const boss = siege.spawned % SIEGE_PACING.bossEvery === 0;
-    const hp = boss
-      ? 100 + Math.floor(siege.spawned / 11) * 20
-      : SIEGE_PACING.enemyHp + Math.floor(siege.spawned * SIEGE_PACING.hpGrowth);
+  if (siege.spawnIn <= 0 && siege.enemies.length < SIEGE_PACING.maxEnemies) {
+    const level = Math.floor(siege.elapsed / 30);
+    const size = Math.min(SIEGE_PACING.maxGroupSize, SIEGE_PACING.groupSize + level);
     const rng = RNG.fromState(siege.rngState);
-    const sprites = boss ? ['c_ogre', 'c_reaper1'] : ['c_orc', 'c_goblin', 'c_reaper2'];
-    const enemy: Invader = {
-      id: siege.nextId++,
-      sprite: rng.pickOne(sprites),
-      boss,
-      hp,
-      maxHp: hp,
-      progress: 0,
-      speed: boss ? 0.016 : 0.022 + Math.min(0.01, siege.spawned * 0.0002),
-      damage: boss ? 4 : 1 + Math.floor(siege.spawned / 30),
-      cooldown: 0,
-    };
-    siege.enemies.push(enemy);
+    for (let i = 0; i < size && siege.enemies.length < SIEGE_PACING.maxEnemies; i++) {
+      siege.spawned++;
+      const boss = siege.spawned % SIEGE_PACING.bossEvery === 0;
+      const hp = boss ? 100 + level * 20 : SIEGE_PACING.enemyHp + level * SIEGE_PACING.hpGrowth;
+      const sprites = boss ? ['c_ogre', 'c_reaper1'] : ['c_orc', 'c_goblin', 'c_reaper2'];
+      const enemy: Invader = {
+        id: siege.nextId++,
+        sprite: rng.pickOne(sprites),
+        boss,
+        hp,
+        maxHp: hp,
+        progress: i * 0.035,
+        speed: (boss ? 0.025 : 0.032) + rng.next() * 0.006,
+        damage: boss ? 4 : 1 + Math.floor(level / 2),
+        cooldown: 0,
+      };
+      siege.enemies.push(enemy);
+      events.push({ type: 'spawn', enemy: { ...enemy } });
+    }
     siege.rngState = rng.getState();
     siege.spawnIn = Math.max(
       SIEGE_PACING.intervalFloor,
-      SIEGE_PACING.interval - siege.spawned * SIEGE_PACING.acceleration
+      SIEGE_PACING.interval - Math.floor(siege.elapsed / 2) * SIEGE_PACING.acceleration
     );
-    events.push({ type: 'spawn', enemy: { ...enemy } });
   }
   for (const unit of siege.units) {
     if (unit.engaged) unit.ttl -= STEP;

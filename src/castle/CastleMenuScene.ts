@@ -42,7 +42,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'THE ROAD IS REAL TIME',
-      'Enemies march toward your castle. Every 10 regular invaders brings a supermonster. Pause or switch apps to stop time.',
+      'Groups of 3–5 enemies march toward your castle. Every 20 regular invaders brings a supermonster. Pause or switch apps to stop time.',
     ],
     [
       'CARDS KEEP YOU ALIVE',

@@ -286,7 +286,7 @@ export class CastleScene extends Phaser.Scene {
   private enemyPosition(enemy: Invader) {
     return {
       x: 10 + enemy.progress * viewport(this).width * 0.78,
-      y: this.groundY() - (enemy.id % 3) * 7,
+      y: this.groundY() - (enemy.id % 4) * 14,
     };
   }
   private activePosition() {
@@ -411,7 +411,9 @@ export class CastleScene extends Phaser.Scene {
       .fillRoundedRect(14, y + 2, Math.max(0, ((w * 0.58 - 4) * player.hp) / player.maxHp), 18, 9);
     this.hpText.setText(`CASTLE ${Math.ceil(player.hp)} / ${player.maxHp}`);
     this.coins.setText(String(state.siege.coins + player.gold));
-    this.status.setText(`ARMOR ${player.armor}\nKILLS ${state.siege.kills}`);
+    this.status.setText(`ARMOR ${player.armor}\nENEMIES ${state.siege.enemies.length}`);
+    const danger = state.siege.enemies.some((e) => e.progress >= 0.72);
+    this.status.setColor(danger ? '#ff6b84' : '#bff5ff');
     this.chainText.setText(
       state.siege.started ? `CHAIN ${chain} · DRAW TO DEPLOY` : 'FIRST MOVE STARTS THE SIEGE'
     );
@@ -440,7 +442,7 @@ export class CastleScene extends Phaser.Scene {
       let view = this.invaders.get(enemy.id);
       if (!view) {
         const p = this.enemyPosition(enemy),
-          root = this.add.container(p.x, p.y).setDepth(35 + (enemy.id % 3));
+          root = this.add.container(p.x, p.y).setDepth(39 - (enemy.id % 4));
         const size = Math.min(enemy.boss ? 90 : 59, this.layout.arenaHeight * 0.6);
         const body = this.add
           .sprite(0, 0, `enemy-${enemy.sprite}`)
@@ -462,7 +464,9 @@ export class CastleScene extends Phaser.Scene {
       view.hp
         .fillStyle(enemy.boss ? 0xffab4d : 0xee536a)
         .fillRect(-width / 2, -size, (width * enemy.hp) / enemy.maxHp, 3);
-      if (enemy.hp / enemy.maxHp < 0.3) view.body.setTint(enemy.boss ? 0xffbba0 : 0xd2b8ff);
+      view.label.setText(enemy.boss ? 'BOSS' : enemy.progress >= 0.72 ? '!' : '');
+      if (enemy.progress >= 0.72) view.body.setTint(0xff9f9f);
+      else if (enemy.hp / enemy.maxHp < 0.3) view.body.setTint(enemy.boss ? 0xffbba0 : 0xd2b8ff);
       else view.body.clearTint();
     }
     const ids = new Set(state.siege.units.map((u) => u.id));
