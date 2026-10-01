@@ -11,7 +11,13 @@ import { SettingsModal } from '../design/SettingsModal';
 import { showRules, hasSeenRules } from '../design/RulesPopup';
 import { isPlayable, MIN_ATTACK_CHAIN } from '../../core/GameRules';
 import { AudioSystem } from '../audio/AudioSystem';
+import { Juice } from '../juice/Juice';
+import { JUICE, classifyHit, hitStopMs, shakeIntensity } from '../juice/juiceConfig';
 import type { RunState, Card, BattleState, PowerType } from '../../core/types';
+
+const POWER_TINTS: Record<PowerType, number> = {
+  CRIT: 0xff6633, HEAL: 0x3aef98, GUARD: 0x50bfff, GOLD: 0xffd34a, BOMB: 0xff9a30, WILD: 0x80eaff, ECHO: 0xc58aff,
+};
 
 export class BattleScene extends Phaser.Scene {
   private layout!: ReturnType<typeof getLayoutMetrics>;
@@ -66,6 +72,11 @@ export class BattleScene extends Phaser.Scene {
   private enemyDying = false;
   private dealt = false;
   private lastShake = 0;
+  private juice!: Juice;
+  private lastEnemyMaxHp = 1;
+  /** While an enemy attack animates, the player HP bar keeps showing the pre-hit value until contact. */
+  private heldPlayerHp: number | null = null;
+  private chainHadCrit = false;
 
   constructor() {
     super('BattleScene');
@@ -105,6 +116,9 @@ export class BattleScene extends Phaser.Scene {
     // Stock pile (tap to draw / end turn) and undo
     this.createStockPile();
     this.createUndoButton();
+
+    // Juice toolkit (pooled particles/numbers, hit-stop, shake)
+    this.juice = new Juice(this);
 
     // Initial render
     this.dealt = false;
@@ -404,6 +418,7 @@ export class BattleScene extends Phaser.Scene {
     const intent = enemy.intents[enemy.currentIntentIndex];
     const intentKey = `${intent?.type}:${intent?.value}`;
     if (this.renderedEnemyId === enemy.id) {
+      this.lastEnemyMaxHp = enemy.maxHp;
       this.enemyHPBar.setHp(enemy.hp, enemy.maxHp);
       this.enemyHPBar.setPendingDamage(battle.accumulatedDamage);
       if (this.renderedIntentKey !== intentKey) {
@@ -412,6 +427,7 @@ export class BattleScene extends Phaser.Scene {
       return;
     }
     this.renderedEnemyId = enemy.id;
+    this.lastEnemyMaxHp = enemy.maxHp;
     const enemyX = width / 2;
     const enemyY = arenaTop + arenaHeight - 70;
 
@@ -652,7 +668,7 @@ export class BattleScene extends Phaser.Scene {
   }
 
   private updatePlayerHUD(state: RunState): void {
-    this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
+    this.playerHPBar.setHp(this.heldPlayerHp ?? state.player.hp, state.player.maxHp);
     this.goldText.setText(`${state.player.gold}`);
     this.armorText.setText(`ARMOR ${state.player.armor}`);
     const relics = state.player.relics;
@@ -679,21 +695,61 @@ export class BattleScene extends Phaser.Scene {
     const moving = flying.getContainer();
     const destinationX = viewport(this).width * 0.76 - this.layout.activeW / 2;
     const destinationY = this.layout.trayTop + 12;
-    this.tweens.add({ targets: moving, y: bounds.y - 22, angle: -8, scale: 1.15, duration: 90, ease: 'Quad.out', onComplete: () => {
-      const path = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(moving.x, moving.y), new Phaser.Math.Vector2(destinationX + 20, bounds.y - 55), new Phaser.Math.Vector2(destinationX, destinationY));
+    const J = JUICE.cards;
+    const played = result.events.find((item) => item.type === 'card_played') as { damage: number; chainPosition: number } | undefined;
+    const tint = card.joker ? (card.joker === 'red' ? 0xff557c : 0xb795ff) : power ? POWER_TINTS[power] : 0xffe7a0;
+    const special = !!(power || card.joker);
+    const { cw, ch, activeScale, activeW, activeH } = this.layout;
+    // 1) Anticipation lift.
+    this.tweens.add({ targets: moving, y: bounds.y - J.liftPx, angle: -J.rotateDeg * 0.5, scale: J.liftScale, duration: J.liftMs, ease: 'Quad.out', onComplete: () => {
+      // 2) Arc flight with rotation and trail.
+      const path = new Phaser.Curves.QuadraticBezier(new Phaser.Math.Vector2(moving.x, moving.y), new Phaser.Math.Vector2((moving.x + destinationX) / 2 + 20, Math.min(moving.y, destinationY) - J.flightArcPx), new Phaser.Math.Vector2(destinationX, destinationY));
       const progress = { t: 0 };
-      this.tweens.add({ targets: progress, t: 1, duration: 240, ease: 'Cubic.inOut', onUpdate: () => {
-        const point = path.getPoint(progress.t); moving.setPosition(point.x, point.y).setAngle(-8 * (1 - progress.t));
+      const point = new Phaser.Math.Vector2();
+      this.juice.startTrail(moving, cw / 2, ch / 2, tint);
+      this.tweens.add({ targets: progress, t: 1, duration: J.flightMs, ease: 'Sine.inOut', onUpdate: () => {
+        path.getPoint(progress.t, point);
+        const t = progress.t;
+        moving.setPosition(point.x, point.y).setAngle(-J.rotateDeg * 0.5 + J.rotateDeg * Math.sin(t * Math.PI) * 0.9 - J.rotateDeg * 0.5 * t).setScale(J.liftScale + (activeScale - J.liftScale) * t);
       }, onComplete: () => {
+        this.juice.stopTrail();
         flying.destroy();
+        // 3) Landing squash + dust/glow.
         const active = this.activeCardVisual?.getContainer();
-        active?.setVisible(true).setScale(this.layout.activeScale * 1.12);
-        if (active) this.tweens.add({ targets: active, scale: this.layout.activeScale, duration: 140, ease: 'Back.out' });
-        this.cardBurst(destinationX + this.layout.activeW / 2, destinationY + this.layout.activeH / 2, power ? 0xff7cee : 0xffdf70);
-        const handle = window.setTimeout(() => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); }, getGameManager().getState()?.phase === 'battle' ? 120 : 450);
+        if (active) {
+          active.setVisible(true).setScale(activeScale * (1 + J.landSquash), activeScale * (1 - J.landSquash));
+          this.tweens.add({ targets: active, scaleX: activeScale, scaleY: activeScale, duration: J.landMs, ease: 'Back.out' });
+        }
+        const cx = destinationX + activeW / 2;
+        this.juice.dustPuff(cx, destinationY + activeH, J.dustCount, special ? tint : 0xfff3d0);
+        if (special) {
+          this.juice.ring(cx, destinationY + activeH / 2, tint, 3, 340, 5);
+          this.juice.sparkBurst(cx, destinationY + activeH / 2, 14, tint);
+        } else {
+          this.cardBurst(cx, destinationY + activeH / 2, 0xffdf70);
+        }
+        // 4) Routine hit feedback on the enemy: the chain is charging up.
+        if (played && played.damage > 0) this.playChargeFeedback(played.damage, played.chainPosition);
+        const ended = getGameManager().getState()?.phase !== 'battle';
+        const handle = window.setTimeout(() => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); }, ended ? 1400 : 110);
         this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.clearTimeout(handle));
       } });
     } });
+  }
+
+  /** Routine tier: small number + flinch while a chain builds (damage lands on END TURN). */
+  private playChargeFeedback(damage: number, chainPosition: number): void {
+    const x = viewport(this).width / 2;
+    const y = this.enemyBaseY - this.layout.enemyHeight * 0.55;
+    this.juice.damageNumber(x + Phaser.Math.Between(-30, 30), y, damage, { small: true, prefix: '+', size: JUICE.numbers.routineSize + Math.min(10, chainPosition), color: '#fff1a8' });
+    this.juice.shake(JUICE.shake.routine.intensity + chainPosition * 0.0003, JUICE.shake.routine.ms);
+    const sprite = this.enemySprite;
+    if (sprite && !this.enemyDying) {
+      const baseX = viewport(this).width / 2;
+      const px = JUICE.enemy.routineFlinchPx + Math.min(4, chainPosition * 0.5);
+      this.tweens.add({ targets: sprite, x: baseX + px, duration: 40, yoyo: true, ease: 'Sine.inOut', onComplete: () => sprite.setX(baseX) });
+      this.juice.sparkBurst(x, y + 10, 4 + Math.min(8, chainPosition), 0xffe08a);
+    }
   }
 
   private onDrawClick(): void {
@@ -704,6 +760,11 @@ export class BattleScene extends Phaser.Scene {
     if (!result || result.state === before) return;
     this.inputPaused = true;
     AudioSystem.play('card_draw');
+    const chain = before?.battle?.chain ?? [];
+    const powers = before?.battle?.powerCards ?? [];
+    this.chainHadCrit = chain.some((c) => c.joker === 'black' || powers.some((p) => p.cardId === c.id && p.type === 'CRIT'));
+    const attacked = result.events.some((e) => e.type === 'enemy_attacked');
+    this.heldPlayerHp = attacked && before ? before.player.hp : null;
     this.refreshState();
     this.handleEvents(result.events);
     const active = this.activeCardVisual?.getContainer();
@@ -716,7 +777,8 @@ export class BattleScene extends Phaser.Scene {
     }
     // Unlock on a real-time timer (not the game clock, which can stretch after slow frames).
     const unlock = () => { if (!this.sys.isActive()) return; this.inputPaused = false; this.checkPhaseTransition(); };
-    const handle = window.setTimeout(unlock, result.state.phase === 'battle' ? 520 : 750);
+    const died = result.events.some((e) => e.type === 'enemy_died');
+    const handle = window.setTimeout(unlock, result.state.phase === 'battle' ? (attacked ? 900 : 520) : died ? 1500 : 1100);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => window.clearTimeout(handle));
   }
 
@@ -758,17 +820,23 @@ export class BattleScene extends Phaser.Scene {
           playCombatVFX(this, 'stagger', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight - 8, 84);
           this.cardBurst(viewport(this).width / 2, this.enemyBaseY - 40, 0x69d6ff);
           break;
-        case 'enemy_attacked':
-          this.playEnemyAttackAnimation();
-          AudioSystem.play('player_hit');
+        case 'enemy_attacked': {
+          const damage = event.damage as number;
+          const blocked = event.blocked as number;
+          // Let a chain hit land first, then the enemy answers.
+          const hitFirst = events.some((e) => e.type === 'chain_resolved');
+          this.time.delayedCall(hitFirst ? 380 : 0, () => this.playEnemyAttackAnimation(damage, blocked));
           break;
+        }
         case 'enemy_died':
           playCombatVFX(this, 'smoke', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight * .4, 140, 0xcfc2ff);
+          this.enemyHPBar.setPendingDamage(0);
+          this.enemyHPBar.setHp(0, this.lastEnemyMaxHp);
           this.playEnemyDeathAnimation();
           AudioSystem.play('enemy_death');
           break;
         case 'chain_resolved':
-          this.playDamageAnimation(event.totalDamage as number);
+          this.playChainHit(event.totalDamage as number, event.chainLength as number, events.some((e) => e.type === 'enemy_died'));
           AudioSystem.play('enemy_hit');
           break;
         case 'power_activated':
@@ -803,19 +871,89 @@ export class BattleScene extends Phaser.Scene {
     }
   }
 
-  private playEnemyAttackAnimation(): void {
+  private playEnemyAttackAnimation(damage = 0, blocked = 0): void {
     const sprite = this.enemySprite;
-    if (!sprite || this.enemyDying) return;
+    if (!sprite || this.enemyDying) { this.releasePlayerHp(); return; }
     this.tweens.killTweensOf(sprite);
     sprite.play(`${this.enemyKey}-attack`, true);
     this.tweens.add({ targets: sprite, y: this.enemyBaseY - 18, angle: -7, duration: 130, ease: 'Quad.out', onComplete: () => {
       this.tweens.add({ targets: sprite, y: this.enemyBaseY + 16, angle: 7, scaleX: this.enemyScale * 1.12, scaleY: this.enemyScale * .92, duration: 110, ease: 'Cubic.in', onComplete: () => {
-        this.cameras.main.shake(110, .006);
+        this.onPlayerHit(damage, blocked);
         playCombatVFX(this, 'slash', 76, this.layout.playerHudTop + 15, 94, 0xff606f, 35);
         this.cardBurst(viewport(this).width / 2, this.layout.arenaTop + this.layout.arenaHeight - 70, 0xff6655);
         this.tweens.add({ targets: sprite, y: this.enemyBaseY, angle: 0, scale: this.enemyScale, duration: 240, onComplete: () => { sprite.play(`${this.enemyKey}-idle`); this.startEnemyIdle(); } });
       } });
     } });
+  }
+
+  /** Player getting hit: red vignette, screen shake, HP bar shake, number. */
+  private onPlayerHit(damage: number, blocked: number): void {
+    AudioSystem.play('player_hit');
+    const taken = Math.max(0, damage - blocked);
+    const s = JUICE.shake;
+    this.releasePlayerHp();
+    if (taken > 0) {
+      this.juice.vignetteFlash();
+      this.juice.shake(Math.min(s.max, s.playerBase + taken * s.playerPerDamage), s.playerMs);
+      this.playerHPBar.shake();
+      this.juice.damageNumber(110, this.layout.playerHudTop + 34, taken, { prefix: '-', color: JUICE.numbers.playerHitColor, size: 26 + Math.min(16, taken) });
+    } else {
+      this.juice.shake(s.routine.intensity * 2, s.routine.ms);
+    }
+    if (blocked > 0) {
+      playCombatVFX(this, 'shield', viewport(this).width - 60, this.layout.playerHudTop + 15, 70);
+      this.juice.damageNumber(viewport(this).width - 60, this.layout.playerHudTop + 34, blocked, { prefix: '⛨ ', color: '#9ccfff', size: 20 });
+    }
+  }
+
+  private releasePlayerHp(): void {
+    if (this.heldPlayerHp === null) return;
+    this.heldPlayerHp = null;
+    const state = getGameManager().getState();
+    if (state) this.playerHPBar.setHp(state.player.hp, state.player.maxHp);
+  }
+
+  /**
+   * Every chain-resolve hit: hit-stop, camera shake, white flash, knockback/squash,
+   * sparks at the hit point, big punchy number; escalates with damage and chain length
+   * up to a finisher (slow-mo, screen flash, bigger burst).
+   */
+  private playChainHit(damage: number, chainLength: number, killing: boolean): void {
+    const tier = classifyHit(damage, chainLength, this.lastEnemyMaxHp, killing);
+    if (killing) { this.enemyHPBar.setPendingDamage(0); this.enemyHPBar.setHp(0, this.lastEnemyMaxHp); }
+    const width = viewport(this).width;
+    const x = width / 2;
+    const y = this.enemyBaseY - this.layout.enemyHeight * 0.45;
+    const S = JUICE.shake;
+    const E = JUICE.enemy;
+    const P = JUICE.sparks;
+    this.juice.hitStop(killing ? JUICE.hitStop.deathMs : hitStopMs(damage, tier));
+    this.juice.shake(shakeIntensity(damage, chainLength), tier === 'finisher' ? S.finisherMs : tier === 'big' ? S.bigMs : S.hitMs);
+    playCombatVFX(this, 'slash', x, y, Math.min(195, this.layout.arenaHeight * .75), tier !== 'routine' ? 0xffb43b : undefined, -20);
+    const sprite = this.enemySprite;
+    if (sprite && !this.enemyDying) {
+      const restore = sprite.isTinted && !sprite.tintFill ? sprite.tintTopLeft : undefined;
+      this.juice.flashWhite(sprite, E.flashMs, restore);
+      const kb = Math.min(E.knockbackMax, E.knockbackPx + damage * E.knockbackPerDamage);
+      const sq = E.squash * (tier === 'routine' ? 0.6 : tier === 'big' ? 1 : 1.4);
+      this.tweens.killTweensOf(sprite);
+      sprite.setX(x);
+      this.tweens.add({ targets: sprite, x: x + kb, scaleX: this.enemyScale * (1 - sq), scaleY: this.enemyScale * (1 + sq), duration: E.knockbackMs, ease: 'Quad.out', onComplete: () => {
+        if (!sprite.active || this.enemyDying) return;
+        this.tweens.add({ targets: sprite, x, scaleX: this.enemyScale, scaleY: this.enemyScale, duration: E.recoverMs, ease: 'Back.out', onComplete: () => this.startEnemyIdle() });
+      } });
+    }
+    const sparks = Math.min(P.max, P.base + damage * P.perDamage) + (tier === 'finisher' ? P.finisherExtra : 0);
+    this.juice.sparkBurst(x, y, sparks, tier === 'finisher' ? 0xfff0a0 : 0xffd27a);
+    if (tier !== 'routine') this.juice.shardBurst(x, y, tier === 'finisher' ? 18 : 9, 0xffffff);
+    this.juice.ring(x, y, tier === 'finisher' ? 0xfff3b0 : 0xffc65a, tier === 'finisher' ? 5 : 3.2, 360, tier === 'finisher' ? 6 : 4);
+    this.juice.damageNumber(x, this.layout.arenaTop + this.layout.arenaHeight * 0.36, damage, { chain: chainLength, crit: this.chainHadCrit });
+    if (tier === 'finisher') {
+      const hold = killing ? JUICE.hitStop.deathMs : JUICE.hitStop.finisherMs;
+      window.setTimeout(() => { if (this.sys.isActive()) this.juice.slowMo(); }, hold);
+      this.juice.screenFlash();
+      window.setTimeout(() => { if (this.sys.isActive()) this.juice.ring(x, y, 0xffffff, 6, 520, 3); }, 60);
+    }
   }
 
   private playEnemyDeathAnimation(): void {
@@ -824,8 +962,25 @@ export class BattleScene extends Phaser.Scene {
     this.enemyDying = true;
     this.tweens.killTweensOf(sprite);
     sprite.play(`${this.enemyKey}-dead`, true);
-    this.tweens.add({ targets: sprite, y: this.enemyBaseY + 20, angle: 22, alpha: 0, scaleY: this.enemyScale * .4, duration: 650, ease: 'Cubic.in' });
-    if (this.enemyShadow) this.tweens.add({ targets: this.enemyShadow, alpha: 0, scaleX: .3, duration: 650 });
+    this.juice.flashWhite(sprite, 110);
+    const ms = JUICE.death.fallMs;
+    this.tweens.add({ targets: sprite, y: this.enemyBaseY + 20, angle: 22, alpha: 0, scaleY: this.enemyScale * .4, duration: ms, delay: 120, ease: 'Cubic.in' });
+    if (this.enemyShadow) this.tweens.add({ targets: this.enemyShadow, alpha: 0, scaleX: .3, duration: ms, delay: 120 });
+    // Coin burst flying to the gold counter.
+    const width = viewport(this).width;
+    const fromY = this.enemyBaseY - this.layout.enemyHeight * 0.45;
+    const goldX = width * 0.58 + 6;
+    const goldY = this.layout.hudTop + this.layout.hudHeight / 2;
+    window.setTimeout(() => {
+      if (!this.sys.isActive()) return;
+      this.juice.sparkBurst(width / 2, fromY, 30, 0xffe9a0);
+      this.juice.coinBurst(width / 2, fromY, goldX, goldY, JUICE.death.coinCount, () => {
+        if (!this.goldText?.active) return;
+        this.tweens.killTweensOf(this.goldText);
+        this.goldText.setScale(1.35);
+        this.tweens.add({ targets: this.goldText, scale: 1, duration: 120, ease: 'Quad.out' });
+      });
+    }, 160);
   }
 
   private rejectCard(visual: CardVisual, exposed: boolean): void {
@@ -912,41 +1067,6 @@ export class BattleScene extends Phaser.Scene {
       }
     }
     this.cardBurst(x, y, theme.color);
-  }
-
-  private playDamageAnimation(damage: number): void {
-    playCombatVFX(this, 'slash', viewport(this).width / 2, this.enemyBaseY - this.layout.enemyHeight * .45, Math.min(195, this.layout.arenaHeight * .75), damage >= 20 ? 0xffb43b : undefined, -20);
-    if (!this.enemySprite) return;
-
-    if (!this.enemyDying) {
-      const sprite = this.enemySprite;
-      sprite.setTint(0xff8c8c);
-      this.time.delayedCall(150, () => { if (sprite.active) sprite.clearTint(); });
-      this.tweens.add({ targets: sprite, x: viewport(this).width / 2 + 7, duration: 45, yoyo: true, repeat: 2, onComplete: () => sprite.setX(viewport(this).width / 2) });
-      this.cardBurst(sprite.x, sprite.y - sprite.displayHeight / 2, 0xffdf70);
-    }
-
-    // Damage number popup
-    const dmgText = this.add
-      .text(viewport(this).width / 2, this.layout.arenaTop + this.layout.arenaHeight * 0.4, damage.toString(), {
-        resolution: getRenderDensity(), fontFamily: 'Lilita One',
-        fontSize: '40px',
-        color: '#FFD070',
-      })
-      .setOrigin(0.5)
-      .setStroke('#1B1030', 8)
-      .setShadow(0, 4, '#1B1030', 0, true, true)
-      .setDepth(100);
-
-    this.tweens.add({
-      targets: dmgText,
-      y: dmgText.y - 60,
-      alpha: 0,
-      scale: 1.3,
-      duration: 800,
-      ease: 'Power2',
-      onComplete: () => dmgText.destroy(),
-    });
   }
 
   private checkPhaseTransition(): void {

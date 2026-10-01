@@ -1,3 +1,4 @@
+import { isShakeReduced, setShakeReduced } from '../juice/fxSettings';
 import { viewport, getRenderDensity, safeArea } from './viewport';
 /**
  * SettingsModal - In-game settings panel
@@ -44,7 +45,7 @@ export class SettingsModal {
 
   private createPanel(): void {
     const panelWidth = 280;
-    const panelHeight = 440;
+    const panelHeight = 490;
     
     // Panel background (cream with dark outline)
     const panel = this.scene.add.graphics();
@@ -77,21 +78,23 @@ export class SettingsModal {
     this.container.add(title);
     
     // Sound toggle
-    const soundY = -130;
+    const soundY = -155;
     this.createToggle(0, soundY, 'Sound', AudioSystem.isSoundEnabled, (enabled) => {
       AudioSystem.isSoundEnabled = enabled;
       if (enabled) AudioSystem.play('button_tap');
     });
     
-    this.createVolume(-95, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; });
-    this.createToggle(0, -45, 'Music', AudioSystem.isMusicEnabled, (enabled) => {
+    this.createVolume(-120, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; });
+    this.createToggle(0, -75, 'Music', AudioSystem.isMusicEnabled, (enabled) => {
       AudioSystem.unlock();
       AudioSystem.isMusicEnabled = enabled;
     });
-    this.createVolume(-10, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; });
+    this.createVolume(-40, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; });
+    // Accessibility: reduce camera shake (persisted)
+    this.createToggle(0, 5, 'Less shake', isShakeReduced(), (enabled) => { setShakeReduced(enabled); });
 
     // Buttons
-    const buttonY = 55;
+    const buttonY = 75;
     const buttonSpacing = 54;
     
     // Resume button (green - primary action)
