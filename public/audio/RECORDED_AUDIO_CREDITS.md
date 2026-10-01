@@ -1,16 +1,73 @@
-# Audio revision HD v3
+# Audio revision CI v1
 
-Runtime now uses decoded samples for every effect. No Web Audio oscillators are used for combo, power, reward or end-screen cues.
+All runtime SFX derive from **Chequered Ink — 400 Sounds Pack**:
+https://ci.itch.io/400-sounds-pack . Commercial-use permission, **not CC0**;
+see `ci-v1/LICENSE.md`. The original WAV collection is not redistributed.
 
-- **MintoDog — Hope (Orchestral battle music)**, CC0: https://opengameart.org/content/hopeorchestral-battle-music . New 69.8-second loop from the lossless FLAC source, stereo MP3 192 kbps / 48 kHz, normalized to −16 LUFS / −1.5 dB peak. Runtime file: `hd-v3/hope-battle.mp3`.
-- **Kenney — Impact Sounds**, CC0: https://kenney.nl/assets/impact-sounds . Recorded metal, bell, glass, plate, wood and punch sounds underpin `strike`, `wall-hit`, `armor`, `combo`, `coin`, `heal`, `wild`, `echo`, `crit`, `invalid`, `click`, `win` and `lose`. License included under `public/assets/kenney/licenses/impact.txt`.
-- **kurt — Gunshots**, CC0: https://opengameart.org/content/gunshots . Original .22 Pistol and Black Powder WAV recordings underpin `gun`, `bomb` and the designed `laser` charge/impact, layered with Kenney foley.
-- **Kenney — Casino Audio**, CC0: https://kenney.nl/assets/casino-audio . Short 0.22s recorded card slides; existing shuffle is retained.
-- **Kenney — RPG Audio**, CC0: https://kenney.nl/assets/rpg-audio . Footsteps retained.
-- **Tim Rockk — Orc Voice**, CC0: https://opengameart.org/content/orc-voice . Recorded growl, grunt and death retained.
+| Game cue | Sources inside the pack |
+| --- | --- |
+| Cards / shuffle | Card and Board/card_draw_{1,2,3}, card_fan_2 |
+| Footsteps / vocal cues | Footsteps/foley_footstep_gravel_{1,2}; Human/man_{0,8,6} |
+| Turret | Weapons/shot_muffled + Materials/metal_blunt_tap |
+| Arc cannon / bomb | Weapons/harsh_thud + Environment/air_burst + Materials/cardboard_hit |
+| Laser | Machines/drill_whizz + hydraulic_up + Environment/air_burst |
+| Archer / soldier | Other/elastic_twang + Combat and Gore/swipe; Weapons/sword_light |
+| Castle damage / enemy impact | cardboard_hit + harsh_thud; punch_2 + cardboard_hit |
+| Shield / deploy / reload | sword_clash_2; weapon_pick_up; weapon_equip_short |
+| Combo | Match Three/match_xylophone_1 |
+| CRIT / black joker | weapon_upgrade + metal impact |
+| HEAL / red joker | heart_collect; red joker adds vibraphone |
+| GOLD / reward | coins_gather_quick |
+| WILD / ECHO | Vibraphone; glass ping + xylophone |
+| UI / invalid | controller_button_press; UI/cancel |
+| Victory / defeat | brass_level_complete; grand_piano_defeated |
 
-Effects are mixed from recordings, trimmed, equalized and moderately compressed while preserving their attacks. Output is stereo 192 kbps MP3 at 48 kHz, normalized to −14 LUFS / −1.5 dB peak. Final level remains controlled by the player's saved independent SFX/music sliders.
+Exact source paths, SHA-256 hashes, layer weights, rate adjustments and decoded
+measurements are in `ci-v1/manifest.json`. Rebuild with:
 
-Combo pitches rise by half a semitone per card, capped at seven semitones. Powers use different samples; jokers use lower-pitched healing/critical cues. Menu and results still filter the same continuous new soundtrack behind a wall.
+```
+python scripts/pack-ci-audio.py /path/to/extracted/400-sounds-pack
+```
 
-New `/audio/hd-v3/` URLs prevent old cached files from replacing the new sounds. PWA checks for application updates immediately on launch and when foregrounded. Gameplay is saved before the existing update button reloads the application.
+Requires FFmpeg, ffprobe and NumPy. Do not commit the original pack.
+31 mono MP3 cues, 128 kbps / 48 kHz. Trimmed silence with a short lead-in,
+gentle saturation, role-specific RMS targets, a 35 ms release, and encoded-file
+true-peak checks (at or below −1.5 dBTP). Peak bounds take priority over RMS.
+Integrated LUFS is recorded only when measurable; no universal −14 LUFS claim
+is made for short cues. Mono SFX avoid stereo cancellation on mobile speakers.
+
+Saved controls stay independent (defaults SFX 0.22 / music 0.18). Per-cue gain
+multiplies the SFX bus. Both buses pass through a master compressor: threshold
+−6 dB, knee 3 dB, ratio 20:1, attack 3 ms, release 120 ms; output gain 0.85.
+This controls extreme overlap, but is not a guaranteed true-peak brickwall limiter.
+
+Independent weapon throttles let turret, arrows and cannon sound in one tick.
+Multi-target mortar events coalesce; castle hits within 80 ms coalesce.
+Laser starts within 120 ms coalesce, with one active laser tail. Per-cue voice caps
+and a total cap of 24 SFX voices apply; replaced tails fade over 10 ms.
+Combo starts on card 2, grows from gain 0.35 to 0.6, and rises by half a semitone
+per card up to seven semitones. Both jokers have separately processed cues.
+Versioned `/audio/ci-v1/` URLs avoid old cached SFX; unused legacy SFX are removed.
+
+## Music and additional packs reviewed
+
+The continuous **MintoDog — Hope** track remains (CC0):
+https://opengameart.org/content/hopeorchestral-battle-music .
+`hd-v3/hope-battle.mp3`: 69.818 s decoded, stereo 192 kbps / 48 kHz.
+Menu/results retain 650 Hz low-pass, Q 0.65, scene gain 0.48;
+battle uses 18000 Hz and gain 1.
+
+The 400 Sounds Pack has musical stingers, not a full battle loop.
+No assets from the following reviewed sources ship in this revision:
+
+- https://placeholder-assets.itch.io/50-free-sounds-pack : useful explosions,
+  guns, shields, creatures and magic. Royalty-free project-use license, not CC0;
+  standalone redistribution and sound-library inclusion prohibited.
+- https://pixelloops.itch.io/free2-game-audio-starter-pack-music-sfx-for-games :
+  fantasy tavern, horror ambient and sci-fi combat demos plus five SFX.
+  Supplied license permits game use but prohibits standalone sharing.
+  None was selected as the fantasy battle loop.
+- https://itch.io/game-assets/free/tag-audio : Tallbeard's CC0 music-loop bundle
+  and TomMusic's fantasy SFX are possible future sources, not included here.
+
+Device auditioning is still required for mobile speaker/headphone balance.

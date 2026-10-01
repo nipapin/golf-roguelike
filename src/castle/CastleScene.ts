@@ -68,7 +68,6 @@ export class CastleScene extends Phaser.Scene {
   private ended = false;
   private accumulator = 0;
   private saveTimer = 0;
-  private nextShotSound = 0;
   private nextHealEffect = 0;
   constructor() {
     super('CastleScene');
@@ -101,7 +100,6 @@ export class CastleScene extends Phaser.Scene {
     this.nextCard = null;
     this.nextFootstep = 0;
     this.nextVoice = 0;
-    this.nextShotSound = 0;
     this.nextHealEffect = 0;
     const { width: w, height: h } = viewport(this);
     this.layout = getCastleLayoutMetrics(w, h);
@@ -882,8 +880,8 @@ export class CastleScene extends Phaser.Scene {
             else if (event.kind === 'mortar')
               this.number(p.x, p.y - 65, `MORTAR · ${unit.damage} DMG`, '#d8b0ff');
           }
-          AudioSystem.play('shield', {
-            volume: 0.18,
+          AudioSystem.play('unit_deploy', {
+            volume: 0.35,
             pitchShift: event.kind === 'turret' ? 0.2 : 0,
           });
           break;
@@ -895,7 +893,7 @@ export class CastleScene extends Phaser.Scene {
             this.releaseEffect(p.x, p.y - 18, 0x7ceaff);
             this.number(p.x, p.y - 65, `RELOAD ${event.ammo}/${event.ammo}`, '#7ceaff');
           }
-          AudioSystem.play('shield', { volume: 0.2 });
+          AudioSystem.play('turret_reload', { volume: 0.4 });
           break;
         }
         case 'boost': {
@@ -968,7 +966,7 @@ export class CastleScene extends Phaser.Scene {
             this.number(this.castle.x, this.castle.y - 70, `−${event.damage}`, '#ff6b84');
             if (!isShakeReduced()) this.cameras.main.shake(130, 0.003);
           } else {
-            AudioSystem.play('shield', { volume: 0.18 });
+            AudioSystem.play('shield', { volume: 0.35 });
             playCombatVFX(this, 'shield', this.castle.x - 25, this.castle.y - 40, 65);
           }
           break;
@@ -1045,17 +1043,17 @@ export class CastleScene extends Phaser.Scene {
         },
       });
     }
-    if (this.time.now >= this.nextShotSound) {
-      AudioSystem.play(
-        event.kind === 'turret'
-          ? 'turret_shot'
-          : event.kind === 'mortar'
-            ? 'mortar_shot'
-            : 'orc_hit',
-        { volume: event.kind === 'turret' ? 0.8 : 0.6 }
-      );
-      this.nextShotSound = this.time.now + 180;
-    }
+    // AudioSystem coalesces repeated hits per weapon, without silencing other weapon types.
+    AudioSystem.play(
+      event.kind === 'turret'
+        ? 'turret_shot'
+        : event.kind === 'mortar'
+          ? 'mortar_shot'
+          : event.kind === 'archer'
+            ? 'archer_shot'
+            : 'soldier_shot',
+      { volume: event.kind === 'turret' ? 0.8 : event.kind === 'mortar' ? 0.75 : 0.45 }
+    );
     if (event.kind !== 'turret') this.number(tx, ty - 8, String(event.damage), '#fff4d2');
   }
   private releaseEffect(x: number, y: number, color: number): void {

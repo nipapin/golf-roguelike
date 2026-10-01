@@ -3,10 +3,14 @@ import type { PowerType } from '../../core/types';
 
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
- * Kenney.nl CC0 sounds in public/audio/
+ * Chequered Ink 400 Sounds Pack derivatives in public/audio/ci-v1/
  */
 
 export type SoundId =
+  | 'archer_shot'
+  | 'soldier_shot'
+  | 'unit_deploy'
+  | 'turret_reload'
   | 'power_crit'
   | 'power_heal'
   | 'power_guard'
@@ -55,6 +59,33 @@ const DEFAULT_SETTINGS: AudioSettings = {
   musicVolume: 0.18,
 };
 
+interface ActiveVoice {
+  soundId: SoundId;
+  source: AudioBufferSourceNode;
+  gain: GainNode;
+}
+
+// Event throttles are independent: an arrow must never suppress an arc cannon.
+const SOUND_LIMITS: Partial<Record<SoundId, { interval: number; voices: number }>> = {
+  turret_shot: { interval: 0.18, voices: 2 },
+  mortar_shot: { interval: 0.08, voices: 2 },
+  archer_shot: { interval: 0.08, voices: 2 },
+  soldier_shot: { interval: 0.08, voices: 2 },
+  player_hit: { interval: 0.08, voices: 2 },
+  laser_blast: { interval: 0.12, voices: 1 },
+  combo_up: { interval: 0.035, voices: 2 },
+  unit_deploy: { interval: 0.08, voices: 2 },
+  turret_reload: { interval: 0.08, voices: 1 },
+};
+const SOUND_LEVELS: Partial<Record<SoundId, number>> = {
+  button_tap: 0.4,
+  invalid_tap: 0.4,
+  card_draw: 0.75,
+  victory: 0.7,
+  defeat: 0.65,
+  reward_pick: 0.65,
+};
+
 const STORAGE_KEY = 'golf_rogue_audio_settings';
 
 class AudioSystemClass {
@@ -68,6 +99,8 @@ class AudioSystemClass {
   private unlocked: boolean = false;
   private loadPromise: Promise<void> | null = null;
   private initialized: boolean = false;
+  private activeVoices: ActiveVoice[] = [];
+  private lastPlayed = new Map<SoundId, number>();
 
   constructor() {
     this.loadSettings();
@@ -111,41 +144,45 @@ class AudioSystemClass {
   }
 
   private async loadAllSounds(): Promise<void> {
-    // Sound file mapping - Kenney.nl CC0 sounds
+    // Only processed game cues are shipped; the original pack is not redistributed.
     const soundFiles: Record<SoundId, string> = {
-      power_crit: 'hd-v3/crit',
-      power_heal: 'hd-v3/heal',
-      power_guard: 'hd-v3/armor',
-      power_gold: 'hd-v3/coin',
-      power_bomb: 'hd-v3/bomb',
-      power_wild: 'hd-v3/wild',
-      power_echo: 'hd-v3/echo',
-      power_red_joker: 'hd-v3/heal',
-      power_black_joker: 'hd-v3/crit',
-      card_shuffle: 'kenney-card-shuffle',
-      footstep_1: 'kenney-step-1',
-      footstep_2: 'kenney-step-2',
-      orc_growl: 'orc-growl',
-      orc_hit: 'orc-hit',
-      orc_death: 'orc-death',
-      turret_shot: 'hd-v3/gun',
-      mortar_shot: 'hd-v3/bomb',
-      laser_blast: 'hd-v3/laser',
-      card_play: 'hd-v3/card-1',
-      card_play_1: 'hd-v3/card-1',
-      card_play_2: 'hd-v3/card-2',
-      card_play_3: 'hd-v3/card-3',
-      card_draw: 'hd-v3/card-2',
-      invalid_tap: 'hd-v3/invalid',
-      combo_up: 'hd-v3/combo',
-      enemy_hit: 'hd-v3/strike',
-      player_hit: 'hd-v3/wall-hit',
-      shield: 'hd-v3/armor',
-      enemy_death: 'orc-death',
-      victory: 'hd-v3/win',
-      defeat: 'hd-v3/lose',
-      button_tap: 'hd-v3/click',
-      reward_pick: 'hd-v3/coin',
+      archer_shot: 'arrow',
+      soldier_shot: 'sword',
+      unit_deploy: 'deploy',
+      turret_reload: 'reload',
+      power_crit: 'crit',
+      power_heal: 'heal',
+      power_guard: 'armor',
+      power_gold: 'gold',
+      power_bomb: 'bomb',
+      power_wild: 'wild',
+      power_echo: 'echo',
+      power_red_joker: 'red-joker',
+      power_black_joker: 'black-joker',
+      card_shuffle: 'shuffle',
+      footstep_1: 'step-1',
+      footstep_2: 'step-2',
+      orc_growl: 'growl',
+      orc_hit: 'grunt',
+      orc_death: 'death',
+      turret_shot: 'gun',
+      mortar_shot: 'bomb',
+      laser_blast: 'laser',
+      card_play: 'card-1',
+      card_play_1: 'card-1',
+      card_play_2: 'card-2',
+      card_play_3: 'card-3',
+      card_draw: 'card-2',
+      invalid_tap: 'invalid',
+      combo_up: 'combo',
+      enemy_hit: 'strike',
+      player_hit: 'wall-hit',
+      shield: 'armor',
+      enemy_death: 'death',
+      victory: 'win',
+      defeat: 'lose',
+      button_tap: 'click',
+      reward_pick: 'gold',
     };
 
     // Try to create audio context
@@ -157,9 +194,15 @@ class AudioSystemClass {
     }
 
     // Load each sound (gracefully handle missing files)
+    const bufferLoads = new Map<string, Promise<AudioBuffer | null>>();
     const loadPromises = Object.entries(soundFiles).map(async ([id, filename]) => {
       try {
-        const buffer = await this.loadSound(`/audio/${filename}`);
+        let pending = bufferLoads.get(filename);
+        if (!pending) {
+          pending = this.loadSound(`/audio/ci-v1/${filename}`);
+          bufferLoads.set(filename, pending);
+        }
+        const buffer = await pending;
         if (buffer) {
           this.sounds.set(id as SoundId, buffer);
         }
@@ -246,6 +289,14 @@ class AudioSystemClass {
     const buffer = this.sounds.get(soundId);
     if (!buffer) return;
 
+    const limits = SOUND_LIMITS[soundId] ?? { interval: 0.025, voices: 3 };
+    const now = this.context.currentTime;
+    if (now - (this.lastPlayed.get(soundId) ?? -Infinity) < limits.interval) return;
+    this.lastPlayed.set(soundId, now);
+    const matching = this.activeVoices.filter((voice) => voice.soundId === soundId);
+    if (matching.length >= limits.voices) this.retireVoice(matching[0]);
+    if (this.activeVoices.length >= 24) this.retireVoice(this.activeVoices[0]);
+
     try {
       const source = this.context.createBufferSource();
       source.buffer = buffer;
@@ -255,11 +306,14 @@ class AudioSystemClass {
 
       // Apply volume
       const gainNode = this.context.createGain();
-      gainNode.gain.value = options?.volume ?? 0.65;
+      gainNode.gain.value = this.clampVolume(options?.volume, SOUND_LEVELS[soundId] ?? 0.65);
 
       source.connect(gainNode);
       gainNode.connect(this.soundBus!);
+      const voice = { soundId, source, gain: gainNode };
+      this.activeVoices.push(voice);
       source.onended = () => {
+        this.activeVoices = this.activeVoices.filter((active) => active !== voice);
         source.disconnect();
         gainNode.disconnect();
       };
@@ -267,6 +321,14 @@ class AudioSystemClass {
     } catch (err) {
       console.warn('Error playing sound:', err);
     }
+  }
+
+  private retireVoice(voice: ActiveVoice): void {
+    this.activeVoices = this.activeVoices.filter((active) => active !== voice);
+    const at = this.context!.currentTime;
+    voice.gain.gain.setValueAtTime(voice.gain.gain.value, at);
+    voice.gain.gain.linearRampToValueAtTime(0, at + 0.01);
+    voice.source.stop(at + 0.012);
   }
 
   /**
@@ -282,10 +344,11 @@ class AudioSystemClass {
   }
 
   playCombo(count: number): void {
-    // Pitch rises on a recorded metallic resonance; no oscillator / chiptune layer.
+    if (count < 2) return;
+    // A short xylophone cue rises with the chain; the first card remains plain foley.
     this.play('combo_up', {
       pitchShift: 2 ** (Math.min(Math.max(0, count - 1), 14) / 24) - 1,
-      volume: 0.5,
+      volume: Math.min(0.35 + (count - 2) * 0.025, 0.6),
     });
   }
 
@@ -302,8 +365,7 @@ class AudioSystemClass {
       BLACK_JOKER: 'power_black_joker',
     };
     this.play(samples[power], {
-      volume: power === 'BOMB' || power === 'BLACK_JOKER' ? 0.95 : 0.8,
-      pitchShift: power === 'RED_JOKER' ? -0.12 : power === 'BLACK_JOKER' ? -0.18 : 0,
+      volume: power === 'BOMB' || power === 'BLACK_JOKER' ? 0.85 : 0.7,
     });
   }
 
@@ -322,8 +384,19 @@ class AudioSystemClass {
     this.context = new Audio();
     this.soundBus = this.context.createGain();
     this.musicBus = this.context.createGain();
-    this.soundBus.connect(this.context.destination);
-    this.musicBus.connect(this.context.destination);
+    // Control extreme sums at high slider levels. This is a compressor, not a true-peak ceiling.
+    const master = this.context.createDynamicsCompressor();
+    master.threshold.value = -6;
+    master.knee.value = 3;
+    master.ratio.value = 20;
+    master.attack.value = 0.003;
+    master.release.value = 0.12;
+    const headroom = this.context.createGain();
+    headroom.gain.value = 0.85;
+    this.soundBus.connect(master);
+    this.musicBus.connect(master);
+    master.connect(headroom);
+    headroom.connect(this.context.destination);
     this.music = new MusicSequencer(this.context, this.musicBus);
     this.music.setScene(this.musicScene);
     this.updateMix();
