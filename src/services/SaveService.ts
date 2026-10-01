@@ -2,7 +2,18 @@ import { RunState } from '../core/types';
 import { isSavedRun } from './validateSave';
 
 const SAVE_KEY = 'golf-rogue-save';
-const SAVE_VERSION = 1;
+/**
+ * v2: 6 acts x 7 fights. v1 saves (single 7-fight act) migrate as-is: fight indices 0-6 are
+ * the same positions in act 1 and the in-progress battle is self-contained.
+ */
+export const SAVE_VERSION = 2;
+const MIGRATABLE_VERSIONS = [1];
+
+export function migrateSave(version: unknown, state: unknown): unknown {
+  if (version === SAVE_VERSION) return state;
+  if (typeof version === 'number' && MIGRATABLE_VERSIONS.includes(version)) return state;
+  return null;
+}
 
 interface SaveData {
   version: number;
@@ -37,21 +48,23 @@ export function loadGame(): RunState | null {
     }
     const saveData = parsed as Partial<SaveData>;
 
-    // Version check - for now just accept version 1
-    if (saveData.version !== SAVE_VERSION) {
+    // Version check: current version passes, older known versions are migrated, others reset.
+    const migrated = migrateSave(saveData.version, saveData.state);
+    if (migrated === null) {
       console.warn('Save version mismatch, clearing save');
       clearSave();
       return null;
     }
 
     // Basic validation
-    if (!isSavedRun(saveData.state)) {
+    if (!isSavedRun(migrated)) {
       console.warn('Invalid save data, clearing save');
       clearSave();
       return null;
     }
 
-    return saveData.state;
+    if (saveData.version !== SAVE_VERSION) saveGame(migrated);
+    return migrated;
   } catch (e) {
     console.error('Failed to load game:', e);
     clearSave();

@@ -1,3 +1,4 @@
+import { RelicManager } from './RelicManager';
 import { BattleState, Card, RunState, Relic } from './types';
 import { canConnect, isCardExposed, hasLegalMoves as checkLegalMoves, isTableauEmpty } from './GameState';
 
@@ -87,10 +88,7 @@ export function getEffectiveChainPosition(
   let position = battle.chain.length + 1;
 
   if (battle.isFirstChain && battle.chain.length === 0) {
-    const bonus = relics.find((r) => r.effect.type === 'firstChainBonus');
-    if (bonus && typeof bonus.effect.value === 'number') {
-      position += bonus.effect.value;
-    }
+    position += RelicManager.of(relics).firstChainBonus();
   }
 
   return position;

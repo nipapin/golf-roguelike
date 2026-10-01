@@ -10,13 +10,27 @@
     "baseDiamondGold": 1
   },
   "powerCards": {
-    "CRIT": { "damageMultiplier": 3 },
-    "HEAL": { "healAmount": 8 },
-    "GUARD": { "armorAmount": 8 },
-    "GOLD": { "goldAmount": 8 },
-    "BOMB": { "flatDamage": 12 },
-    "WILD": { "description": "Next play connects to any rank" },
-    "ECHO": { "comboBonus": 2 }
+    "CRIT": {
+      "damageMultiplier": 3
+    },
+    "HEAL": {
+      "healAmount": 8
+    },
+    "GUARD": {
+      "armorAmount": 8
+    },
+    "GOLD": {
+      "goldAmount": 8
+    },
+    "BOMB": {
+      "flatDamage": 12
+    },
+    "WILD": {
+      "description": "Next play connects to any rank"
+    },
+    "ECHO": {
+      "comboBonus": 2
+    }
   },
   "tableau": {
     "columns": 7,
@@ -30,13 +44,56 @@
   "undo": {
     "maxDepth": 10
   },
-  "runStructure": [
-    { "type": "battle", "enemyTier": "normal" },
-    { "type": "battle", "enemyTier": "normal" },
-    { "type": "battle", "enemyTier": "normal" },
-    { "type": "battle", "enemyTier": "elite" },
-    { "type": "battle", "enemyTier": "normal" },
-    { "type": "battle", "enemyTier": "normal" },
-    { "type": "battle", "enemyTier": "boss" }
-  ]
+  "run": {
+    "acts": 6,
+    "fightsPerAct": 7,
+    "fightTiers": [
+      "normal",
+      "normal",
+      "normal",
+      "normal",
+      "normal",
+      "elite",
+      "boss"
+    ],
+    "hp": {
+      "actGrowth": 0.27,
+      "fightGrowth": 0.05
+    },
+    "attack": {
+      "actGrowth": 0.15,
+      "fightGrowth": 0.03
+    },
+    "actStart": {
+      "maxHpBonus": 5,
+      "healPercent": 1
+    }
+  },
+  "simulation": {
+    "seeds": 200,
+    "description": "Greedy bot (core/Simulation.ts) vs every fight. Reference player for act a: full HP = startingHp + (a-1)*run.actStart.maxHpBonus and the first (a-1)*relicsPerAct relics of referenceBuild. Kill rate = battles won / seeds; asserted per tier in Simulation.test.ts.",
+    "relicsPerAct": 2,
+    "referenceBuild": [
+      "spade_bonus",
+      "third_card_multiplier",
+      "ace_strike",
+      "club_bonus",
+      "double_crit",
+      "vampiric",
+      "boosted_sevens",
+      "heart_bonus",
+      "first_chain_bonus",
+      "more_power_cards"
+    ],
+    "minKillRate": {
+      "normal": 0.85,
+      "elite": 0.5,
+      "boss": 0.3
+    },
+    "maxKillRate": {
+      "normal": 1,
+      "elite": 0.95,
+      "boss": 0.8
+    }
+  }
 }

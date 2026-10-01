@@ -1,10 +1,10 @@
-import configData from '../data/config.json';
+import { gameConfig } from '../data/gameConfig';
 import enemiesData from '../data/enemies.json';
 import { startRun, startNextBattle } from '../core/GameActions';
 import type { GameConfig } from '../core/types';
 import type { EnemiesData } from '../core/GameState';
 
-export const config = configData as GameConfig;
+export const config: GameConfig = gameConfig;
 export const enemies = enemiesData as EnemiesData;
 export function battleFixture(seed = 'foundation-test') {
   return startNextBattle(startRun(seed, config), enemies, config);

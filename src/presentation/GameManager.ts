@@ -22,7 +22,8 @@ import { generateSeed } from '../core/RNG';
 import { UndoHistory } from '../core/UndoHistory';
 import { saveGame, loadGame, clearSave, hasSave } from '../services/SaveService';
 
-import configData from '../data/config.json';
+import { gameConfig } from '../data/gameConfig';
+import { getActInfo, type ActInfo } from '../core/RunStructure';
 import enemiesData from '../data/enemies.json';
 import relicsData from '../data/relics.json';
 
@@ -37,7 +38,7 @@ export class GameManager {
   private history: UndoHistory;
 
   constructor() {
-    this.config = configData as GameConfig;
+    this.config = gameConfig;
     this.enemies = enemiesData as EnemiesData;
     this.allRelics = relicsData.relics as Relic[];
     this.history = new UndoHistory(this.config.undo?.maxDepth ?? 10);
@@ -63,10 +64,6 @@ export class GameManager {
     const events: GameEvent[] = [{ type: 'undo_applied', cardId }];
     this.emitEvents(events);
     return { state: this.state, events };
-  }
-
-  getConfig(): GameConfig {
-    return this.config;
   }
 
   getState(): RunState | null {
@@ -208,7 +205,7 @@ export class GameManager {
     if (!this.state) return;
     this.history.clear();
 
-    const result = leaveShop(this.state);
+    const result = leaveShop(this.state, this.config);
     this.state = result.state;
 
     // Start next battle
@@ -225,6 +222,19 @@ export class GameManager {
 
   getCurrentFightNumber(): number {
     return this.state ? this.state.currentFight + 1 : 0;
+  }
+
+  /** Act / fight-in-act for the current fight (ACT n · FIGHT m/7). */
+  getActInfo(): ActInfo {
+    return getActInfo(this.state?.currentFight ?? 0, this.config.runStructure, this.config.run);
+  }
+
+  getConfig(): GameConfig {
+    return this.config;
+  }
+
+  getEnemiesData(): EnemiesData {
+    return this.enemies;
   }
 
   getTotalFights(): number {
