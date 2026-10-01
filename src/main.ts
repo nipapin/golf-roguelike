@@ -35,12 +35,8 @@ async function initGame() {
   document.addEventListener('click', unlockAudio, { once: true });
 
   const host = document.getElementById('game')!;
-  const syncViewportHeight = () => {
-    const standalone = matchMedia('(display-mode: standalone)').matches || (navigator as Navigator & { standalone?: boolean }).standalone;
-    const height = standalone ? window.innerHeight : (window.visualViewport?.height ?? window.innerHeight);
-    document.documentElement.style.setProperty('--viewport-height', height + 'px');
-  };
-  syncViewportHeight();
+  // #game is position:absolute; inset:0 (style.css), so it already matches the
+  // full viewport in Safari and in the standalone PWA. Render density is capped at 2.
   setRenderDensity(window.devicePixelRatio || 1);
   const density = getRenderDensity();
   const bounds = host.getBoundingClientRect();
@@ -71,7 +67,6 @@ async function initGame() {
   const resize = () => {
     cancelAnimationFrame(resizeFrame);
     resizeFrame = requestAnimationFrame(() => {
-      syncViewportHeight();
       const rect = host.getBoundingClientRect();
       const width = Math.round(rect.width * density);
       const height = Math.round(rect.height * density);

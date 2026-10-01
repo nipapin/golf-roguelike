@@ -1,4 +1,4 @@
-import { viewport, getRenderDensity } from './viewport';
+import { viewport, getRenderDensity, safeArea } from './viewport';
 import Phaser from 'phaser';
 import { colors } from './tokens';
 import { ArenaBackground } from './ArenaBackground';
@@ -7,8 +7,10 @@ import { AudioSystem } from '../audio/AudioSystem';
 /** Shared modal language: purple felt, ink outlines, cream cards, gold buttons. */
 export function gamePopup(scene: Phaser.Scene, title: string, subtitle: string, height: number) {
   const w = Math.min(viewport(scene).width - 24, 420);
-  const h = Math.min(height, viewport(scene).height - 24);
-  const root = scene.add.container(viewport(scene).width / 2, viewport(scene).height / 2).setDepth(1000);
+  const safe = safeArea(scene);
+  const h = Math.min(height, safe.height - 16);
+  // Backdrop/shade cover the full screen; the panel stays inside the safe band.
+  const root = scene.add.container(viewport(scene).width / 2, safe.centerY).setDepth(1000);
   // Restore/save routes may open a modal without a live battle beneath it.
   if (!scene.scene.isPaused('BattleScene')) {
     const arena = new ArenaBackground(scene);
@@ -16,7 +18,7 @@ export function gamePopup(scene: Phaser.Scene, title: string, subtitle: string, 
     const felt = scene.add.rectangle(viewport(scene).width / 2, viewport(scene).height * .8, viewport(scene).width, viewport(scene).height * .4, colors.felt);
     arena.setDepth(-2); felt.setDepth(-1);
   }
-  const shade = scene.add.rectangle(0, 0, viewport(scene).width, viewport(scene).height, colors.ink, .8).setInteractive();
+  const shade = scene.add.rectangle(0, viewport(scene).height / 2 - safe.centerY, viewport(scene).width, viewport(scene).height, colors.ink, .8).setInteractive();
   root.add(shade);
   const panel = scene.add.graphics();
   panel.fillStyle(colors.ink).fillRoundedRect(-w / 2, -h / 2 + 8, w, h, 22);

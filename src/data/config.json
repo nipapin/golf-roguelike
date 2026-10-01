@@ -27,6 +27,9 @@
     "healAmount": 8,
     "relicBaseCost": 15
   },
+  "undo": {
+    "maxDepth": 10
+  },
   "runStructure": [
     { "type": "battle", "enemyTier": "normal" },
     { "type": "battle", "enemyTier": "normal" },

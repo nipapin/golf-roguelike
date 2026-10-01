@@ -55,8 +55,7 @@ All fonts are licensed under SIL Open Font License 1.1, which permits commercial
 
 Sound effects used from:
 - **Casino Audio** (https://kenney.nl/assets/casino-audio)
-  - card-place-1, card-place-2, card-place-3 (card play sounds)
-  - card-slide-3 (draw sound)
+  - card-tap-1/2/3 (card play and draw sounds, trimmed recordings)
   - chips-stack-3 (reward pickup)
 - **Interface Sounds** (https://kenney.nl/assets/interface-sounds)
   - click_002 (button tap)

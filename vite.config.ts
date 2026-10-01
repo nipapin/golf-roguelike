@@ -11,21 +11,23 @@ export default defineConfig({
         description: 'A mobile roguelike built on Golf Solitaire.',
         start_url: '/',
         display: 'standalone',
-        background_color: '#090b10',
-        theme_color: '#090b10',
+        background_color: '#140A2A',
+        theme_color: '#140A2A',
         orientation: 'portrait',
         icons: [
-          {
-            src: '/icon.svg',
-            sizes: 'any',
-            type: 'image/svg+xml',
-            purpose: 'any maskable',
-          },
+          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
+          { src: '/icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
+          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
+          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
         ],
       },
       workbox: {
-        // Pre-cache static assets for offline play (including audio)
-        globPatterns: ['**/*.{js,css,svg,png,webp,json,ttf,woff2,ogg,mp3}'],
+        // Pre-cache static assets for offline play. Short SFX (.mp3) are precached;
+        // .ogg fallbacks and the large music loop are runtime-cached on first use.
+        globPatterns: ['**/*.{js,css,svg,png,webp,json,ttf,woff2,mp3}'],
+        globIgnores: ['**/node_modules/**', 'audio/battle-orchestral.mp3', '**/*.ogg', 'icons/icon-maskable-*.png'],
+        maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
 
         // Don't pre-cache HTML - fetch from network first
         navigateFallback: null,

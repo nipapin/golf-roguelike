@@ -437,6 +437,7 @@ export class CardVisual {
       this.hitZone.destroy();
       this.hitZone = null;
     }
+    this.scene.tweens.killTweensOf(this.container);
     this.container.removeAllListeners();
     this.container.destroy();
   }
