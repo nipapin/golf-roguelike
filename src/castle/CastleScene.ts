@@ -141,7 +141,7 @@ export class CastleScene extends Phaser.Scene {
     this.hpText = this.text(w * 0.32, this.layout.playerHudTop + 15, '', 17);
     this.status = this.text(w * 0.76, this.layout.playerHudTop + 15, '', 11, '#aeeaff');
     this.chainText = this.text(w / 2, relicTop + 14, '', 13, '#ffe5a4');
-    const labels = ['1 SOLDIER', '2 KNIGHT', '3 RELOAD', '4 MORTAR', '5 LASER'];
+    const labels = ['1 SOLDIER', '2 ARCHER', '3 RELOAD', '4 CANNON', '5 LASER'];
     labels.forEach((label, i) => {
       const x = 8 + ((i + 0.5) * (w - 16)) / 5;
       const box = this.add
@@ -321,15 +321,11 @@ export class CastleScene extends Phaser.Scene {
     for (const unit of this.manager.state?.siege.units ?? []) {
       const view = this.defenders.get(unit.id);
       if (!view) continue;
-      if (view.body)
-        this.walkAnimation(view.body, unit.kind === 'knight' ? 'c_angel2' : 'c_angel1');
+      if (view.body && unit.kind === 'soldier') this.walkAnimation(view.body, 'c_angel1');
       const target = this.unitPosition(unit);
       view.root.x += (target.x - view.root.x) * Math.min(1, delta / 90);
       view.root.y =
-        target.y +
-        (unit.kind === 'soldier' || unit.kind === 'knight'
-          ? Math.sin(this.time.now / 100 + unit.id) * 1.5
-          : 0);
+        target.y + (unit.kind === 'soldier' ? Math.sin(this.time.now / 100 + unit.id) * 1.5 : 0);
     }
     for (const enemy of this.manager.state?.siege.enemies ?? []) {
       const view = this.invaders.get(enemy.id);
@@ -779,15 +775,30 @@ export class CastleScene extends Phaser.Scene {
         let body: Phaser.GameObjects.Sprite | undefined;
         let weapon: Phaser.GameObjects.Container | undefined;
         let magazine: Phaser.GameObjects.Graphics | undefined;
-        if (unit.kind === 'soldier' || unit.kind === 'knight') {
-          const sprite = unit.kind === 'knight' ? 'c_angel2' : 'c_angel1';
+        if (unit.kind === 'soldier' || unit.kind === 'archer') {
+          const sprite = unit.kind === 'archer' ? 'c_angel2' : 'c_angel1';
           body = this.add
             .sprite(0, 0, `enemy-${sprite}`)
             .setOrigin(0.5, 1)
-            .setDisplaySize(unit.kind === 'knight' ? 67 : 58, unit.kind === 'knight' ? 67 : 58)
+            .setDisplaySize(unit.kind === 'archer' ? 67 : 58, unit.kind === 'archer' ? 67 : 58)
             .setFlipX(true);
           body.play(`${sprite}-idle`);
           root.add([this.add.ellipse(0, -2, 28, 8, 0x17313a, 0.24), body]);
+          if (unit.kind === 'archer') {
+            const bow = this.add.graphics();
+            bow
+              .lineStyle(3, 0xb9793d)
+              .beginPath()
+              .moveTo(0, -15)
+              .lineTo(-8, -8)
+              .lineTo(-10, 0)
+              .lineTo(-8, 8)
+              .lineTo(0, 15)
+              .strokePath();
+            bow.lineStyle(1, 0xffedcc).lineBetween(0, -15, 0, 15);
+            weapon = this.add.container(-16, -26, [bow]);
+            root.add(weapon);
+          }
         } else {
           weapon = weaponArt(this, unit.kind === 'mortar');
           root.add(weapon);
@@ -864,7 +875,7 @@ export class CastleScene extends Phaser.Scene {
           AudioSystem.play('card_draw');
           if (events.some((e) => e.type === 'deploy')) {
             const troops = events.filter(
-              (e) => e.type === 'deploy' && (e.kind === 'soldier' || e.kind === 'knight')
+              (e) => e.type === 'deploy' && (e.kind === 'soldier' || e.kind === 'archer')
             ).length;
             if (troops) this.callout(`${troops} TROOPS DEPLOYED`, '#c6ffd1');
           }
@@ -884,7 +895,7 @@ export class CastleScene extends Phaser.Scene {
             this.releaseEffect(
               p.x,
               p.y - 18,
-              event.kind === 'soldier' ? 0x73e6ad : event.kind === 'knight' ? 0xffd56b : 0x7ceaff
+              event.kind === 'soldier' ? 0x73e6ad : event.kind === 'archer' ? 0xffd56b : 0x7ceaff
             );
             if (event.kind === 'turret')
               this.number(p.x, p.y - 65, `READY · ${unit.ammo}`, '#7ceaff');
@@ -938,7 +949,7 @@ export class CastleScene extends Phaser.Scene {
           const view = this.defenders.get(event.unit.id);
           if (!view) break;
           this.defenders.delete(event.unit.id);
-          view.body?.play(`${event.unit.kind === 'knight' ? 'c_angel2' : 'c_angel1'}-dead`);
+          view.body?.play(`${event.unit.kind === 'archer' ? 'c_angel2' : 'c_angel1'}-dead`);
           this.tweens.add({
             targets: view.root,
             alpha: 0,
@@ -1010,29 +1021,46 @@ export class CastleScene extends Phaser.Scene {
       tx = enemy.root.x,
       ty = enemy.root.y - 23;
     this.actorAnimation(event.target, 'hurt');
-    if (unit.body) {
-      const sprite = event.kind === 'knight' ? 'c_angel2' : 'c_angel1';
+    if (unit.body && event.kind === 'soldier') {
+      const sprite = 'c_angel1';
       unit.body.play(`${sprite}-attack`, true);
       unit.body.once('animationcomplete', () => {
         if (unit.body?.active) unit.body.play(`${sprite}-idle`);
       });
     }
-    if (event.kind === 'soldier' || event.kind === 'knight')
-      playCombatVFX(this, 'slash', tx, ty, 44, 0xaffaff);
+    if (event.kind === 'archer' && unit.weapon)
+      this.tweens.add({ targets: unit.weapon, scaleX: 0.75, duration: 80, yoyo: true });
+    if (event.kind === 'soldier') playCombatVFX(this, 'slash', tx, ty, 44, 0xaffaff);
     else {
-      const projectile = this.add
-        .circle(
-          x,
-          y,
-          event.kind === 'mortar' ? 5 : 2,
-          event.kind === 'mortar' ? 0x94efff : 0xffe579
-        )
-        .setDepth(100);
+      const projectile =
+        event.kind === 'archer'
+          ? this.add
+              .container(x, y, [
+                this.add.rectangle(0, 0, 17, 2, 0xc98b49),
+                this.add.triangle(-8, 0, 0, -3, -6, 0, 0, 3, 0xfff1b3),
+              ])
+              .setRotation(Math.atan2(ty - y, tx - x))
+              .setDepth(100)
+          : this.add
+              .circle(
+                x,
+                y,
+                event.kind === 'mortar' ? 5 : 2,
+                event.kind === 'mortar' ? 0x94efff : 0xffe579
+              )
+              .setDepth(100);
+      const flight = { t: 0 };
       this.tweens.add({
-        targets: projectile,
-        x: tx,
-        y: ty,
-        duration: event.kind === 'mortar' ? 250 : 100,
+        targets: flight,
+        t: 1,
+        onUpdate: () =>
+          projectile.setPosition(
+            x + (tx - x) * flight.t,
+            y +
+              (ty - y) * flight.t -
+              (event.kind === 'mortar' ? Math.sin(Math.PI * flight.t) * 45 : 0)
+          ),
+        duration: event.kind === 'mortar' ? 250 : event.kind === 'archer' ? 250 : 100,
         onComplete: () => {
           projectile.destroy();
           playCombatVFX(
@@ -1091,14 +1119,14 @@ export class CastleScene extends Phaser.Scene {
     const state = this.manager.state!;
     const descriptions = [
       `${upgradeValue('soldier', state.upgrades.soldier)} soldiers march from the castle. Each has 1 HP and 1 base damage. Workshop levels add soldiers.`,
-      `A knight has ${upgradeValue('knight', state.upgrades.knight)} HP and deals ${upgradeValue('knight', state.upgrades.knight)} base damage in melee. Workshop levels increase HP and damage.`,
-      `One turret only. The first reward builds it; later rewards refill its magazine to ${upgradeValue('magazine', state.upgrades.magazine)} rounds. It fires 4 bullets per second for 2 base damage each. Workshop magazine levels add 20 rounds.`,
-      `A mortar fires 12 shells for ${upgradeValue('mortar', state.upgrades.mortar)} base damage to up to three enemies. Workshop levels increase damage.`,
-      `The laser clears regular invaders and deals ${upgradeValue('laser', state.upgrades.laser)} base damage to bosses. Every 3 extra chain cards bank another laser.`,
+      `A stationary archer has 1 HP and deals ${upgradeValue('knight', state.upgrades.knight)} damage per arrow. Enemies can kill it when they reach the castle. Workshop levels increase arrow damage.`,
+      `One turret only. The first reward builds it; later rewards refill its magazine to ${upgradeValue('magazine', state.upgrades.magazine)} rounds. It fires 4 bullets per second for 2 base damage each. Workshop magazine levels add 5 rounds.`,
+      `An arc cannon (mortar) fires 12 explosive shells for ${upgradeValue('mortar', state.upgrades.mortar)} base damage to up to three enemies. Workshop levels increase damage.`,
+      `The laser deals ${upgradeValue('laser', state.upgrades.laser)} base damage to every enemy. Strong enemies can survive. Every 3 extra chain cards bank another laser.`,
     ];
     const modal = gamePopup(
       this,
-      ['SOLDIERS', 'KNIGHT', 'TURRET & RELOAD', 'MORTAR', 'LASER'][index],
+      ['SOLDIERS', 'ARCHER', 'TURRET & RELOAD', 'ARC CANNON', 'LASER'][index],
       'Bank the chain, then DRAW to release it.',
       420
     );

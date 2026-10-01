@@ -23,7 +23,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'BUILD A CHAIN',
-      '1: soldier · 2: knight · 3: build / reload ONE turret\n4: mortar · 5: laser. Rewards stay banked until you DRAW from stock. Then all reached rewards deploy. Soldiers march: 1 HP / 1 damage.',
+      '1: soldier · 2: archer · 3: build / reload ONE turret\n4: arc cannon · 5: laser. Rewards stay banked until you DRAW from stock. Then all reached rewards deploy. Soldiers march: 1 HP / 1 damage.',
     ],
     [
       'THE ROAD IS REAL TIME',

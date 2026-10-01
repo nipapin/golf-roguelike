@@ -5,6 +5,7 @@ import {
   UPGRADE_LIMIT,
   upgradeCost,
   earnedCoins,
+  upgradeValue,
   SIEGE_PACING,
   type CastleRun,
   type Upgrades,
@@ -99,7 +100,7 @@ function validRun(v: unknown): v is CastleRun {
       (u) =>
         record(u) &&
         integer(u.id) &&
-        ['soldier', 'knight', 'turret', 'mortar'].includes(String(u.kind)) &&
+        ['soldier', 'archer', 'turret', 'mortar'].includes(String(u.kind)) &&
         typeof u.engaged === 'boolean' &&
         ['damage', 'heal', 'ttl', 'ammo', 'hp', 'maxHp', 'progress'].every((k) => finite(u[k])) &&
         (u.progress as number) <= 0.94 &&
@@ -199,17 +200,28 @@ export class CastleService {
       // Existing saves predate marching infantry; preserve their board and wallet.
       if (record(v) && v.siegeNumber === undefined) v.siegeNumber = 1;
       if (record(v) && record(v.siege) && Array.isArray(v.siege.units)) {
-        v.siege.units = v.siege.units.map((u) =>
-          record(u)
-            ? {
-                ...u,
-                hp: u.hp ?? (u.kind === 'soldier' ? 1 : 6),
-                maxHp: u.maxHp ?? (u.kind === 'soldier' ? 1 : 6),
-                progress: u.progress ?? 0.94,
-                damage: u.hp === undefined && u.kind === 'soldier' ? 1 : u.damage,
-              }
-            : u
-        );
+        const legacyBalance = v.balanceVersion !== 2;
+        const levels = upgrades(v.upgrades) ? v.upgrades : emptyUpgrades();
+        v.siege.units = v.siege.units.map((u) => {
+          if (!record(u)) return u;
+          const wasKnight = u.kind === 'knight';
+          const migrated: Record<string, unknown> = {
+            ...u,
+            kind: wasKnight ? 'archer' : u.kind,
+            hp: wasKnight ? 1 : (u.hp ?? (u.kind === 'soldier' ? 1 : 6)),
+            maxHp: wasKnight ? 1 : (u.maxHp ?? (u.kind === 'soldier' ? 1 : 6)),
+            progress: wasKnight ? 0.94 : (u.progress ?? 0.94),
+            damage: wasKnight
+              ? upgradeValue('knight', levels.knight)
+              : u.hp === undefined && u.kind === 'soldier'
+                ? 1
+                : u.damage,
+          };
+          if (legacyBalance && migrated.kind === 'turret' && finite(u.ammo))
+            migrated.ammo = Math.min(u.ammo, upgradeValue('magazine', levels.magazine));
+          return migrated;
+        });
+        v.balanceVersion = 2;
       }
       if (!validRun(v)) return null;
       // Merge legacy duplicate cannons into one without summing their magazines.
@@ -218,6 +230,7 @@ export class CastleService {
         const best = turrets.reduce((a, b) => (a.ammo >= b.ammo ? a : b));
         v.siege.units = v.siege.units.filter((u) => u.kind !== 'turret' || u.id === best.id);
       }
+      // Retain old boards and paid upgrade levels while replacing obsolete knight stats.
       return v;
     } catch {
       return null;

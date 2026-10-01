@@ -79,11 +79,14 @@ export const trainingSteps = [
   ['Continue with 5', 'Removing the 6 reveals the 5. Build your chain with the newly opened card.'],
   ['Try UNDO', 'Undo returns your last card and costs 1 castle HP. Tap the large button below.'],
   ['Play the 5 again', 'The castle paid 1 HP. Now continue the restored chain.'],
-  ['Reach three cards', 'Play 4. Your chain banks a soldier, a knight and a turret reload.'],
+  [
+    'Reach three cards',
+    'Play 4. Your chain banks a soldier, a stationary archer and a 10-round turret reload.',
+  ],
   ['Deploy your defense', 'NEXT previews the stock card. Tap DRAW to release all banked rewards.'],
   [
     'Watch the defense',
-    'Soldiers advance toward enemies. The single turret fires from its magazine.',
+    'Soldiers advance toward enemies. Archers stay at the castle: 1 HP / 2 damage. The turret has 10 rounds.',
   ],
   [
     'Play the WILD 8',
@@ -91,8 +94,8 @@ export const trainingSteps = [
   ],
   ['Use WILD: play King', 'Normally 8 cannot connect to King. WILD allows this one connection.'],
   ['King → Queen', 'Continue downward with Queen. Ordinary cards still follow the ±1 rule.'],
-  ['Queen → Jack', 'Four cards bank a mortar as well as the earlier rewards.'],
-  ['Jack → 10', 'Five cards charge the laser. Longer chains earn stronger defense.'],
+  ['Queen → Jack', 'Four cards bank an arc cannon as well as the earlier rewards.'],
+  ['Jack → 10', 'Five cards charge a 40-damage laser. Longer chains earn stronger defense.'],
   ['Fire the laser', 'Tap DRAW. Rewards deploy only when you draw, never while building a chain.'],
   [
     'Ready for the siege',

@@ -100,14 +100,14 @@ describe('castle siege', () => {
     const result = drawCastleCard(played.state, config);
     expect(result.state.siege.units.map((u) => u.kind)).toEqual([
       'soldier',
-      'knight',
+      'archer',
       'turret',
       'mortar',
     ]);
-    expect(result.state.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(100);
+    expect(result.state.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(10);
     expect(drawCastleCard(result.state, config).state.siege.units).toHaveLength(4);
     expect(result.state.siege.enemies).toHaveLength(1);
-    expect(result.state.siege.enemies[0].hp).toBe(70);
+    expect(result.state.siege.enemies[0].hp).toBe(110);
     expect(result.events.some((e) => e.type === 'laser')).toBe(true);
     expect(result.state.run.phase).toBe('battle');
   });
@@ -125,6 +125,60 @@ describe('castle siege', () => {
     expect(result.state.siege.enemies[0].hp).toBe(19);
     expect(result.state.siege.units).toHaveLength(0);
     expect(result.events.some((e) => e.type === 'unit_killed')).toBe(true);
+  });
+  it('keeps archers stationary with 1 HP and 2 ranged damage', () => {
+    const f = forcedChain(2);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    state.siege.units = state.siege.units.filter((u) => u.kind === 'archer');
+    const archer = state.siege.units[0];
+    expect(archer).toMatchObject({ hp: 1, maxHp: 1, damage: 2, progress: 0.94 });
+    state.siege.spawnIn = 1000;
+    state.siege.enemies = [{ ...enemy(false, 100), progress: 0.6, speed: 0 }];
+    const result = stepSiege(state);
+    expect(result.state.siege.units[0].progress).toBe(0.94);
+    expect(result.events).toContainEqual({
+      type: 'shot',
+      kind: 'archer',
+      unit: archer.id,
+      target: 100,
+      damage: 2,
+    });
+    result.state.siege.enemies[0].progress = 0.94;
+    result.state.siege.enemies[0].cooldown = 0;
+    expect(
+      stepSiege(result.state).events.some(
+        (e) => e.type === 'unit_killed' && e.unit.kind === 'archer'
+      )
+    ).toBe(true);
+  });
+  it('exhausts the base turret after ten shots and retains the empty cannon', () => {
+    const f = forcedChain(3);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    state.siege.units = state.siege.units.filter((u) => u.kind === 'turret');
+    state.siege.spawnIn = 1000;
+    state.siege.enemies = [{ ...enemy(false, 100), progress: 0.5, speed: 0 }];
+    let shots = 0;
+    for (let i = 0; i < 20; i++) {
+      const result = stepSiege(state);
+      shots += result.events.filter((e) => e.type === 'shot').length;
+      state = result.state;
+    }
+    expect(shots).toBe(10);
+    expect(state.siege.units[0].ammo).toBe(0);
+    expect(state.siege.enemies[0].hp).toBe(80);
+  });
+  it('applies 40 laser damage to regular enemies instead of deleting them', () => {
+    const f = forcedChain(5);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state.siege.enemies = [enemy(false, 90), { ...enemy(true, 150), id: 101 }];
+    const result = drawCastleCard(state, config);
+    expect(result.state.siege.enemies.map((e) => e.hp)).toEqual([50, 110]);
+    expect(result.events).toContainEqual({ type: 'laser', final: false, damage: 40 });
   });
   it('creates a dense stream of invaders in the first ten seconds', () => {
     let state = drawCastleCard(start(), config).state;
@@ -191,7 +245,7 @@ describe('castle siege', () => {
       expect(state.siege.units).toHaveLength(0);
       const result = drawCastleCard(state, config);
       expect(result.state.siege.units.map((u) => u.kind)).toEqual(
-        ['soldier', 'knight', 'turret', 'mortar'].slice(0, length)
+        ['soldier', 'archer', 'turret', 'mortar'].slice(0, length)
       );
     }
   });
@@ -227,8 +281,8 @@ describe('castle siege', () => {
     const result = drawCastleCard(state, config);
     const turrets = result.state.siege.units.filter((u) => u.kind === 'turret');
     expect(turrets).toHaveLength(1);
-    expect(turrets[0]).toMatchObject({ id, ammo: 160 });
-    expect(result.events).toContainEqual({ type: 'reload', id, ammo: 160 });
+    expect(turrets[0]).toMatchObject({ id, ammo: 25 });
+    expect(result.events).toContainEqual({ type: 'reload', id, ammo: 25 });
   });
   it('increases health, speed and wave pressure between new sieges', () => {
     const first = createCastleRun('pressure', config, emptyUpgrades(), 'first', 1);
@@ -368,6 +422,30 @@ describe('persistent castle upgrades', () => {
     expect(restored.siege.units.filter((u) => u.kind === 'turret')).toHaveLength(1);
     expect(restored.siege.units.find((u) => u.kind === 'turret')!.ammo).toBe(45);
   });
+  it('converts saved knights and old turret ammunition without resetting progress', () => {
+    const storage = memoryStorage(),
+      service = new CastleService(storage),
+      f = forcedChain(3);
+    let state = f.state;
+    for (const card of f.chain) state = playCastleCard(state, card.id, config).state;
+    state = drawCastleCard(state, config).state;
+    const legacy = JSON.parse(JSON.stringify(state));
+    delete legacy.balanceVersion;
+    const archer = legacy.siege.units.find((u: { kind: string }) => u.kind === 'archer');
+    Object.assign(archer, { kind: 'knight', hp: 6, maxHp: 6, damage: 6, progress: 0.5 });
+    legacy.siege.units.find((u: { kind: string }) => u.kind === 'turret').ammo = 100;
+    storage.setItem('golf-castle-run-v1', JSON.stringify(legacy));
+    const restored = service.load()!;
+    expect(restored.run.battle).toEqual(state.run.battle);
+    expect(restored.siege.units.find((u) => u.kind === 'archer')).toMatchObject({
+      hp: 1,
+      damage: 2,
+      progress: 0.94,
+    });
+    expect(restored.siege.units.find((u) => u.kind === 'turret')!.ammo).toBe(10);
+    service.save(restored);
+    expect(service.load()).toEqual(restored);
+  });
   it('permanent levels apply at the next siege and leave existing snapshots unchanged', () => {
     const upgrades = { ...emptyUpgrades(), walls: 2, magazine: 3 };
     const state = createCastleRun('upgrades', config, upgrades);
@@ -379,7 +457,7 @@ describe('persistent castle upgrades', () => {
     let next = f.state;
     for (const card of f.chain) next = playCastleCard(next, card.id, config).state;
     next = drawCastleCard(next, config).state;
-    expect(next.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(160);
+    expect(next.siege.units.find((u) => u.kind === 'turret')?.ammo).toBe(25);
   });
 });
 describe('siege progression balance', () => {

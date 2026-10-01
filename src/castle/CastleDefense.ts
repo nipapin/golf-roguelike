@@ -4,7 +4,8 @@ import { RNG } from '../core/RNG';
 import type { RunState, GameConfig, GameEvent } from '../core/types';
 import { startRun } from '../core/GameActions';
 
-export type UnitKind = 'soldier' | 'knight' | 'turret' | 'mortar';
+export type UnitKind = 'soldier' | 'archer' | 'turret' | 'mortar';
+// Keep the legacy 'knight' upgrade key so paid levels survive the archer replacement.
 export type UpgradeKey = 'walls' | 'soldier' | 'knight' | 'magazine' | 'mortar' | 'laser';
 export type Upgrades = Record<UpgradeKey, number>;
 export const DEFENDER_STATS: Record<
@@ -12,17 +13,17 @@ export const DEFENDER_STATS: Record<
   { damage: number; interval: number; range: number; ttl: number; ammo: number }
 > = {
   soldier: { damage: 1, interval: 1, range: 0.52, ttl: 18, ammo: 100 },
-  knight: { damage: 6, interval: 1.5, range: 0.38, ttl: 24, ammo: 100 },
-  turret: { damage: 2, interval: 0.25, range: 0.4, ttl: 600, ammo: 100 },
+  archer: { damage: 2, interval: 1.5, range: 0.55, ttl: 24, ammo: 100 },
+  turret: { damage: 2, interval: 0.25, range: 0.4, ttl: 600, ammo: 10 },
   mortar: { damage: 9, interval: 2, range: 0.22, ttl: 45, ammo: 12 },
 };
 export const UPGRADE_VALUES: Record<UpgradeKey, { base: number; step: number }> = {
   walls: { base: 30, step: 8 },
   soldier: { base: 1, step: 1 },
-  knight: { base: 6, step: 2 },
-  magazine: { base: 100, step: 20 },
+  knight: { base: 2, step: 1 },
+  magazine: { base: 10, step: 5 },
   mortar: { base: 9, step: 2 },
-  laser: { base: 80, step: 20 },
+  laser: { base: 40, step: 10 },
 };
 export const upgradeValue = (key: UpgradeKey, level: number) =>
   UPGRADE_VALUES[key].base + UPGRADE_VALUES[key].step * level;
@@ -96,6 +97,7 @@ export interface SiegeState {
 }
 export interface CastleRun {
   version: 1;
+  balanceVersion?: 2;
   id: string;
   siegeNumber: number;
   run: RunState;
@@ -140,6 +142,7 @@ export function createCastleRun(
   const initial = setupBattle(startRun(seed, config), sentinel, 7, config);
   return {
     version: 1,
+    balanceVersion: 2,
     id,
     siegeNumber,
     upgrades: { ...upgrades },
@@ -196,7 +199,7 @@ function laser(state: CastleRun, events: SiegeEvent[], final = false) {
   let healing = 0;
   for (const enemy of state.siege.enemies) {
     healing += Math.min(enemy.hp, damage) * ratio;
-    enemy.hp = final || !enemy.boss ? 0 : Math.max(0, enemy.hp - damage);
+    enemy.hp = final ? 0 : Math.max(0, enemy.hp - damage);
   }
   if (healing)
     state.run = {
@@ -219,7 +222,9 @@ function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
   const base =
     kind === 'turret' || kind === 'soldier'
       ? stats.damage
-      : upgradeValue(kind, state.upgrades[kind]);
+      : kind === 'archer'
+        ? upgradeValue('knight', state.upgrades.knight)
+        : upgradeValue('mortar', state.upgrades.mortar);
   const unit: Defender = {
     id:
       kind === 'turret'
@@ -230,18 +235,8 @@ function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
     heal: ((b.lifestealMultiplier ?? 0) / multiplier) * 0.3,
     cooldown: 0,
     engaged: false,
-    hp:
-      kind === 'soldier'
-        ? 1
-        : kind === 'knight'
-          ? upgradeValue('knight', state.upgrades.knight)
-          : 6,
-    maxHp:
-      kind === 'soldier'
-        ? 1
-        : kind === 'knight'
-          ? upgradeValue('knight', state.upgrades.knight)
-          : 6,
+    hp: kind === 'soldier' || kind === 'archer' ? 1 : 6,
+    maxHp: kind === 'soldier' || kind === 'archer' ? 1 : 6,
     progress: 0.94,
     ttl: stats.ttl,
     ammo: kind === 'turret' ? upgradeValue('magazine', state.upgrades.magazine) : stats.ammo,
@@ -354,7 +349,7 @@ export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeRes
     for (let i = 0; i < upgradeValue('soldier', state.upgrades.soldier); i++)
       deploy(state, 'soldier', events);
   }
-  if (chain >= 2) deploy(state, 'knight', events);
+  if (chain >= 2) deploy(state, 'archer', events);
   if (chain >= 3) deploy(state, 'turret', events);
   if (chain >= 4) deploy(state, 'mortar', events);
   for (let tier = 5; tier <= chain; tier += 3) laser(state, events);
@@ -440,7 +435,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
   for (const unit of siege.units) {
     if (unit.engaged && unit.kind !== 'turret') unit.ttl -= STEP;
     unit.cooldown -= STEP;
-    const mobile = unit.kind === 'soldier' || unit.kind === 'knight';
+    const mobile = unit.kind === 'soldier';
     const nearby = siege.enemies.some(
       (e) => e.hp > 0 && Math.abs(e.progress - unit.progress) <= 0.045
     );
@@ -481,7 +476,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
     const opponent = siege.units.find(
       (u) =>
         u.hp > 0 &&
-        (u.kind === 'soldier' || u.kind === 'knight') &&
+        (u.kind === 'soldier' || u.kind === 'archer') &&
         Math.abs(u.progress - enemy.progress) <= 0.06
     );
     enemy.cooldown -= STEP;
