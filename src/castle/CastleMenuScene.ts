@@ -200,7 +200,7 @@ export class CastleMenuScene extends Phaser.Scene {
   private credits(): void {
     const modal = gamePopup(this, 'CREDITS', 'Artists, audio and licenses', 400);
     const content =
-      'Models & animation · Kenney · CC0\nCombat VFX · Kalponic Studio / Jony\nFree Stylized Sprite VFX · CC BY 4.0\nMusic · MintoDog / Hope · CC0\nCard / combat audio · Kenney · CC0\nOrc voices · Tim Rockk · CC0\nWeapon recordings · kurt / OGA · CC0\nFonts · Google Fonts · SIL OFL 1.1\nDefense · Golf Rogue';
+      'Models & animation · Kenney · CC0\nCombat VFX · Kalponic Studio / Jony\nFree Stylized Sprite VFX · CC BY 4.0\nMusic · MintoDog / Hope · CC0\nSFX · Chequered Ink · 400 Sounds Pack\nProcessed game cues · commercial license\nFonts · Google Fonts · SIL OFL 1.1\nDefense · Golf Rogue';
     modal.content.add(
       this.add
         .text(0, modal.top + 110, content, {

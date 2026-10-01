@@ -24,9 +24,9 @@ export default defineConfig({
       },
       workbox: {
         // Pre-cache static assets for offline play. Short SFX (.mp3) are precached;
-        // .ogg fallbacks and the large music loop are runtime-cached on first use.
+        // the current music loop also fits the precache size limit.
         globPatterns: ['**/*.{js,css,svg,png,webp,json,ttf,woff2,mp3}'],
-        globIgnores: ['**/node_modules/**', 'audio/battle-orchestral.mp3', '**/*.ogg', 'icons/icon-maskable-*.png'],
+        globIgnores: ['**/node_modules/**', '**/*.ogg', 'icons/icon-maskable-*.png'],
         maximumFileSizeToCacheInBytes: 3 * 1024 * 1024,
 
         // Don't pre-cache HTML - fetch from network first

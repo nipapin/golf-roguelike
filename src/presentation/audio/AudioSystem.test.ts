@@ -10,13 +10,18 @@ class AudioParamStub {
 }
 class AudioNodeStub {
   gain = new AudioParamStub();
+  threshold = new AudioParamStub();
+  knee = new AudioParamStub();
+  ratio = new AudioParamStub();
+  attack = new AudioParamStub();
+  release = new AudioParamStub();
   frequency = new AudioParamStub();
   Q = new AudioParamStub();
   playbackRate = new AudioParamStub();
   connect = vi.fn();
   disconnect = vi.fn();
   start = vi.fn();
-  stop = vi.fn();
+  stop = vi.fn(() => this.onended?.());
   buffer: unknown;
   type = '';
   onended: (() => void) | null = null;
@@ -30,6 +35,7 @@ class ContextStub {
   voices: AudioNodeStub[] = [];
   filters: AudioNodeStub[] = [];
   sources: AudioNodeStub[] = [];
+  compressors: AudioNodeStub[] = [];
   resume = vi.fn(async () => {
     this.state = 'running';
   });
@@ -44,6 +50,11 @@ class ContextStub {
   createBiquadFilter() {
     const node = new AudioNodeStub();
     this.filters.push(node);
+    return node;
+  }
+  createDynamicsCompressor() {
+    const node = new AudioNodeStub();
+    this.compressors.push(node);
     return node;
   }
   createOscillator() {
@@ -146,8 +157,9 @@ it('uses recorded rising combo and distinct power buffers without oscillators', 
   await AudioSystem.init();
   AudioSystem.unlock();
   const context = ContextStub.instances[0];
-  AudioSystem.playCombo(1);
+  AudioSystem.playCombo(2);
   const first = context.sources.at(-1)!.playbackRate.value;
+  context.currentTime += 0.1;
   AudioSystem.playCombo(6);
   const sixth = context.sources.at(-1)!.playbackRate.value;
   expect(sixth).toBeGreaterThan(first);
@@ -163,7 +175,69 @@ it('loads the replacement music and versioned recorded cues instead of cached le
   await AudioSystem.init();
   const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]));
   expect(urls).toContain('/audio/hd-v3/hope-battle.mp3');
-  expect(urls).toContain('/audio/hd-v3/card-1.mp3');
+  expect(urls).toContain('/audio/ci-v1/card-1.mp3');
+  expect(urls.filter((url) => url.includes('/ci-v1/'))).toHaveLength(31);
+  expect(new Set(urls).size).toBe(urls.length);
   expect(urls).not.toContain('/audio/heartfelt-battle.mp3');
   expect(urls).not.toContain('/audio/combo-up.mp3');
+});
+
+it('keeps different weapons audible in one tick and coalesces multi-target mortar hits', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const before = context.sources.length;
+  AudioSystem.play('turret_shot');
+  AudioSystem.play('archer_shot');
+  AudioSystem.play('mortar_shot');
+  AudioSystem.play('mortar_shot');
+  AudioSystem.play('mortar_shot');
+  expect(context.sources.length - before).toBe(3);
+  context.currentTime += 0.25;
+  AudioSystem.play('turret_shot');
+  expect(context.sources.length - before).toBe(4);
+});
+
+it('coalesces castle damage bursts and limits overlapping laser tails', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const before = context.sources.length;
+  for (let i = 0; i < 48; i++) AudioSystem.play('player_hit');
+  expect(context.sources.length - before).toBe(1);
+  AudioSystem.play('laser_blast');
+  const first = context.sources.at(-1)!;
+  AudioSystem.play('laser_blast');
+  expect(first.stop).not.toHaveBeenCalled();
+  context.currentTime += 0.2;
+  AudioSystem.play('laser_blast');
+  expect(first.stop).toHaveBeenCalledOnce();
+});
+
+it('routes both buses through master compression with headroom', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  const context = ContextStub.instances[0];
+  const master = context.compressors[0];
+  expect(context.gains[0].connect).toHaveBeenCalledWith(master);
+  expect(context.gains[1].connect).toHaveBeenCalledWith(master);
+  expect(master.ratio.value).toBe(20);
+  expect(context.gains[2].gain.value).toBe(0.85);
+});
+
+it('leaves the first card as foley and grows later combo accents', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const before = context.sources.length;
+  AudioSystem.playCombo(1);
+  expect(context.sources).toHaveLength(before);
+  AudioSystem.playCombo(2);
+  const firstLevel = context.gains.at(-1)!.gain.value;
+  context.currentTime += 0.1;
+  AudioSystem.playCombo(20);
+  expect(context.gains.at(-1)!.gain.value).toBeGreaterThan(firstLevel);
 });

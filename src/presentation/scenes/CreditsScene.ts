@@ -72,8 +72,9 @@ export class CreditsScene extends Phaser.Scene {
       { text: 'Google Fonts • SIL OFL 1.1', style: 'normal' },
       { text: '', style: 'spacer' },
       { text: 'Audio', style: 'header' },
-      { text: 'Kenney · request (Heartfelt Battle)', style: 'name' },
-      { text: 'CC0 Public Domain', style: 'normal' },
+      { text: 'Chequered Ink · 400 Sounds Pack', style: 'name' },
+      { text: 'Commercial-use SFX license', style: 'normal' },
+      { text: 'Music · MintoDog / Hope · CC0', style: 'normal' },
     ];
 
     let y = 100;
