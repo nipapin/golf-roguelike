@@ -8,6 +8,7 @@ import { AudioSystem } from './presentation/audio/AudioSystem';
 import { initPWAUpdateHandler } from './pwa/updateHandler';
 import { BootScene } from './presentation/scenes/BootScene';
 import { CastleMenuScene } from './castle/CastleMenuScene';
+import { CastleGuideScene } from './castle/CastleGuideScene';
 import { CastleScene } from './castle/CastleScene';
 
 async function initGame() {
@@ -53,7 +54,7 @@ async function initGame() {
       height: Math.round(bounds.height * density),
       zoom: 1 / density,
     },
-    scene: [BootScene, CastleMenuScene, CastleScene],
+    scene: [BootScene, CastleMenuScene, CastleScene, CastleGuideScene],
     render: {
       antialias: true,
       pixelArt: false,

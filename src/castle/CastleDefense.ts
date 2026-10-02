@@ -1,7 +1,7 @@
 import { drawCard, playCard } from '../core/GameActions';
 import { setupBattle, isTableauEmpty, hasLegalMoves } from '../core/GameState';
 import { RNG } from '../core/RNG';
-import type { RunState, GameConfig, GameEvent } from '../core/types';
+import type { RunState, GameConfig, GameEvent, BattleState } from '../core/types';
 import { startRun } from '../core/GameActions';
 
 export type UnitKind = 'soldier' | 'archer' | 'turret' | 'mortar';
@@ -268,6 +268,14 @@ function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
     events.push({ type: 'deploy', kind, id: unit.id });
   }
 }
+/** ECHO contributes virtual links to siege reward thresholds without duplicating cards. */
+export function castleChainLength(battle: BattleState | null, echoBonus = 2): number {
+  if (!battle) return 0;
+  const echoes = battle.chain.filter((card) =>
+    battle.powerCards.some((power) => power.cardId === card.id && power.type === 'ECHO')
+  ).length;
+  return battle.chain.length + echoes * echoBonus;
+}
 export function playCastleCard(
   current: CastleRun,
   cardId: string,
@@ -286,7 +294,7 @@ export function playCastleCard(
   const played = playCard(input, cardId, config);
   if (played.state === input || !played.state.battle) return { state: current, events: [] };
   const state = clone(current);
-  const chain = (current.run.battle?.chain.length ?? 0) + 1;
+  const chain = castleChainLength(played.state.battle, config.powerCards.ECHO.comboBonus);
   // Card legality, powers and joker order come from the same solitaire engine.
   // The legacy duel's completion/reward events do not control this siege.
   state.run = {
@@ -355,7 +363,7 @@ export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeRes
   if (current.run.phase !== 'battle') return { state: current, events: [] };
   const state = clone(current);
   const events: SiegeEvent[] = [];
-  const chain = state.run.battle?.chain.length ?? 0;
+  const chain = castleChainLength(state.run.battle, config.powerCards.ECHO.comboBonus);
   // Release all reached rewards once, before drawing resets joker/chain effects.
   if (chain >= 1) {
     for (let i = 0; i < upgradeValue('soldier', state.upgrades.soldier); i++)

@@ -19,6 +19,7 @@ import {
   nextCastleCard,
   earnedCoins,
   upgradeValue,
+  castleChainLength,
   type Invader,
   type Defender,
   type SiegeEvent,
@@ -592,10 +593,10 @@ export class CastleScene extends Phaser.Scene {
     }
     this.showTraining();
   }
-  private finishTraining(): void {
+  private finishTraining(completed = true): void {
     if (!this.training || this.locked) return;
     this.locked = true;
-    completeTraining();
+    if (completed) completeTraining();
     // Phaser retains previous scene data when start/restart receives no data.
     // Clear it immediately so a queued resize or later menu launch cannot revive training.
     this.sys.settings.data = { tutorial: false };
@@ -638,10 +639,15 @@ export class CastleScene extends Phaser.Scene {
         wordWrap: { width: w - 40 },
       })
     );
-    const skip = this.text(w / 2, this.layout.relicTop + 14, 'SKIP TRAINING', 13, '#fff1b3')
-      .setPadding(10)
-      .setInteractive();
-    skip.on('pointerup', () => this.finishTraining());
+    this.chainText.setVisible(false);
+    const skip = this.add.container(w / 2, this.layout.relicTop + 14);
+    skip.add(this.add.rectangle(0, 0, w - 32, 30, 0x315d6a).setStrokeStyle(2, 0xffdc63));
+    skip.add(this.text(0, 0, 'SKIP TRAINING', 14, '#fff1b3'));
+    skip.setInteractive(
+      new Phaser.Geom.Rectangle(-(w - 32) / 2, -15, w - 32, 30),
+      Phaser.Geom.Rectangle.Contains
+    );
+    skip.on('pointerup', () => this.finishTraining(false));
     root.add(skip);
     const expected = this.trainingAction();
     const target = expected.id ? this.cards.get(expected.id)?.getContainer() : undefined;
@@ -691,7 +697,7 @@ export class CastleScene extends Phaser.Scene {
   private refreshHUD(): void {
     const state = this.manager.state!,
       player = state.run.player,
-      chain = state.run.battle!.chain.length;
+      chain = castleChainLength(state.run.battle, gameConfig.powerCards.ECHO.comboBonus);
     const { width: w } = viewport(this),
       y = this.layout.playerHudTop + 5;
     this.hp

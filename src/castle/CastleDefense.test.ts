@@ -343,6 +343,23 @@ describe('castle siege', () => {
       drawCastleCard(result.state, config).events.filter((e) => e.type === 'deploy')
     ).toHaveLength(0);
   });
+
+  it('ECHO unlocks two extra defense links without copying cards or farming deployments', () => {
+    const fixture = forcedChain(1);
+    const card = fixture.chain[0];
+    fixture.state.run = {
+      ...fixture.state.run,
+      battle: { ...fixture.state.run.battle!, powerCards: [{ cardId: card.id, type: 'ECHO' }] },
+    };
+    const played = playCastleCard(fixture.state, card.id, config);
+    expect(played.state.run.battle!.chain).toHaveLength(1);
+    expect(played.events.some((e) => e.type === 'card' && e.chain === 3)).toBe(true);
+    const drawn = drawCastleCard(played.state, config);
+    expect(
+      drawn.events.filter((e) => e.type === 'deploy').map((e) => e.type === 'deploy' && e.kind)
+    ).toEqual(['soldier', 'archer', 'turret']);
+    expect(drawCastleCard(drawn.state, config).events.some((e) => e.type === 'deploy')).toBe(false);
+  });
   it('deterministically resumes a siege including movement, shots and RNG', () => {
     let state = drawCastleCard(start(), config).state;
     for (let i = 0; i < 40; i++) state = stepSiege(state).state;

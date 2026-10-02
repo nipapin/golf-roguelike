@@ -11,7 +11,7 @@ import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { castleArt } from './CastleArt';
 import { showCastleWorkshop } from './CastleWorkshop';
 import { castleManager } from './CastleManager';
-import { trainingCompleted, resetTrainingSession } from './CastleTutorial';
+import { resetTrainingSession } from './CastleTutorial';
 import { showCastleRewards } from './CastleRewards';
 import { siegeDifficulty } from './CastleDefense';
 
@@ -130,13 +130,6 @@ export class CastleMenuScene extends Phaser.Scene {
       saved?.run.phase === 'battle' ? 'CONTINUE SIEGE' : 'NEW SIEGE',
       () => {
         AudioSystem.unlock();
-        if (!trainingCompleted()) {
-          this.scene.start('CastleScene', {
-            tutorial: true,
-            finish: saved?.run.phase === 'battle' ? 'resume' : 'start',
-          });
-          return;
-        }
         if (saved?.run.phase === 'battle') manager.resume();
         else manager.start();
         this.scene.start('CastleScene', { tutorial: false });
@@ -152,10 +145,21 @@ export class CastleMenuScene extends Phaser.Scene {
       () => this.scene.start('CastleScene', { tutorial: true, finish: 'menu' }),
       true
     ).setX(-(w - 36) / 4);
-    popupButton(this, buttons, 124, (w - 60) / 2, 'CREDITS', () => this.credits(), true).setX(
+    popupButton(
+      this,
+      buttons,
+      124,
+      (w - 60) / 2,
+      'BOOSTERS',
+      () => this.scene.start('CastleGuideScene'),
+      true
+    ).setX((w - 36) / 4);
+    popupButton(this, buttons, 186, (w - 60) / 2, 'CREDITS', () => this.credits(), true).setX(
+      -(w - 36) / 4
+    );
+    popupButton(this, buttons, 186, (w - 60) / 2, 'RESET', () => this.resetProgress(), true).setX(
       (w - 36) / 4
     );
-    popupButton(this, buttons, 186, w - 48, 'RESET PROGRESS', () => this.resetProgress(), true);
     if (saved?.run.phase === 'battle') {
       const restart = this.text(w / 2, safe.bottom - 334, 'START A NEW SIEGE', 13, '#ffe3b2');
       restart
