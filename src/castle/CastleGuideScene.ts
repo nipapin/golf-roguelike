@@ -8,7 +8,7 @@ import {
 import { popupButton } from '../presentation/design/GamePopup';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { gameConfig } from '../data/gameConfig';
-import { UPGRADE_VALUES } from './CastleDefense';
+import { UPGRADE_VALUES, REDEAL_HP_COST } from './CastleDefense';
 
 interface GuideEntry {
   title: string;
@@ -139,6 +139,11 @@ const groups: { title: string; entries: GuideEntry[] }[] = [
         icon: '5',
         description:
           'DRAW also deals 40 base damage to every enemy. An extra beam is banked at 8, 11, 14… links. All reached rewards deploy together.',
+      },
+      {
+        title: 'NO MOVES · NEW DEAL',
+        icon: '−5',
+        description: `Empty stock + no legal moves costs ${REDEAL_HP_COST} HP and deals a fresh board. Armor does not absorb this cost. Enemies, defenders and gold stay. At 0 HP the siege ends.`,
       },
     ],
   },

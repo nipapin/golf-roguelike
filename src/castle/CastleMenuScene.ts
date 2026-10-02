@@ -1,3 +1,4 @@
+import { getLanguage, setLanguage } from '../localization/i18n';
 import { cardboardActor } from './CardboardArt';
 import Phaser from 'phaser';
 import {
@@ -33,7 +34,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'CARDS KEEP YOU ALIVE',
-      'One pack: stock never recycles. Empty stock + no legal moves means defeat. Suits grant repairs, armor and coins. NEXT previews stock; UNDO returns your last card for 1 castle HP. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
+      'One pack: stock never recycles. Empty stock + no legal moves costs 5 HP and deals a new board. At 0 HP the castle falls. Suits grant repairs, armor and coins. NEXT previews stock; UNDO returns your last card for 1 castle HP. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
     ],
     [
       'FINISH TO WIN',
@@ -119,6 +120,19 @@ export class CastleMenuScene extends Phaser.Scene {
       12,
       '#bfe1e3'
     );
+    const language = this.text(
+      w - 47,
+      safe.top + 190,
+      getLanguage() === 'ru' ? 'RU / EN' : 'EN / RU',
+      13,
+      '#ffe35a'
+    )
+      .setPadding(10)
+      .setInteractive();
+    language.on('pointerup', () => {
+      setLanguage(getLanguage() === 'ru' ? 'en' : 'ru');
+      this.scene.restart();
+    });
     const buttons = this.add.container(w / 2, safe.bottom - 227);
     this.add.image(w / 2 - 39, safe.bottom - 285, 'coin').setDisplaySize(26, 26);
     this.text(w / 2 + 17, safe.bottom - 285, String(meta.coins), 24, '#ffe35a');

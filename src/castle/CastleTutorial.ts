@@ -102,6 +102,6 @@ export const trainingSteps = [
   ['Fire the laser', 'Tap DRAW. Rewards deploy only when you draw, never while building a chain.'],
   [
     'Ready for the siege',
-    'Clear every column to win. Empty stock reshuffles. Upgrade between sieges; defeat resets difficulty.',
+    'Clear every column to win. Empty stock with no legal moves costs 5 HP and deals a new board. Upgrade between sieges; defeat resets difficulty.',
   ],
 ];

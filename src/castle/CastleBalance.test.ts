@@ -36,16 +36,23 @@ function board() {
   return { state, playable };
 }
 describe('finite pack balance', () => {
-  it('keeps playing with empty stock while a legal card exists, then loses immediately', () => {
+  it('keeps legal moves with empty stock, then charges 5 HP and deals a fresh pack', () => {
     const { state, playable } = board();
     expect(drawCastleCard(state, config).state.run.phase).toBe('battle');
     const result = playCastleCard(state, playable.id, config);
-    expect(result.state.run.phase).toBe('defeat');
-    expect(result.state.run.player.hp).toBe(0);
-    expect(result.events).toContainEqual({ type: 'ended', victory: false });
-    expect(result.state.run.battle!.deck).toHaveLength(0);
+    expect(result.state.run.phase).toBe('battle');
+    expect(result.state.run.player.hp).toBe(state.run.player.hp - 5);
+    expect(result.events).toContainEqual({ type: 'redeal', hpCost: 5 });
+    expect(result.state.run.battle!.deck).toHaveLength(18);
+    expect(result.state.run.battle!.tableau.map((c) => c.cards.length)).toEqual([
+      5, 5, 5, 5, 5, 5, 5,
+    ]);
+    expect(result.state.run.battle!.chain).toHaveLength(0);
+    expect(result.state.siege).toEqual({ ...state.siege, started: true });
+    expect(result.state.run.rngState).not.toBe(state.run.rngState);
+    expect(playCastleCard(state, playable.id, config)).toEqual(result);
   });
-  it('loses on the last draw and on reopening an exhausted board', () => {
+  it('redeals after the last draw and does not charge again on the next tick', () => {
     const { state } = board();
     const b = state.run.battle!;
     const next = b.discard.find((c) => c.rank === 11)!;
@@ -54,10 +61,39 @@ describe('finite pack balance', () => {
       battle: { ...b, deck: [next], discard: b.discard.filter((c) => c.id !== next.id) },
     };
     const result = drawCastleCard(state, config);
+    expect(result.state.run.phase).toBe('battle');
+    expect(result.state.run.player.hp).toBe(25);
+    expect(result.state.run.battle!.deck).toHaveLength(18);
+    expect(stepSiege(result.state).state.run.player.hp).toBe(25);
+  });
+
+  it.each([1, 5])('falls at %i HP when it cannot pay for another deal, even with armor', (hp) => {
+    const { state, playable } = board();
+    state.run = { ...state.run, player: { ...state.run.player, hp, armor: 50 } };
+    const result = playCastleCard(state, playable.id, config);
     expect(result.state.run.phase).toBe('defeat');
-    expect(result.state.run.battle!.deck).toHaveLength(0);
-    const resumed = { ...result.state, run: { ...result.state.run, phase: 'battle' as const } };
-    expect(stepSiege(resumed).state.run.phase).toBe('defeat');
+    expect(result.state.run.player.hp).toBe(0);
+    expect(result.state.run.player.armor).toBe(50);
+    expect(result.events.some((e) => e.type === 'redeal')).toBe(false);
+    expect(result.events).toContainEqual({ type: 'ended', victory: false });
+  });
+  it('saves a paid deal without settling the wallet or allowing undo into the old board', () => {
+    const storage = memoryStorage();
+    const manager = new CastleManager(storage);
+    const { state, playable } = board();
+    state.usedPowers = ['old-card'];
+    state.run = { ...state.run, player: { ...state.run.player, armor: 17, gold: 12 } };
+    state.siege.coins = 9;
+    manager.state = state;
+    manager.play(playable.id);
+    expect(manager.canUndo).toBe(false);
+    expect(manager.state!.run.player).toMatchObject({ hp: 25, armor: 17, gold: 13 });
+    expect(manager.state!.siege.coins).toBe(9);
+    expect(manager.state!.usedPowers).toEqual([]);
+    expect(manager.service.readMeta().claimed).toEqual([]);
+    const saved = manager.state;
+    expect(manager.resume()).toBe(true);
+    expect(manager.state).toEqual(saved);
   });
   it('wins when the last playable card clears the tableau, even with empty stock', () => {
     const { state, playable } = board();

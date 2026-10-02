@@ -3,6 +3,7 @@
  * Shows in-app update prompt for iOS PWA users who can't easily reload
  */
 
+import { translate } from '../localization/i18n';
 import { castleManager } from '../castle/CastleManager';
 import { registerSW } from 'virtual:pwa-register';
 import { saveGame } from '../services/SaveService';
@@ -75,8 +76,8 @@ function showUpdateToast(onUpdate: () => void): void {
   toastElement.id = 'pwa-update-toast';
   toastElement.innerHTML = `
     <div class="pwa-toast-content">
-      <span class="pwa-toast-text">Есть обновление</span>
-      <button class="pwa-toast-btn">Обновить</button>
+      <span class="pwa-toast-text">${translate('Update available')}</span>
+      <button class="pwa-toast-btn">${translate('Update')}</button>
     </div>
   `;
 
@@ -156,7 +157,7 @@ function showOfflineReadyToast(): void {
   offlineToastElement = document.createElement('div');
   offlineToastElement.id = 'pwa-offline-toast';
   offlineToastElement.innerHTML = `
-    <div class="pwa-offline-content">Готово к офлайн-игре</div>
+    <div class="pwa-offline-content">${translate('Ready for offline play')}</div>
   `;
 
   const style = document.createElement('style');

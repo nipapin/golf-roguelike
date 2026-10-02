@@ -2,6 +2,7 @@ import { drawCard, playCard } from '../core/GameActions';
 import { setupBattle, isTableauEmpty, hasLegalMoves } from '../core/GameState';
 import { RNG } from '../core/RNG';
 import type { RunState, GameConfig, GameEvent, BattleState } from '../core/types';
+import { gameConfig } from '../data/gameConfig';
 import { startRun } from '../core/GameActions';
 
 export type UnitKind = 'soldier' | 'archer' | 'turret' | 'mortar';
@@ -58,6 +59,7 @@ export const UPGRADE_KEYS: UpgradeKey[] = [
 export const UPGRADE_LIMIT = 10;
 export const upgradeCost = (level: number) => 10 + level * 8;
 export const STEP = 0.25;
+export const REDEAL_HP_COST = 5;
 export interface Invader {
   id: number;
   sprite: string;
@@ -117,6 +119,7 @@ export type SiegeEvent =
   | { type: 'laser'; final: boolean; damage: number }
   | { type: 'card'; chain: number; events: GameEvent[] }
   | { type: 'draw'; recycled: boolean }
+  | { type: 'redeal'; hpCost: number }
   | { type: 'ended'; victory: boolean };
 export interface SiegeResult {
   state: CastleRun;
@@ -343,15 +346,27 @@ export function playCastleCard(
     laser(state, events, true);
     state.run = { ...state.run, phase: 'victory' };
     events.push({ type: 'ended', victory: true });
-  } else checkExhaustion(state, events);
+  } else redealIfBlocked(state, events, config);
   return { state, events };
 }
-function checkExhaustion(state: CastleRun, events: SiegeEvent[]) {
+function redealIfBlocked(state: CastleRun, events: SiegeEvent[], config: GameConfig) {
   const battle = state.run.battle;
-  if (state.run.phase === 'battle' && battle && !battle.deck.length && !hasLegalMoves(battle)) {
-    state.run = { ...state.run, phase: 'defeat', player: { ...state.run.player, hp: 0 } };
+  if (state.run.phase !== 'battle' || !battle || battle.deck.length || hasLegalMoves(battle))
+    return;
+  // The fee is direct castle HP: armor does not pay for another physical pack.
+  const hp = Math.max(0, state.run.player.hp - REDEAL_HP_COST);
+  state.run = { ...state.run, player: { ...state.run.player, hp } };
+  events.push({ type: 'castle_hit', damage: REDEAL_HP_COST, enemy: 0 });
+  if (hp === 0) {
+    state.run = { ...state.run, phase: 'defeat' };
     events.push({ type: 'ended', victory: false });
+    return;
   }
+  const powerCount = new RNG(state.run.seed + ':powers:' + state.run.rngState).next() < 0.5 ? 3 : 4;
+  state.run = setupBattle(state.run, sentinel, powerCount, config);
+  state.usedPowers = [];
+  state.siege.laserCharge = 0;
+  events.push({ type: 'redeal', hpCost: REDEAL_HP_COST });
 }
 /** Only the remaining finite stock is previewed; discarded cards never return. */
 export function nextCastleCard(current: CastleRun) {
@@ -410,18 +425,18 @@ export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeRes
   state.siege.started = true;
   state.siege.laserCharge = 0;
   events.push({ type: 'draw', recycled: false });
-  checkExhaustion(state, events);
+  redealIfBlocked(state, events, config);
   return { state, events };
 }
 
 /** Fixed-step simulation. UI does not call this while paused or hidden. */
-export function stepSiege(current: CastleRun): SiegeResult {
+export function stepSiege(current: CastleRun, config: GameConfig = gameConfig): SiegeResult {
   if (current.run.phase !== 'battle') return { state: current, events: [] };
   const battle = current.run.battle;
   if (battle && !battle.deck.length && !hasLegalMoves(battle)) {
     const exhausted = clone(current);
     const exhaustionEvents: SiegeEvent[] = [];
-    checkExhaustion(exhausted, exhaustionEvents);
+    redealIfBlocked(exhausted, exhaustionEvents, config);
     return { state: exhausted, events: exhaustionEvents };
   }
   if (!current.siege.started) return { state: current, events: [] };

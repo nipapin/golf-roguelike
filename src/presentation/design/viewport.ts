@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { installSceneLocalization } from '../../localization/i18n';
 
 /** Highest canvas density we render at. DPR 3 phones look identical at 2 and save ~45% fill-rate. */
 export const MAX_RENDER_DENSITY = 2;
@@ -14,6 +15,7 @@ export function viewport(scene: Pick<Phaser.Scene, 'scale'>) {
   return { width: scene.scale.width / renderDensity, height: scene.scale.height / renderDensity };
 }
 export function configureViewport(scene: Phaser.Scene): void {
+  installSceneLocalization(scene);
   const size = viewport(scene);
   scene.cameras.main.setOrigin(.5, .5).setZoom(renderDensity).centerOn(size.width / 2, size.height / 2);
 }

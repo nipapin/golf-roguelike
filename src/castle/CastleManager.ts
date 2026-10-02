@@ -49,6 +49,10 @@ export class CastleManager {
   private apply(result: SiegeResult | null): SiegeResult | null {
     if (!result) return null;
     this.state = result.state;
+    if (result.events.some((e) => e.type === 'redeal')) {
+      this.previousCard = null;
+      this.save();
+    }
     if (result.state.run.phase !== 'battle') {
       this.save();
       this.service.settle(result.state);
@@ -58,7 +62,8 @@ export class CastleManager {
   play(id: string): SiegeResult | null {
     const before = this.state;
     const result = this.apply(before ? playCastleCard(before, id, gameConfig) : null);
-    if (result && result.state !== before) this.previousCard = before!.run.battle;
+    if (result && result.state !== before && !result.events.some((e) => e.type === 'redeal'))
+      this.previousCard = before!.run.battle;
     this.save();
     return result;
   }

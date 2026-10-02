@@ -866,6 +866,17 @@ export class CastleScene extends Phaser.Scene {
           }
           if (event.recycled) this.callout('STOCK RECYCLED', '#ffe3a4');
           break;
+        case 'redeal':
+          this.cards.forEach((visual) => visual.destroy());
+          this.cards.clear();
+          this.active?.destroy();
+          this.active = null;
+          this.callout(`NO MOVES · −${event.hpCost} HP · NEW DEAL`, '#ffce6e');
+          this.animateReshuffle(() => {
+            this.renderCards();
+            this.refreshHUD();
+          });
+          break;
         case 'spawn':
           if (this.time.now >= this.nextVoice) {
             AudioSystem.play('orc_growl', { volume: 0.32 });
@@ -1210,7 +1221,7 @@ export class CastleScene extends Phaser.Scene {
     }
     const modal = gamePopup(
       this,
-      won ? 'CASTLE SAVED!' : exhausted ? 'NO MOVES LEFT!' : 'CASTLE FALLEN',
+      won ? 'CASTLE SAVED!' : exhausted ? 'NO HP TO REDEAL!' : 'CASTLE FALLEN',
       won
         ? 'You completed the solitaire and broke the siege.'
         : 'Half your gold paid for castle repairs.\nRun bonuses lost. Workshop upgrades kept.',
