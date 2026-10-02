@@ -176,8 +176,12 @@ it('loads the replacement music and versioned recorded cues instead of cached le
   const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]));
   expect(urls).toContain('/audio/hd-v3/hope-battle.mp3');
   expect(urls).toContain('/audio/ci-v1/card-1.mp3');
-  expect(urls.filter((url) => url.includes('/ci-v1/'))).toHaveLength(31);
+  expect(urls.filter((url) => url.includes('/ci-v1/'))).toHaveLength(25);
   expect(new Set(urls).size).toBe(urls.length);
+  for (const cue of ['growl', 'grunt', 'death', 'gun', 'bomb', 'laser']) {
+    expect(urls).toContain(`/audio/combat-v2/${cue}.mp3`);
+    expect(urls).not.toContain(`/audio/ci-v1/${cue}.mp3`);
+  }
   expect(urls).not.toContain('/audio/heartfelt-battle.mp3');
   expect(urls).not.toContain('/audio/combo-up.mp3');
 });

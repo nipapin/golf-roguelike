@@ -1,16 +1,13 @@
-# Audio revision CI v1
+# Audio revision CI v1 + combat-v2
 
-All runtime SFX derive from **Chequered Ink — 400 Sounds Pack**:
+Card, UI, item and remaining foley SFX derive from **Chequered Ink — 400 Sounds Pack**:
 https://ci.itch.io/400-sounds-pack . Commercial-use permission, **not CC0**;
 see `ci-v1/LICENSE.md`. The original WAV collection is not redistributed.
 
 | Game cue | Sources inside the pack |
 | --- | --- |
 | Cards / shuffle | Card and Board/card_draw_{1,2,3}, card_fan_2 |
-| Footsteps / vocal cues | Footsteps/foley_footstep_gravel_{1,2}; Human/man_{0,8,6} |
-| Turret | Weapons/shot_muffled + Materials/metal_blunt_tap |
-| Arc cannon / bomb | Weapons/harsh_thud + Environment/air_burst + Materials/cardboard_hit |
-| Laser | Machines/drill_whizz + hydraulic_up + Environment/air_burst |
+| Footsteps | Footsteps/foley_footstep_gravel_{1,2} |
 | Archer / soldier | Other/elastic_twang + Combat and Gore/swipe; Weapons/sword_light |
 | Castle damage / enemy impact | cardboard_hit + harsh_thud; punch_2 + cardboard_hit |
 | Shield / deploy / reload | sword_clash_2; weapon_pick_up; weapon_equip_short |
@@ -30,7 +27,7 @@ python scripts/pack-ci-audio.py /path/to/extracted/400-sounds-pack
 ```
 
 Requires FFmpeg, ffprobe and NumPy. Do not commit the original pack.
-31 mono MP3 cues, 128 kbps / 48 kHz. Trimmed silence with a short lead-in,
+25 mono MP3 cues, 128 kbps / 48 kHz. Trimmed silence with a short lead-in,
 gentle saturation, role-specific RMS targets, a 35 ms release, and encoded-file
 true-peak checks (at or below −1.5 dBTP). Peak bounds take priority over RMS.
 Integrated LUFS is recorded only when measurable; no universal −14 LUFS claim
@@ -48,6 +45,30 @@ and a total cap of 24 SFX voices apply; replaced tails fade over 10 ms.
 Combo starts on card 2, grows from gain 0.35 to 0.6, and rises by half a semitone
 per card up to seven semitones. Both jokers have separately processed cues.
 Versioned `/audio/ci-v1/` URLs avoid old cached SFX; unused legacy SFX are removed.
+
+## Recorded combat replacements
+
+`combat-v2/` restores the actual weapon and creature recordings from commit
+075336466ad86516227458a2b30ef00fffe66153. No Human/man_* voice takes or
+Machines/drill_whizz/hydraulic_up laser layers are loaded or shipped.
+Cards and the other CI cues retain their exact files and playback settings.
+
+- `gun.mp3`, `bomb.mp3`: kurt — Gunshots, .22 pistol / black powder recordings.
+  https://opengameart.org/content/gunshots (CC0).
+- `laser.mp3`: Kenney — Sci-fi Sounds, laserLarge_000.
+  https://kenney.nl/assets/sci-fi-sounds (CC0).
+- `growl.mp3`, `grunt.mp3`, `death.mp3`: Tim Rockk — Orc Voice,
+  ORC GROWL / ORC GRUNT / ORC DIES.
+  https://opengameart.org/content/orc-voice (CC0).
+
+These are the original repository-prepared MP3s, without further synthesis or
+processing in this correction. They retain the older mono 44.1 kHz / 96 kbps
+encoding and processing; the −1.5 dBTP CI checks above apply only to CI cues.
+`combat-v2/manifest.json` records the source commit, paths and SHA-256 hashes.
+BOMB power uses the same recorded explosion as the arc cannon. Enemy-death
+aliases share the same recorded orc death buffer. Source authors retain credit.
+Fresh URLs avoid reusing the mistaken sounds from the PWA cache.
+Device auditioning is still needed; numerical validation does not establish fit.
 
 ## Music and additional packs reviewed
 

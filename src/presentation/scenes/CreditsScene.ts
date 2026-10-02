@@ -73,7 +73,8 @@ export class CreditsScene extends Phaser.Scene {
       { text: '', style: 'spacer' },
       { text: 'Audio', style: 'header' },
       { text: 'Chequered Ink · 400 Sounds Pack', style: 'name' },
-      { text: 'Commercial-use SFX license', style: 'normal' },
+      { text: 'Commercial-use foley / UI license', style: 'normal' },
+      { text: 'Combat · kurt / Kenney / Tim Rockk · CC0', style: 'normal' },
       { text: 'Music · MintoDog / Hope · CC0', style: 'normal' },
     ];
 

@@ -1,0 +1,32 @@
+{
+  "growl": {
+    "restored_from_commit": "075336466ad86516227458a2b30ef00fffe66153",
+    "original_repo_path": "public/audio/orc-growl.mp3",
+    "sha256": "9f83781308d577884c1da27269ec2b9d6eb60826528c0b41ac1cd923fc6415b9"
+  },
+  "grunt": {
+    "restored_from_commit": "075336466ad86516227458a2b30ef00fffe66153",
+    "original_repo_path": "public/audio/orc-hit.mp3",
+    "sha256": "afd1e4b5d98d8433f06e619b585dacf91e495beffa12e7c71792ef437ead90da"
+  },
+  "death": {
+    "restored_from_commit": "075336466ad86516227458a2b30ef00fffe66153",
+    "original_repo_path": "public/audio/orc-death.mp3",
+    "sha256": "94b410c0863020caf9465993bc830d1e0b0f1912fd887afd4d3b1535999cb53a"
+  },
+  "gun": {
+    "restored_from_commit": "075336466ad86516227458a2b30ef00fffe66153",
+    "original_repo_path": "public/audio/turret-shot.mp3",
+    "sha256": "8d41936c40de7e4dd952620189b31f730da3820e1a583bb55a67e60b0a31fb72"
+  },
+  "bomb": {
+    "restored_from_commit": "075336466ad86516227458a2b30ef00fffe66153",
+    "original_repo_path": "public/audio/mortar-shot.mp3",
+    "sha256": "b6ae4247176ee68a87ee5d4eb739d87f4838a84032d0794c4e2d58d42a0fe280"
+  },
+  "laser": {
+    "restored_from_commit": "075336466ad86516227458a2b30ef00fffe66153",
+    "original_repo_path": "public/audio/laser-blast.mp3",
+    "sha256": "7becc4b8e5081e73eefc87ed2c0a1cfa9689cda10473ec902360034238d7aa07"
+  }
+}

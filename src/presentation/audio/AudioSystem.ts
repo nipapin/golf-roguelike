@@ -3,7 +3,7 @@ import type { PowerType } from '../../core/types';
 
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
- * Chequered Ink 400 Sounds Pack derivatives in public/audio/ci-v1/
+ * Chequered Ink foley/UI plus recorded CC0 combat cues in public/audio/
  */
 
 export type SoundId =
@@ -146,43 +146,43 @@ class AudioSystemClass {
   private async loadAllSounds(): Promise<void> {
     // Only processed game cues are shipped; the original pack is not redistributed.
     const soundFiles: Record<SoundId, string> = {
-      archer_shot: 'arrow',
-      soldier_shot: 'sword',
-      unit_deploy: 'deploy',
-      turret_reload: 'reload',
-      power_crit: 'crit',
-      power_heal: 'heal',
-      power_guard: 'armor',
-      power_gold: 'gold',
-      power_bomb: 'bomb',
-      power_wild: 'wild',
-      power_echo: 'echo',
-      power_red_joker: 'red-joker',
-      power_black_joker: 'black-joker',
-      card_shuffle: 'shuffle',
-      footstep_1: 'step-1',
-      footstep_2: 'step-2',
-      orc_growl: 'growl',
-      orc_hit: 'grunt',
-      orc_death: 'death',
-      turret_shot: 'gun',
-      mortar_shot: 'bomb',
-      laser_blast: 'laser',
-      card_play: 'card-1',
-      card_play_1: 'card-1',
-      card_play_2: 'card-2',
-      card_play_3: 'card-3',
-      card_draw: 'card-2',
-      invalid_tap: 'invalid',
-      combo_up: 'combo',
-      enemy_hit: 'strike',
-      player_hit: 'wall-hit',
-      shield: 'armor',
-      enemy_death: 'death',
-      victory: 'win',
-      defeat: 'lose',
-      button_tap: 'click',
-      reward_pick: 'gold',
+      archer_shot: 'ci-v1/arrow',
+      soldier_shot: 'ci-v1/sword',
+      unit_deploy: 'ci-v1/deploy',
+      turret_reload: 'ci-v1/reload',
+      power_crit: 'ci-v1/crit',
+      power_heal: 'ci-v1/heal',
+      power_guard: 'ci-v1/armor',
+      power_gold: 'ci-v1/gold',
+      power_bomb: 'combat-v2/bomb',
+      power_wild: 'ci-v1/wild',
+      power_echo: 'ci-v1/echo',
+      power_red_joker: 'ci-v1/red-joker',
+      power_black_joker: 'ci-v1/black-joker',
+      card_shuffle: 'ci-v1/shuffle',
+      footstep_1: 'ci-v1/step-1',
+      footstep_2: 'ci-v1/step-2',
+      orc_growl: 'combat-v2/growl',
+      orc_hit: 'combat-v2/grunt',
+      orc_death: 'combat-v2/death',
+      turret_shot: 'combat-v2/gun',
+      mortar_shot: 'combat-v2/bomb',
+      laser_blast: 'combat-v2/laser',
+      card_play: 'ci-v1/card-1',
+      card_play_1: 'ci-v1/card-1',
+      card_play_2: 'ci-v1/card-2',
+      card_play_3: 'ci-v1/card-3',
+      card_draw: 'ci-v1/card-2',
+      invalid_tap: 'ci-v1/invalid',
+      combo_up: 'ci-v1/combo',
+      enemy_hit: 'ci-v1/strike',
+      player_hit: 'ci-v1/wall-hit',
+      shield: 'ci-v1/armor',
+      enemy_death: 'combat-v2/death',
+      victory: 'ci-v1/win',
+      defeat: 'ci-v1/lose',
+      button_tap: 'ci-v1/click',
+      reward_pick: 'ci-v1/gold',
     };
 
     // Try to create audio context
@@ -199,7 +199,7 @@ class AudioSystemClass {
       try {
         let pending = bufferLoads.get(filename);
         if (!pending) {
-          pending = this.loadSound(`/audio/ci-v1/${filename}`);
+          pending = this.loadSound(`/audio/${filename}`);
           bufferLoads.set(filename, pending);
         }
         const buffer = await pending;

@@ -7,7 +7,8 @@ The castle mode uses a coherent Kenney low-poly diorama style. GLB models are re
 | Castle, gate, flag, landscape | Kenney, [Castle Kit](https://kenney.nl/assets/castle-kit) | CC0 |
 | Turret and mortar models | Kenney, [Tower Defense Kit](https://kenney.nl/assets/tower-defense-kit) | CC0 |
 | Animated human and orc | Kenney, [Mini Dungeon](https://kenney.nl/assets/mini-dungeon) | CC0 |
-| All gameplay SFX | Chequered Ink, [400 Sounds Pack](https://ci.itch.io/400-sounds-pack), processed game cues | Commercial-use license; not CC0 |
+| Card / UI / item SFX | Chequered Ink, [400 Sounds Pack](https://ci.itch.io/400-sounds-pack), processed game cues | Commercial-use license; not CC0 |
+| Combat and voices | kurt / Kenney / Tim Rockk (see audio credits) | CC0 |
 | Orchestral combat loop | MintoDog, [Hope](https://opengameart.org/content/hopeorchestral-battle-music) | CC0 |
 
 Kenney license files are included in `public/assets/kenney/licenses`. Existing attributed VFX remain under their original license in the game's credits.
@@ -34,4 +35,4 @@ UNDO restores the previous successful tableau card and chain, costs one castle H
 
 The difficulty streak advances per new siege and resets after defeat. Total attempts, best siege, best kills, coins and workshop upgrades are tracked separately. Resuming a saved siege keeps its saved difficulty. Old wallets migrate to a fresh streak without losing permanent progression.
 
-The active SFX revision is CI v1. See `public/audio/RECORDED_AUDIO_CREDITS.md` for current files, processing and source provenance; older render instructions describe the initial audio assets.
+The active SFX bank combines CI v1 foley/UI with combat-v2 recorded effects. See `public/audio/RECORDED_AUDIO_CREDITS.md` for current files, processing and source provenance; older render instructions describe the initial audio assets.
