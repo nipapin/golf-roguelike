@@ -1,5 +1,5 @@
 import { drawCard, playCard } from '../core/GameActions';
-import { setupBattle, isTableauEmpty } from '../core/GameState';
+import { setupBattle, isTableauEmpty, hasLegalMoves } from '../core/GameState';
 import { RNG } from '../core/RNG';
 import type { RunState, GameConfig, GameEvent } from '../core/types';
 import { startRun } from '../core/GameActions';
@@ -139,7 +139,12 @@ export function createCastleRun(
   siegeNumber = 1
 ): CastleRun {
   const maxHp = upgradeValue('walls', upgrades.walls);
-  const initial = setupBattle(startRun(seed, config), sentinel, 7, config);
+  const initial = setupBattle(
+    startRun(seed, config),
+    sentinel,
+    new RNG(seed + ':powers').next() < 0.5 ? 3 : 4,
+    config
+  );
   return {
     version: 1,
     balanceVersion: 2,
@@ -330,14 +335,21 @@ export function playCastleCard(
     laser(state, events, true);
     state.run = { ...state.run, phase: 'victory' };
     events.push({ type: 'ended', victory: true });
-  }
+  } else checkExhaustion(state, events);
   return { state, events };
 }
-/** Preview uses a cloned RNG: seeing a recycled card never changes the shuffle. */
+function checkExhaustion(state: CastleRun, events: SiegeEvent[]) {
+  const battle = state.run.battle;
+  if (state.run.phase === 'battle' && battle && !battle.deck.length && !hasLegalMoves(battle)) {
+    state.run = { ...state.run, phase: 'defeat', player: { ...state.run.player, hp: 0 } };
+    events.push({ type: 'ended', victory: false });
+  }
+}
+/** Only the remaining finite stock is previewed; discarded cards never return. */
 export function nextCastleCard(current: CastleRun) {
   const battle = current.run.battle;
   if (!battle) return undefined;
-  return battle.deck[0] ?? RNG.fromState(current.run.rngState).shuffle(battle.discard)[0];
+  return battle.deck[0];
 }
 export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeResult {
   if (current.run.phase !== 'battle') return { state: current, events: [] };
@@ -363,35 +375,48 @@ export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeRes
         if (unit) unit.damage *= config.powerCards.CRIT.damageMultiplier;
       }
     }
-  let run = state.run;
-  const recycled = !!run.battle && run.battle.deck.length === 0 && run.battle.discard.length > 0;
-  if (recycled && run.battle) {
-    const rng = RNG.fromState(run.rngState);
-    run = {
-      ...run,
-      rngState: rng.getState(),
-      battle: { ...run.battle, deck: rng.shuffle(run.battle.discard), discard: [] },
+  const battle = state.run.battle!;
+  if (battle.deck.length > 0) {
+    const drawn = drawCard(
+      {
+        ...state.run,
+        battle: { ...battle, accumulatedDamage: 0, chainBaseDamage: 0 },
+      },
+      config
+    );
+    state.run = { ...drawn.state, phase: 'battle' };
+  } else {
+    // Release the last banked chain once, without recycling the physical pack.
+    state.run = {
+      ...state.run,
+      battle: {
+        ...battle,
+        chain: [],
+        accumulatedDamage: 0,
+        chainBaseDamage: 0,
+        jokerMultiplier: battle.activeCard?.joker === 'black' ? 5 : 1,
+        lifestealMultiplier: battle.activeCard?.joker === 'red' ? 1 : 0,
+      },
     };
-    run = { ...run, rngState: rng.getState() };
   }
-  const drawn = drawCard(
-    {
-      ...run,
-      battle: run.battle ? { ...run.battle, accumulatedDamage: 0, chainBaseDamage: 0 } : null,
-    },
-    config
-  );
-  state.run = { ...drawn.state, phase: 'battle' };
   state.siege.started = true;
   state.siege.laserCharge = 0;
-  events.push({ type: 'draw', recycled });
+  events.push({ type: 'draw', recycled: false });
+  checkExhaustion(state, events);
   return { state, events };
 }
 
 /** Fixed-step simulation. UI does not call this while paused or hidden. */
 export function stepSiege(current: CastleRun): SiegeResult {
-  if (current.run.phase !== 'battle' || !current.siege.started)
-    return { state: current, events: [] };
+  if (current.run.phase !== 'battle') return { state: current, events: [] };
+  const battle = current.run.battle;
+  if (battle && !battle.deck.length && !hasLegalMoves(battle)) {
+    const exhausted = clone(current);
+    const exhaustionEvents: SiegeEvent[] = [];
+    checkExhaustion(exhausted, exhaustionEvents);
+    return { state: exhausted, events: exhaustionEvents };
+  }
+  if (!current.siege.started) return { state: current, events: [] };
   const state = clone(current),
     siege = state.siege,
     events: SiegeEvent[] = [];

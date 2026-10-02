@@ -317,7 +317,7 @@ describe('castle siege', () => {
     expect(state.run.player.hp).toBe(0);
     expect(state.run.phase).toBe('defeat');
   });
-  it('stock recycle keeps the tableau and resets the chain even with playable moves', () => {
+  it('exhausted stock releases the banked chain once without recycling cards', () => {
     let state = start();
     state = {
       ...state,
@@ -337,6 +337,11 @@ describe('castle siege', () => {
     expect(result.state.run.battle!.chain).toHaveLength(0);
     expect(result.state.run.battle!.tableau).toEqual(board);
     expect(ids(result.state)).toEqual(original);
+    expect(result.state.run.battle!.deck).toHaveLength(0);
+    expect(result.events.some((e) => e.type === 'draw' && e.recycled)).toBe(false);
+    expect(
+      drawCastleCard(result.state, config).events.filter((e) => e.type === 'deploy')
+    ).toHaveLength(0);
   });
   it('deterministically resumes a siege including movement, shots and RNG', () => {
     let state = drawCastleCard(start(), config).state;
@@ -546,14 +551,16 @@ describe('deterministic castle balance sample', () => {
     }
     console.log(JSON.stringify({ slowWins, upgradedWins, actionSeconds: 3 }));
     expect(upgradedWins).toBeGreaterThanOrEqual(slowWins);
-    expect(wins).toBeGreaterThanOrEqual(12);
+    // Finite-stock experiment: a quick greedy policy should win 20–80% of seeds.
+    expect(wins).toBeGreaterThanOrEqual(8);
+    expect(wins).toBeLessThanOrEqual(32);
     expect(bossRuns).toBeGreaterThan(0);
     expect(totalCards / 40).toBeGreaterThan(20);
   });
 });
 
 describe('stock preview', () => {
-  it('predicts both ordinary draws and recycled stock without advancing RNG', () => {
+  it('previews only remaining stock without advancing RNG', () => {
     const state = start();
     expect(drawCastleCard(state, config).state.run.battle!.activeCard).toEqual(
       nextCastleCard(state)
@@ -567,8 +574,11 @@ describe('stock preview', () => {
     };
     const rng = recycled.run.rngState;
     const card = nextCastleCard(recycled);
-    expect(nextCastleCard(recycled)).toEqual(card);
+    expect(card).toBeUndefined();
+    expect(nextCastleCard(recycled)).toBeUndefined();
     expect(recycled.run.rngState).toBe(rng);
-    expect(drawCastleCard(recycled, config).state.run.battle!.activeCard).toEqual(card);
+    expect(drawCastleCard(recycled, config).state.run.battle!.activeCard).toEqual(
+      recycled.run.battle!.activeCard
+    );
   });
 });

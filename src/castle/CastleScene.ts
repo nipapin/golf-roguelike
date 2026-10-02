@@ -3,13 +3,14 @@ import Phaser from 'phaser';
 import { viewport, configureViewport, getRenderDensity } from '../presentation/design/viewport';
 import { getCastleLayoutMetrics } from '../presentation/design/tokens';
 import { CardVisual, createCardBack } from '../presentation/design/CardVisual';
-import { canConnect, getPowerType } from '../core/GameState';
+import { canConnect, getPowerType, hasLegalMoves } from '../core/GameState';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { SettingsModal } from '../presentation/design/SettingsModal';
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { playCombatVFX } from '../presentation/design/CombatVFX';
 import { isShakeReduced } from '../presentation/juice/fxSettings';
 import { castleArt, weaponArt } from './CastleArt';
+import { showCastleRewards } from './CastleRewards';
 import { CastleManager, castleManager } from './CastleManager';
 import { createTraining, trainingSteps, completeTraining } from './CastleTutorial';
 import { gameConfig } from '../data/gameConfig';
@@ -715,7 +716,7 @@ export class CastleScene extends Phaser.Scene {
     );
     const left = state.run.battle!.tableau.reduce((n, col) => n + col.cards.length, 0);
     this.stockText.setText(
-      `${chain ? 'DRAW TO DEPLOY' : 'No chain banked'}\n${state.run.battle!.deck.length} stock · ${left} cards left`
+      `${chain ? 'DRAW TO DEPLOY' : state.run.battle!.deck.length ? 'No chain banked' : 'STOCK EMPTY'}\n${state.run.battle!.deck.length} stock · ${left} cards left`
     );
     this.undoButton.setAlpha(this.manager.canUndo ? 1 : 0.7);
     this.activeLabel.setText(
@@ -1188,16 +1189,25 @@ export class CastleScene extends Phaser.Scene {
     const manager = this.manager,
       state = manager.state!,
       won = state.run.phase === 'victory';
+    const exhausted =
+      !!state.run.battle && !state.run.battle.deck.length && !hasLegalMoves(state.run.battle);
     const banked = manager.service.settle(state);
     manager.save();
     AudioSystem.setMusicScene(won ? 'victory' : 'defeat');
     AudioSystem.play(won ? 'victory' : 'defeat');
+    if (won && manager.service.readMeta().pendingReward) {
+      showCastleRewards(this, manager, () => {
+        manager.start();
+        this.scene.restart({ tutorial: false });
+      });
+      return;
+    }
     const modal = gamePopup(
       this,
-      won ? 'CASTLE SAVED!' : 'CASTLE FALLEN',
+      won ? 'CASTLE SAVED!' : exhausted ? 'NO MOVES LEFT!' : 'CASTLE FALLEN',
       won
         ? 'You completed the solitaire and broke the siege.'
-        : 'Your defenders held the line. Build a stronger castle.',
+        : 'Half your gold paid for castle repairs.\nRun bonuses lost. Workshop upgrades kept.',
       400
     );
     modal.root.setDepth(3000);
@@ -1206,7 +1216,9 @@ export class CastleScene extends Phaser.Scene {
       this.text(
         0,
         modal.top + 157,
-        `+${earnedCoins(state)} COINS ${banked ? 'BANKED' : 'TO SAVE'}`,
+        won
+          ? `+${earnedCoins(state)} COINS ${banked ? 'BANKED' : 'TO SAVE'}`
+          : `${manager.service.readMeta().coins} GOLD ${banked ? 'REMAINING' : '· REPAIR NOT SAVED'}`,
         22,
         '#ffe35a'
       )

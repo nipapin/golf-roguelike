@@ -12,6 +12,7 @@ import { castleArt } from './CastleArt';
 import { showCastleWorkshop } from './CastleWorkshop';
 import { castleManager } from './CastleManager';
 import { trainingCompleted, resetTrainingSession } from './CastleTutorial';
+import { showCastleRewards } from './CastleRewards';
 import { siegeDifficulty } from './CastleDefense';
 
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
@@ -32,11 +33,11 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'CARDS KEEP YOU ALIVE',
-      'Suits grant repairs, armor and coins. NEXT previews stock; UNDO returns your last card for 1 castle HP. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
+      'One pack: stock never recycles. Empty stock + no legal moves means defeat. Suits grant repairs, armor and coins. NEXT previews stock; UNDO returns your last card for 1 castle HP. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
     ],
     [
       'FINISH TO WIN',
-      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop. Winning advances siege difficulty. Losing resets it to siege 1. Your upgrades and best run stay.',
+      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop. Win: choose 1 of 3 run upgrades. Lose: half all gold pays for repairs; run upgrades reset. Workshop upgrades and records stay.',
     ],
   ];
   const available = modal.height - 166,
@@ -187,6 +188,7 @@ export class CastleMenuScene extends Phaser.Scene {
           );
         });
     }
+    if (meta.pendingReward) showCastleRewards(this, manager, () => this.scene.restart());
     const resize = () => this.scene.restart();
     this.scale.on('resize', resize);
     this.events.once('shutdown', () => this.scale.off('resize', resize));

@@ -1,3 +1,4 @@
+import { RNG } from '../core/RNG';
 import { isSavedRun } from '../services/validateSave';
 import {
   emptyUpgrades,
@@ -23,6 +24,8 @@ export interface CastleMeta {
   siegesStarted: number;
   currentStreak: number;
   bestSiege: number;
+  runUpgrades: Upgrades;
+  pendingReward: { id: string; choices: UpgradeKey[] } | null;
 }
 const fresh = (): CastleMeta => ({
   version: 1,
@@ -34,6 +37,8 @@ const fresh = (): CastleMeta => ({
   siegesStarted: 0,
   currentStreak: 0,
   bestSiege: 0,
+  runUpgrades: emptyUpgrades(),
+  pendingReward: null,
 });
 const record = (v: unknown): v is Record<string, unknown> =>
   !!v && typeof v === 'object' && !Array.isArray(v);
@@ -50,7 +55,10 @@ function validRun(v: unknown): v is CastleRun {
     !v.id ||
     !integer(v.siegeNumber) ||
     v.siegeNumber < 1 ||
-    !upgrades(v.upgrades) ||
+    !(
+      record(v.upgrades) &&
+      UPGRADE_KEYS.every((k) => integer((v.upgrades as Record<string, unknown>)[k]))
+    ) ||
     !record(v.run) ||
     !record(v.run.player) ||
     !record(v.siege)
@@ -128,6 +136,20 @@ export class CastleService {
       )
         return {
           ...v,
+          runUpgrades:
+            record(v.runUpgrades) &&
+            UPGRADE_KEYS.every((k) => integer((v.runUpgrades as Record<string, unknown>)[k]))
+              ? v.runUpgrades
+              : emptyUpgrades(),
+          pendingReward:
+            record(v.pendingReward) &&
+            typeof v.pendingReward.id === 'string' &&
+            Array.isArray(v.pendingReward.choices) &&
+            v.pendingReward.choices.length === 3 &&
+            new Set(v.pendingReward.choices).size === 3 &&
+            v.pendingReward.choices.every((k) => UPGRADE_KEYS.includes(k as UpgradeKey))
+              ? v.pendingReward
+              : null,
           siegesStarted: integer(v.siegesStarted) ? v.siegesStarted : v.claimed.length,
           currentStreak: integer(v.currentStreak) ? v.currentStreak : 0,
           bestSiege: integer(v.bestSiege)
@@ -153,6 +175,18 @@ export class CastleService {
     }
     return meta;
   }
+  chooseReward(key: UpgradeKey): boolean {
+    const meta = this.readMeta();
+    if (!meta.pendingReward?.choices.includes(key)) return false;
+    meta.runUpgrades[key]++;
+    meta.pendingReward = null;
+    try {
+      this.storage.setItem(META_KEY, JSON.stringify(meta));
+      return true;
+    } catch {
+      return false;
+    }
+  }
   purchase(key: UpgradeKey): boolean {
     const meta = this.readMeta(),
       level = meta.upgrades[key];
@@ -171,11 +205,20 @@ export class CastleService {
     const meta = this.readMeta();
     if (meta.claimed.includes(state.id)) return true;
     meta.coins += earnedCoins(state);
+    if (state.run.phase === 'defeat') {
+      meta.coins = Math.floor(meta.coins / 2);
+      meta.runUpgrades = emptyUpgrades();
+      meta.pendingReward = null;
+    }
     meta.bestKills = Math.max(meta.bestKills, state.siege.kills);
     meta.bestSiege = Math.max(meta.bestSiege, state.siegeNumber);
     if (state.run.phase === 'defeat') meta.currentStreak = 0;
     if (state.run.phase === 'victory') {
       meta.victories++;
+      meta.pendingReward = {
+        id: state.id,
+        choices: new RNG(state.id + ':reward').pick(UPGRADE_KEYS, 3),
+      };
       meta.currentStreak = state.siegeNumber;
     }
     meta.claimed = [...meta.claimed, state.id].slice(-100);

@@ -5,6 +5,7 @@ import {
   playCastleCard,
   drawCastleCard,
   stepSiege,
+  UPGRADE_KEYS,
   type CastleRun,
   type SiegeResult,
 } from './CastleDefense';
@@ -24,13 +25,16 @@ export class CastleManager {
     return true;
   }
   start(): void {
+    if (this.service.readMeta().pendingReward) return;
     this.previousCard = null;
     const seed = generateSeed(),
       meta = this.service.beginSiege();
     this.state = createCastleRun(
       seed,
       gameConfig,
-      meta.upgrades,
+      Object.fromEntries(
+        UPGRADE_KEYS.map((k) => [k, meta.upgrades[k] + meta.runUpgrades[k]])
+      ) as typeof meta.upgrades,
       `${seed}:${Date.now()}`,
       meta.currentStreak
     );
