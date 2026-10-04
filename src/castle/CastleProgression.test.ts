@@ -43,12 +43,18 @@ describe('compact castle arena', () => {
     [390, 844],
     [430, 932],
     [375, 667],
-  ])('uses spare sky for cards at %i×%i', (w, h) => {
+  ])('fits the compact HUD, battlefield and card controls at %i×%i', (w, h) => {
     const layout = getCastleLayoutMetrics(w, h, { top: 0, bottom: 0 });
-    expect(layout.arenaHeight).toBeLessThanOrEqual(205);
+    // The top HUD now contains one 32px row; vitals belong to the card tray.
+    expect(layout.arenaTop).toBeGreaterThanOrEqual(layout.hudTop + 32 + 6);
+    expect(layout.arenaTop + layout.arenaHeight).toBeLessThan(layout.tableauTop);
     expect(layout.arenaHeight).toBeGreaterThan(60);
     expect(layout.tableauTop + layout.tableauHeight).toBeLessThan(layout.trayTop);
     expect(layout.trayTop + layout.trayHeight).toBeLessThanOrEqual(h - 8);
+    expect(layout.barsY).toBeGreaterThanOrEqual(layout.trayTop);
+    expect(layout.barsY + 24 + 12).toBeLessThan(layout.stockPileY);
+    expect(layout.stockPileScale).toBe(layout.activeScale);
+    expect(layout.jokerY + 20).toBeLessThanOrEqual(h - layout.safeBottom);
     expect(layout.strip).toBeLessThan(layout.ch);
   });
 });

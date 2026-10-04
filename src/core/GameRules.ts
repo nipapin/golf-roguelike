@@ -1,10 +1,10 @@
 import { RelicManager } from './RelicManager';
 import { BattleState, Card, RunState, Relic } from './types';
-import { canConnect, isCardExposed, hasLegalMoves as checkLegalMoves, isTableauEmpty } from './GameState';
+import { canConnectInBattle, isCardExposed, hasLegalMoves as checkLegalMoves, isTableauEmpty } from './GameState';
 
 /**
  * Check if a card can be played from the tableau
- * A-K wrap is always legal (base rule)
+ * Uses the battle's rank policy, including its WILD exception.
  */
 export function isPlayable(
   battle: BattleState,
@@ -27,8 +27,8 @@ export function isPlayable(
   // Check if exposed
   if (!isCardExposed(battle.tableau, cardId)) return false;
 
-  // Check if can connect (A-K wrap is always legal)
-  return canConnect(card, battle.activeCard, battle.wildActive);
+  // UI hints and gameplay use the same battle rank policy.
+  return canConnectInBattle(card, battle);
 }
 
 /**
@@ -42,7 +42,7 @@ export function getPlayableCards(battle: BattleState): Card[] {
   for (const col of battle.tableau) {
     if (col.cards.length === 0) continue;
     const topCard = col.cards[col.cards.length - 1];
-    if (canConnect(topCard, battle.activeCard, battle.wildActive)) {
+    if (canConnectInBattle(topCard, battle)) {
       playable.push(topCard);
     }
   }

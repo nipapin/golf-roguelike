@@ -151,11 +151,12 @@ export function setupBattle(
   enemyData: EnemyData,
   powerCardCount: number,
   config: GameConfig,
-  scaling: EnemyScaling = {}
+  scaling: EnemyScaling = {},
+  deckCards: Card[] = createDeck()
 ): RunState {
   const rng = RNG.fromState(state.rngState);
 
-  const deck = rng.shuffle(createDeck());
+  const deck = rng.shuffle(deckCards);
   const tableau: TableauColumn[] = [];
 
   for (let col = 0; col < config.tableau.columns; col++) {
@@ -219,13 +220,24 @@ export function hasLegalMoves(battle: BattleState): boolean {
   if (!battle.activeCard) return false;
 
   const exposed = getExposedCards(battle.tableau);
-  return exposed.some((card) => canConnect(card, battle.activeCard!, battle.wildActive));
+  return exposed.some((card) => canConnectInBattle(card, battle));
+}
+
+export function canConnectInBattle(card: Card, battle: BattleState): boolean {
+  if (!battle.activeCard) return false;
+  if (battle.wildActive) return true;
+  if (battle.castleJokerExit) {
+    const red = card.suit === 'hearts' || card.suit === 'diamonds';
+    return battle.castleJokerExit === 'red' ? red : !red;
+  }
+  return canConnect(card, battle.activeCard, battle.wildActive, battle.allowRankWrap !== false);
 }
 
 export function canConnect(
   card: Card,
   activeCard: Card,
-  wildActive: boolean = false
+  wildActive: boolean = false,
+  allowRankWrap: boolean = true
 ): boolean {
   // WILD explicitly allows any next rank; jokers apply their color rule.
   if (wildActive) return true;
@@ -236,8 +248,8 @@ export function canConnect(
   }
 
   const diff = Math.abs(card.rank - activeCard.rank);
-  // A-K wrap is ALWAYS legal (base rule)
-  if (diff === 1 || diff === 12) return true;
+  // Castle uses the linear A..K sequence; other modes retain their wrap rule.
+  if (diff === 1 || (allowRankWrap && diff === 12)) return true;
   return false;
 }
 

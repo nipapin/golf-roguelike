@@ -30,6 +30,8 @@ const RANK_DISPLAY: Record<number, string> = {
 export class CardVisual {
   private scene: Phaser.Scene;
   private container: Phaser.GameObjects.Container;
+  private faceContainer: Phaser.GameObjects.Container;
+  private shadowGfx: Phaser.GameObjects.Graphics;
   private cardBg: Phaser.GameObjects.Graphics;
   private outlineGfx: Phaser.GameObjects.Graphics;
   private glowGfx: Phaser.GameObjects.Graphics;
@@ -44,6 +46,8 @@ export class CardVisual {
   private played: boolean = false;
   private jokerTween: Phaser.Tweens.Tween | null = null;
   private pulseTween: Phaser.Tweens.Tween | null = null;
+  private hoverTween: Phaser.Tweens.Tween | null = null;
+  private hoverLift = { value: 0 };
 
   private card: Card;
   private metrics: ReturnType<typeof getCardMetrics>;
@@ -60,9 +64,14 @@ export class CardVisual {
     this.scene = scene;
     this.card = card;
     this.powerType = powerType;
-    this.metrics = getCardMetrics(viewport(scene).width);
+    this.metrics = getCardMetrics(viewport(scene).width, viewport(scene).height);
 
     this.container = scene.add.container(x, y);
+    // Keep the world anchor stable: only the face rises, while its shadow stays on the table.
+    this.shadowGfx = scene.add.graphics();
+    this.faceContainer = scene.add.container(0, 0);
+    this.container.add([this.shadowGfx, this.faceContainer]);
+    this.updateHoverVisual();
 
     const { cw, ch } = this.metrics;
     const suitKey = card.suit as keyof typeof suitColors;
@@ -70,16 +79,16 @@ export class CardVisual {
 
     // Glow layer (behind everything)
     this.glowGfx = scene.add.graphics();
-    this.container.add(this.glowGfx);
+    this.faceContainer.add(this.glowGfx);
 
     // Outline layer
     this.outlineGfx = scene.add.graphics();
-    this.container.add(this.outlineGfx);
+    this.faceContainer.add(this.outlineGfx);
 
     // Card background
     this.cardBg = scene.add.graphics();
     this.drawCardFace();
-    this.container.add(this.cardBg);
+    this.faceContainer.add(this.cardBg);
 
     // Power card frame
     if (powerType) {
@@ -102,21 +111,27 @@ export class CardVisual {
     if (card.rank === 10) {
       this.rankText.setLetterSpacing(-2);
     }
-    this.container.add(this.rankText);
+    this.faceContainer.add(this.rankText);
 
-    // Pip (small suit symbol)
+    // Keep the suit beside the rank so both read together in stacked mobile cards.
     this.pipText = scene.add
-      .text(cw - cw * 0.07, cw * 0.1, card.joker ? '' : SUIT_SYMBOLS[card.suit], {
+      .text(0, 0, card.joker ? '' : SUIT_SYMBOLS[card.suit], {
         resolution: getRenderDensity(),
         fontFamily: 'Arial',
-        fontSize: `${cw * 0.22}px`,
+        fontSize: `${cw * 0.43}px`,
         color: this.hexToString(suitColor),
       })
-      .setOrigin(1, 0);
-    if (powerType) {
-      this.pipText.setVisible(false);
-    }
-    this.container.add(this.pipText);
+      .setOrigin(0, 0.5);
+    // Power medals keep their top-right space, including on two-digit ranks.
+    const headerGap = cw * 0.04;
+    const headerWidth = this.rankText.width + headerGap + this.pipText.width;
+    const headerScale = Math.min(1, (cw * (powerType ? 0.56 : 0.84)) / headerWidth);
+    this.rankText.setScale(headerScale);
+    this.pipText.setScale(headerScale).setPosition(
+      this.rankText.x + this.rankText.displayWidth + headerGap * headerScale,
+      this.rankText.y + this.rankText.displayHeight * 0.48
+    );
+    this.faceContainer.add(this.pipText);
 
     // Big suit symbol
     this.bigSuitText = scene.add
@@ -127,7 +142,7 @@ export class CardVisual {
         color: this.hexToString(suitColor),
       })
       .setOrigin(0.5);
-    this.container.add(this.bigSuitText);
+    this.faceContainer.add(this.bigSuitText);
 
     // Power medal and ribbon
     if (powerType) {
@@ -138,7 +153,7 @@ export class CardVisual {
     if (card.joker) {
       const border = scene.add.graphics().lineStyle(3, card.joker === 'red' ? 0xff486c : 0x7048be);
       border.strokeRoundedRect(1, 1, cw - 2, ch - 2, this.metrics.radius);
-      this.container.add(border);
+      this.faceContainer.add(border);
       const tint = card.joker === 'red' ? 0xff486c : 0x9462ef;
       const aura = scene.add.graphics();
       for (let ring = 1; ring <= 4; ring++)
@@ -151,7 +166,7 @@ export class CardVisual {
             ch + ring * 4,
             this.metrics.radius + ring
           );
-      this.container.addAt(aura, 0);
+      this.faceContainer.addAt(aura, 0);
       this.rankText.setColor(this.hexToString(tint));
       this.bigSuitText
         .setColor(this.hexToString(tint))
@@ -172,7 +187,6 @@ export class CardVisual {
     const { cw, ch, radius, bevelHeight } = this.metrics;
 
     this.cardBg.clear();
-    this.cardBg.fillStyle(0x162a32, 0.3).fillRoundedRect(2, 5, cw, ch, radius);
     this.cardBg.fillStyle(colors.face, 1);
 
     if (this.powerType) {
@@ -252,7 +266,7 @@ export class CardVisual {
       radius - frameWidth * 0.5
     );
 
-    this.container.add(this.powerFrame);
+    this.faceContainer.add(this.powerFrame);
   }
 
   private createPowerMedal(powerType: PowerType): void {
@@ -292,7 +306,7 @@ export class CardVisual {
           .setStroke('#1B1030', 2);
 
     this.powerMedal.add([medal, icon]);
-    this.container.add(this.powerMedal);
+    this.faceContainer.add(this.powerMedal);
   }
 
   private createPowerRibbon(powerType: PowerType): void {
@@ -324,7 +338,7 @@ export class CardVisual {
     ribbon.strokeRoundedRect(-ribbonW / 2, -ribbonH / 2, ribbonW, ribbonH, 5);
 
     this.powerRibbon.add([ribbon, text]);
-    this.container.add(this.powerRibbon);
+    this.faceContainer.add(this.powerRibbon);
   }
 
   private updateOutline(): void {
@@ -413,6 +427,8 @@ export class CardVisual {
 
   setState(state: CardState): void {
     this.state = state;
+    if (state !== 'playable') this.resetHover();
+    if (this.hitZone?.input) this.hitZone.input.cursor = state === 'playable' ? 'pointer' : '';
     this.powerMedal?.setVisible(state !== 'covered');
     this.powerRibbon?.setVisible(state !== 'covered');
 
@@ -471,13 +487,49 @@ export class CardVisual {
     this.played = false;
     this.hitZone.removeAllListeners();
     this.hitZone.setInteractive();
+    if (this.hitZone.input) this.hitZone.input.cursor = this.state === 'playable' ? 'pointer' : '';
+    const hover = (lift: number) => {
+      if (this.played || this.state !== 'playable') return;
+      this.hoverTween?.stop();
+      this.hoverTween = this.scene.tweens.add({
+        targets: this.hoverLift, value: lift, duration: 140, ease: 'Sine.out',
+        onUpdate: () => this.updateHoverVisual(),
+      });
+    };
+    this.hitZone.on('pointerover', () => hover(Math.min(12, cw * 0.14)));
+    this.hitZone.on('pointerout', () => hover(0));
+    this.hitZone.on('pointerdown', () => hover(2));
     this.hitZone.on('pointerup', () => {
       if (this.played) return;
+      this.resetHover();
       callback();
     });
   }
 
+  private updateHoverVisual(): void {
+    const { cw, ch, radius } = this.metrics;
+    const lift = this.hoverLift.value;
+    this.faceContainer.setY(-lift);
+    this.shadowGfx.clear();
+    this.shadowGfx.fillStyle(0x10222d, 0.28 + Math.min(0.26, lift * 0.023));
+    this.shadowGfx.fillRoundedRect(2, 5 + lift * 0.15, cw, ch, radius);
+    if (this.hitZone?.input) {
+      // Include the lifted face and its resting footprint to avoid hover flicker at the bottom edge.
+      const hitArea = this.hitZone.input.hitArea as Phaser.Geom.Rectangle;
+      hitArea.setTo(0, -lift, cw, ch + lift);
+    }
+  }
+
+  private resetHover(): void {
+    this.hoverTween?.stop();
+    this.hoverTween = null;
+    this.hoverLift.value = 0;
+    this.updateHoverVisual();
+  }
+
   disableInteractive(): void {
+    this.resetHover();
+    this.container.setScale(1).setAngle(0);
     this.hitZone?.disableInteractive();
     this.hitZone?.removeAllListeners();
   }
@@ -490,11 +542,15 @@ export class CardVisual {
     return this.card;
   }
 
+  getPowerType(): PowerType | null {
+    return this.powerType;
+  }
+
   getWorldBounds(): { x: number; y: number; width: number; height: number } {
     const { cw, ch } = this.metrics;
     return {
       x: this.container.x,
-      y: this.container.y,
+      y: this.container.y - this.hoverLift.value,
       width: cw,
       height: ch,
     };
@@ -505,6 +561,7 @@ export class CardVisual {
   }
 
   destroy(): void {
+    this.hoverTween?.stop();
     if (this.hitZone) {
       this.hitZone.removeAllListeners();
       this.hitZone.destroy();
@@ -546,7 +603,7 @@ export function createCardBack(
   x: number,
   y: number
 ): Phaser.GameObjects.Container {
-  const metrics = getCardMetrics(viewport(scene).width);
+  const metrics = getCardMetrics(viewport(scene).width, viewport(scene).height);
   const { cw, ch, radius } = metrics;
 
   const container = scene.add.container(x, y);

@@ -1,9 +1,11 @@
+import { SOUND_CATALOG, SOUND_VARIANTS, MUSIC_CATALOG } from '../../configurator/sounds';
+import { assetUrl, soundOverride, configuredMix } from '../../configurator/runtime';
 import { MusicSequencer, type MusicScene } from './MusicSequencer';
 import type { PowerType } from '../../core/types';
 
 /**
  * AudioSystem - Manages game audio with iOS Safari compatibility
- * Chequered Ink 400 Sounds Pack derivatives in public/audio/ci-v1/
+ * User-supplied recordings with archived cues for events outside the new pack.
  */
 
 export type SoundId =
@@ -56,13 +58,20 @@ const DEFAULT_SETTINGS: AudioSettings = {
   soundEnabled: true,
   musicEnabled: true,
   soundVolume: 0.22,
-  musicVolume: 0.18,
+  musicVolume: 0.12,
 };
 
 interface ActiveVoice {
   soundId: SoundId;
   source: AudioBufferSourceNode;
   gain: GainNode;
+}
+
+export interface SoundOptions {
+  pitchShift?: number;
+  volume?: number;
+  /** Maximum playback time in seconds, independent of the recording's length. */
+  duration?: number;
 }
 
 // Event throttles are independent: an arrow must never suppress an arc cannon.
@@ -76,6 +85,9 @@ const SOUND_LIMITS: Partial<Record<SoundId, { interval: number; voices: number }
   combo_up: { interval: 0.035, voices: 2 },
   unit_deploy: { interval: 0.08, voices: 2 },
   turret_reload: { interval: 0.08, voices: 1 },
+  orc_growl: { interval: 5, voices: 1 },
+  orc_hit: { interval: 0.4, voices: 1 },
+  orc_death: { interval: 0.6, voices: 1 },
 };
 const SOUND_LEVELS: Partial<Record<SoundId, number>> = {
   button_tap: 0.4,
@@ -90,7 +102,8 @@ const STORAGE_KEY = 'golf_rogue_audio_settings';
 
 class AudioSystemClass {
   private context: AudioContext | null = null;
-  private sounds: Map<SoundId, AudioBuffer> = new Map();
+  private sounds: Map<SoundId, AudioBuffer[]> = new Map();
+  private lastVariant = new Map<SoundId, number>();
   private settings: AudioSettings = { ...DEFAULT_SETTINGS };
   private soundBus: GainNode | null = null;
   private musicBus: GainNode | null = null;
@@ -144,47 +157,6 @@ class AudioSystemClass {
   }
 
   private async loadAllSounds(): Promise<void> {
-    // Only processed game cues are shipped; the original pack is not redistributed.
-    const soundFiles: Record<SoundId, string> = {
-      archer_shot: 'arrow',
-      soldier_shot: 'sword',
-      unit_deploy: 'deploy',
-      turret_reload: 'reload',
-      power_crit: 'crit',
-      power_heal: 'heal',
-      power_guard: 'armor',
-      power_gold: 'gold',
-      power_bomb: 'bomb',
-      power_wild: 'wild',
-      power_echo: 'echo',
-      power_red_joker: 'red-joker',
-      power_black_joker: 'black-joker',
-      card_shuffle: 'shuffle',
-      footstep_1: 'step-1',
-      footstep_2: 'step-2',
-      orc_growl: 'growl',
-      orc_hit: 'grunt',
-      orc_death: 'death',
-      turret_shot: 'gun',
-      mortar_shot: 'bomb',
-      laser_blast: 'laser',
-      card_play: 'card-1',
-      card_play_1: 'card-1',
-      card_play_2: 'card-2',
-      card_play_3: 'card-3',
-      card_draw: 'card-2',
-      invalid_tap: 'invalid',
-      combo_up: 'combo',
-      enemy_hit: 'strike',
-      player_hit: 'wall-hit',
-      shield: 'armor',
-      enemy_death: 'death',
-      victory: 'win',
-      defeat: 'lose',
-      button_tap: 'click',
-      reward_pick: 'gold',
-    };
-
     // Try to create audio context
     try {
       this.ensureContext();
@@ -195,17 +167,20 @@ class AudioSystemClass {
 
     // Load each sound (gracefully handle missing files)
     const bufferLoads = new Map<string, Promise<AudioBuffer | null>>();
-    const loadPromises = Object.entries(soundFiles).map(async ([id, filename]) => {
+    const loadBuffer = (url: string) => {
+      let pending = bufferLoads.get(url);
+      if (!pending) {
+        pending = this.loadSound(url);
+        bufferLoads.set(url, pending);
+      }
+      return pending;
+    };
+    const loadPromises = Object.entries(SOUND_CATALOG).map(async ([id, sound]) => {
+      const override = soundOverride(id).url;
+      const urls = override ? [override] : [sound.url, ...(SOUND_VARIANTS[id as SoundId] ?? [])].map(assetUrl);
       try {
-        let pending = bufferLoads.get(filename);
-        if (!pending) {
-          pending = this.loadSound(`/audio/ci-v1/${filename}`);
-          bufferLoads.set(filename, pending);
-        }
-        const buffer = await pending;
-        if (buffer) {
-          this.sounds.set(id as SoundId, buffer);
-        }
+        const buffers = (await Promise.all(urls.map(loadBuffer))).filter((buffer): buffer is AudioBuffer => buffer !== null);
+        if (buffers.length) this.sounds.set(id as SoundId, buffers);
       } catch {
         // Silently ignore missing audio files for graceful degradation
       }
@@ -213,8 +188,9 @@ class AudioSystemClass {
 
     await Promise.all([
       ...loadPromises,
-      this.loadSound('/audio/hd-v3/hope-battle').then((buffer) => {
-        if (buffer) this.music?.setBuffer(buffer);
+      ...Object.entries(MUSIC_CATALOG).map(async ([id, track]) => {
+        const buffer = await loadBuffer(soundOverride(id).url ?? assetUrl(track.url));
+        if (buffer) this.music?.setBuffer(buffer, id === 'music_battle' ? 'battle' : 'menu');
       }),
     ]);
     this.initialized = true;
@@ -223,12 +199,14 @@ class AudioSystemClass {
   private async loadSound(basePath: string): Promise<AudioBuffer | null> {
     if (!this.context) return null;
 
-    // Try .ogg first (smaller, better quality), then .mp3 (Safari fallback)
-    const extensions = ['.mp3', '.ogg'];
+    // Explicit extensions are used as-is; extensionless paths try MP3 then OGG.
+    const candidates = /\.(mp3|ogg|wav|m4a)$/i.test(basePath)
+      ? [basePath]
+      : [basePath + '.mp3', basePath + '.ogg'];
 
-    for (const ext of extensions) {
+    for (const url of candidates) {
       try {
-        const response = await fetch(basePath + ext);
+        const response = await fetch(url);
         if (!response.ok) continue;
 
         const arrayBuffer = await response.arrayBuffer();
@@ -283,11 +261,13 @@ class AudioSystemClass {
   /**
    * Play a sound effect
    */
-  play(soundId: SoundId, options?: { pitchShift?: number; volume?: number }): void {
+  play(soundId: SoundId, options?: SoundOptions): void {
     if (!this.settings.soundEnabled || !this.context || !this.unlocked) return;
 
-    const buffer = this.sounds.get(soundId);
-    if (!buffer) return;
+    const custom = soundOverride(soundId);
+    if (custom.muted) return;
+    const buffers = this.sounds.get(soundId);
+    if (!buffers?.length) return;
 
     const limits = SOUND_LIMITS[soundId] ?? { interval: 0.025, voices: 3 };
     const now = this.context.currentTime;
@@ -298,15 +278,21 @@ class AudioSystemClass {
     if (this.activeVoices.length >= 24) this.retireVoice(this.activeVoices[0]);
 
     try {
+      // Random takes without immediately repeating the previous take.
+      const previous = this.lastVariant.get(soundId);
+      let variant = Math.floor(Math.random() * Math.max(1, buffers.length - (previous === undefined ? 0 : 1)));
+      if (previous !== undefined && variant >= previous) variant++;
+      if (buffers.length === 1) variant = 0;
+      this.lastVariant.set(soundId, variant);
       const source = this.context.createBufferSource();
-      source.buffer = buffer;
+      source.buffer = buffers[variant];
 
       // Apply pitch shift if specified
-      source.playbackRate.value = 1 + (options?.pitchShift ?? 0);
+      source.playbackRate.value = (1 + (options?.pitchShift ?? 0)) * (custom.rate ?? 1);
 
       // Apply volume
       const gainNode = this.context.createGain();
-      gainNode.gain.value = this.clampVolume(options?.volume, SOUND_LEVELS[soundId] ?? 0.65);
+      gainNode.gain.value = this.clampVolume(options?.volume, SOUND_LEVELS[soundId] ?? 0.65) * (custom.volume ?? 1);
 
       source.connect(gainNode);
       gainNode.connect(this.soundBus!);
@@ -318,6 +304,16 @@ class AudioSystemClass {
         gainNode.disconnect();
       };
       source.start(0);
+      const duration = options?.duration;
+      if (typeof duration === 'number' && Number.isFinite(duration) && duration > 0 &&
+        duration < source.buffer.duration / source.playbackRate.value) {
+        // A multi-shot recording is a single shot here; fade before its precise cutoff.
+        const end = now + duration;
+        const fadeStart = end - Math.min(0.015, duration);
+        gainNode.gain.setValueAtTime(gainNode.gain.value, fadeStart);
+        gainNode.gain.linearRampToValueAtTime(0, end);
+        source.stop(end);
+      }
     } catch (err) {
       console.warn('Error playing sound:', err);
     }
@@ -326,9 +322,16 @@ class AudioSystemClass {
   private retireVoice(voice: ActiveVoice): void {
     this.activeVoices = this.activeVoices.filter((active) => active !== voice);
     const at = this.context!.currentTime;
+    voice.gain.gain.cancelScheduledValues(at);
     voice.gain.gain.setValueAtTime(voice.gain.gain.value, at);
     voice.gain.gain.linearRampToValueAtTime(0, at + 0.01);
     voice.source.stop(at + 0.012);
+  }
+
+  /** Stop one event channel without interrupting music or other effects. */
+  stopSound(soundId: SoundId): void {
+    for (const voice of this.activeVoices.filter((active) => active.soundId === soundId))
+      this.retireVoice(voice);
   }
 
   /**
@@ -404,13 +407,14 @@ class AudioSystemClass {
 
   private updateMix(): void {
     if (!this.context || !this.soundBus || !this.musicBus) return;
+    const musicOverride = soundOverride(this.musicScene === 'battle' ? 'music_battle' : 'music');
     this.soundBus.gain.setTargetAtTime(
-      this.settings.soundEnabled ? this.settings.soundVolume : 0,
+      this.settings.soundEnabled ? this.settings.soundVolume * configuredMix().sound : 0,
       this.context.currentTime,
       0.04
     );
     this.musicBus.gain.setTargetAtTime(
-      this.settings.musicEnabled ? this.settings.musicVolume : 0,
+      this.settings.musicEnabled && !musicOverride.muted ? this.settings.musicVolume * configuredMix().music * (musicOverride.volume ?? 1) : 0,
       this.context.currentTime,
       0.08
     );

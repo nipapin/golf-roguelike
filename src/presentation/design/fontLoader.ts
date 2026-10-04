@@ -1,3 +1,4 @@
+import { assetUrl } from '../../configurator/runtime';
 /**
  * Font loader - loads custom fonts before Phaser starts
  * Per STYLE.md section 13: use FontFace API, wait for load before scene start
@@ -20,7 +21,7 @@ export async function loadFonts(): Promise<void> {
       descriptors.weight = font.weight;
     }
 
-    const fontFace = new FontFace(font.family, `url(${font.url})`, descriptors);
+    const fontFace = new FontFace(font.family, `url(${assetUrl(font.url)})`, descriptors);
 
     try {
       const loadedFont = await fontFace.load();

@@ -1,27 +1,15 @@
 import { defineConfig } from 'vite';
 import { VitePWA } from 'vite-plugin-pwa';
+import { configuratorPlugin } from './tools/configurator-plugin';
 
 export default defineConfig({
   plugins: [
+    configuratorPlugin(),
     VitePWA({
       registerType: 'prompt',
-      manifest: {
-        name: 'Castle Solitaire',
-        short_name: 'Castle Solitaire',
-        description: 'Build chains, deploy defenders and protect your castle with one solitaire.',
-        start_url: '/',
-        display: 'standalone',
-        background_color: '#213E48',
-        theme_color: '#213E48',
-        orientation: 'portrait',
-        icons: [
-          { src: '/icons/icon-192.png', sizes: '192x192', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-512.png', sizes: '512x512', type: 'image/png', purpose: 'any' },
-          { src: '/icons/icon-maskable-192.png', sizes: '192x192', type: 'image/png', purpose: 'maskable' },
-          { src: '/icons/icon-maskable-512.png', sizes: '512x512', type: 'image/png', purpose: 'maskable' },
-          { src: '/icon.svg', sizes: 'any', type: 'image/svg+xml', purpose: 'any' },
-        ],
-      },
+      // The static manifest is served identically in dev, preview and production.
+      manifest: false,
+      includeAssets: ['manifest.webmanifest', 'icons/*.png'],
       workbox: {
         // Pre-cache static assets for offline play. Short SFX (.mp3) are precached;
         // the current music loop also fits the precache size limit.
@@ -120,4 +108,5 @@ export default defineConfig({
   build: {
     target: 'es2022',
   },
+  server: { host: '127.0.0.1', port: 5173, strictPort: true },
 });

@@ -1,3 +1,5 @@
+import { loadAssetConfig, assetUrl } from './configurator/runtime';
+import { applyConfiguredColors } from './presentation/design/tokens';
 import { viewportHeight } from './presentation/design/safeArea';
 import Phaser from 'phaser';
 import './style.css';
@@ -11,6 +13,11 @@ import { CastleMenuScene } from './castle/CastleMenuScene';
 import { CastleScene } from './castle/CastleScene';
 
 async function initGame() {
+  await loadAssetConfig();
+  applyConfiguredColors();
+  for (const link of document.querySelectorAll<HTMLLinkElement>('link[rel="icon"], link[rel="apple-touch-icon"]')) {
+    link.href = assetUrl(new URL(link.href).pathname);
+  }
   // Load fonts before Phaser starts (per STYLE.md section 13)
   await loadFonts();
 
@@ -75,10 +82,13 @@ async function initGame() {
       const height = Math.round(rect.height * density);
       if (width > 0 && height > 0 && (game.scale.width !== width || game.scale.height !== height)) {
         game.scale.resize(width, height);
-        // Battle has its own resize handler. Rebuild visible menus/popups too.
-        for (const scene of game.scene.getScenes(true)) {
-          if (scene.scene.key === 'StartScene' || scene.scene.key === 'CreditsScene') scene.scene.restart();
-        }
+      }
+      // The centered canvas can move without changing size. Keep pointer coordinates
+      // aligned with its current CSS bounds in Phaser's manually managed scale mode.
+      game.scale.updateBounds();
+      const display = game.scale.canvasBounds;
+      if (display.width > 0 && display.height > 0) {
+        game.scale.displayScale.set(game.scale.baseSize.width / display.width, game.scale.baseSize.height / display.height);
       }
     });
   };

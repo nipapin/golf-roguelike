@@ -2,7 +2,7 @@ import { CastleManager } from './CastleManager';
 import { createCastleRun, emptyUpgrades } from './CastleDefense';
 import { gameConfig } from '../data/gameConfig';
 
-const KEY = 'castle-interactive-training-v1';
+const KEY = 'castle-interactive-training-v2';
 let completedThisSession = false;
 export function trainingCompleted(): boolean {
   if (completedThisSession) return true;
@@ -64,6 +64,8 @@ export function createTraining(): { manager: CastleManager; ids: string[] } {
   ];
   manager.state = {
     ...state,
+    // Preserve legacy progression data; chain rewards are available in every round.
+    progression: { xp: 56, level: 5, modules: [] },
     run: {
       ...state.run,
       battle: {
@@ -80,28 +82,28 @@ export function createTraining(): { manager: CastleManager; ids: string[] } {
 export const trainingSteps = [
   ['Play the 6', 'The active card is 7. Only an open 6 or 8 connects. Tap the glowing 6.'],
   ['Continue with 5', 'Removing the 6 reveals the 5. Build your chain with the newly opened card.'],
-  ['Try UNDO', 'Undo returns your last card and costs 1 castle HP. Tap the large button below.'],
-  ['Play the 5 again', 'The castle paid 1 HP. Now continue the restored chain.'],
+  ['Try the reverse arrow', 'The reverse arrow beside the stock restores your previous step, including stock draws and WILD. Undo is free and unlimited while there are earlier moves in this round. Tap it.'],
+  ['Play the 5 again', 'Continue the restored chain with 5. You can undo again whenever you need to.'],
   [
     'Reach three cards',
     'Play 4. Your chain banks a soldier, a stationary archer and a 10-round turret reload.',
   ],
-  ['Deploy your defense', 'NEXT previews the stock card. Tap DRAW to release all banked rewards.'],
+  ['Deploy your defense', 'Tap the closed stock to take a card and deploy your banked rewards. The stock glows when there are no legal plays.'],
   [
     'Watch the defense',
-    'Soldiers advance toward enemies. Archers stay at the castle: 1 HP / 2 damage. The turret has 10 rounds.',
+    'Soldiers leave the gate; archers stand on walls; weapons mount to towers. Every reward is available from the first round through card chains.',
   ],
   [
     'Play the WILD 8',
     'From active 9 you can play 8. This special card lets the next card have any rank.',
   ],
   ['Use WILD: play King', 'Normally 8 cannot connect to King. WILD allows this one connection.'],
-  ['King → Queen', 'Continue downward with Queen. Ordinary cards still follow the ±1 rule.'],
+  ['King → Queen', 'Continue downward with Queen. Q ↔ K works, but A ↔ K is blocked. An Ace normally connects only to 2.'],
   ['Queen → Jack', 'Four cards bank an arc cannon as well as the earlier rewards.'],
-  ['Jack → 10', 'Five cards charge a 40-damage laser. Longer chains earn stronger defense.'],
-  ['Fire the laser', 'Tap DRAW. Rewards deploy only when you draw, never while building a chain.'],
+  ['Jack → 10', 'Five cards charge a 40-damage laser. Rewards repeat every five cards: 6 banks another soldier, 7 another archer; 10 doubles all rewards.'],
+  ['Fire the laser', 'Tap the closed stock. Drawing deploys your banked rewards and fires the charged laser.'],
   [
     'Ready for the siege',
-    'Clear every column to win. Empty stock reshuffles. Upgrade between sieges; defeat resets difficulty.',
+    'Clear every column to win. Kills give coins. HEAL costs 30, BOMB 100, ECHO 50; each can be used once per round. ECHO adds two chain positions. Each board has one WILD. Empty stock does not end the round: finish any available chain, then tap the empty stock marked with a shuffle arrow and heart for 5 HP. Recycled waste loses its powers; cards on the field keep them. The reverse arrow restores the previous step, including draws and WILD, with no undo limit.',
   ],
 ];

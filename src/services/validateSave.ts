@@ -72,6 +72,8 @@ export function isSavedRun(value: unknown): value is RunState {
   if (!['battle', 'reward', 'shop'].includes(String(value.phase)) || !record(value.battle)) return false;
   const battle = value.battle;
   if (
+    (battle.castleJokerExit !== undefined && !['red', 'black'].includes(String(battle.castleJokerExit))) ||
+    (battle.castleCritical !== undefined && typeof battle.castleCritical !== 'boolean') ||
     (battle.mode !== undefined && !['solitaire', 'boss'].includes(String(battle.mode))) ||
     !Array.isArray(battle.tableau) ||
     battle.tableau.length !== config.tableau.columns ||

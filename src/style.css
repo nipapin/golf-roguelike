@@ -39,6 +39,11 @@ body {
   background: #213E48;
 }
 
+/* Landscape monitors use the entire window; portrait devices retain the phone layout. */
+@media (min-width: 900px) and (min-aspect-ratio: 6/5) {
+  #game { max-width: none; }
+}
+
 canvas {
   display: block !important;
   width: 100% !important;

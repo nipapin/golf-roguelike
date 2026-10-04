@@ -8,11 +8,14 @@ import { viewport, getRenderDensity, safeArea } from './viewport';
 import Phaser from 'phaser';
 import { colors } from './tokens';
 import { AudioSystem } from '../audio/AudioSystem';
+import { gameDisplayStyle } from './displayFont';
 
 export interface SettingsModalCallbacks {
   onResume: () => void;
   onRestart: () => void;
   onMainMenu: () => void;
+  variant?: 'game' | 'menu';
+  onMore?: () => void;
 }
 
 export class SettingsModal {
@@ -22,6 +25,8 @@ export class SettingsModal {
   private callbacks: SettingsModalCallbacks;
   private confirmContainer: Phaser.GameObjects.Container | null = null;
   private isOpen: boolean = false;
+  private panelWidth: number;
+  private panelHeight: number;
 
   constructor(scene: Phaser.Scene, callbacks: SettingsModalCallbacks) {
     this.scene = scene;
@@ -29,6 +34,8 @@ export class SettingsModal {
     
     const width = viewport(scene).width;
     const height = viewport(scene).height;
+    this.panelWidth = Math.min(420, width - 32);
+    this.panelHeight = callbacks.variant === 'menu' ? 470 : 530;
     
     // Dark overlay
     this.overlay = scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
@@ -36,16 +43,18 @@ export class SettingsModal {
     this.overlay.setDepth(200);
     
     // Main container
-    this.container = scene.add.container(width / 2, safeArea(scene).centerY);
+    this.container = scene.add.container(width / 2, safeArea(scene).centerY).setName('settings-panel');
     this.container.setDepth(201);
     
     this.createPanel();
+    this.container.setScale(Math.min(1, (safeArea(scene).height - 24) / this.panelHeight));
     this.hide();
   }
 
   private createPanel(): void {
-    const panelWidth = 280;
-    const panelHeight = 490;
+    const panelWidth = this.panelWidth;
+    const menu = this.callbacks.variant === 'menu';
+    const panelHeight = this.panelHeight;
     
     // Panel background (cream with dark outline)
     const panel = this.scene.add.graphics();
@@ -70,31 +79,42 @@ export class SettingsModal {
     this.container.add(panel);
     
     // Title
-    const title = this.scene.add.text(0, -panelHeight / 2 + 40, 'SETTINGS', {
-      resolution: getRenderDensity(), fontFamily: 'Lilita One',
-      fontSize: '28px',
+    const titleText = menu ? 'НАСТРОЙКИ' : 'SETTINGS';
+    const title = this.scene.add.text(0, -panelHeight / 2 + 40, titleText, {
+      resolution: getRenderDensity(), ...gameDisplayStyle(titleText),
+      fontSize: menu ? '24px' : '28px',
       color: '#1B1030',
     }).setOrigin(0.5);
     this.container.add(title);
     
     // Sound toggle
-    const soundY = -155;
-    this.createToggle(0, soundY, 'Sound', AudioSystem.isSoundEnabled, (enabled) => {
+    const soundY = -panelHeight / 2 + 90;
+    this.createToggle(0, soundY, menu ? 'Звук' : 'Sound', AudioSystem.isSoundEnabled, (enabled) => {
       AudioSystem.isSoundEnabled = enabled;
       if (enabled) AudioSystem.play('button_tap');
-    });
+    }, 'settings-sound-toggle');
     
-    this.createVolume(-120, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; });
-    this.createToggle(0, -75, 'Music', AudioSystem.isMusicEnabled, (enabled) => {
+    this.createVolume(soundY + 38, () => AudioSystem.soundVolume, (value) => { AudioSystem.soundVolume = value; }, 'sound');
+    this.createToggle(0, soundY + 100, menu ? 'Музыка' : 'Music', AudioSystem.isMusicEnabled, (enabled) => {
       AudioSystem.unlock();
       AudioSystem.isMusicEnabled = enabled;
-    });
-    this.createVolume(-40, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; });
+    }, 'settings-music-toggle');
+    this.createVolume(soundY + 138, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; }, 'music');
     // Accessibility: reduce camera shake (persisted)
-    this.createToggle(0, 5, 'Less shake', isShakeReduced(), (enabled) => { setShakeReduced(enabled); });
+    this.createToggle(0, soundY + 200, menu ? 'Меньше тряски' : 'Less shake', isShakeReduced(), (enabled) => { setShakeReduced(enabled); }, 'settings-shake-toggle');
+
+    if (menu) {
+      this.createButton(0, soundY + 260, 'НАЗАД', colors.gold, colors.goldLo, () => {
+        this.hide(); this.callbacks.onResume();
+      }).setName('menu-settings-back');
+      this.createButton(0, soundY + 322, 'ДОПОЛНИТЕЛЬНО', colors.blue, colors.blueLo, () => {
+        this.hide(); this.callbacks.onMore?.();
+      }).setName('menu-settings-more');
+      return;
+    }
 
     // Buttons
-    const buttonY = 75;
+    const buttonY = soundY + 260;
     const buttonSpacing = 54;
     
     // Resume button (green - primary action)
@@ -123,18 +143,23 @@ export class SettingsModal {
     y: number,
     label: string,
     initialValue: boolean,
-    onChange: (enabled: boolean) => void
+    onChange: (enabled: boolean) => void,
+    name: string
   ): void {
     const toggleWidth = 60;
     const toggleHeight = 32;
+    const trackX = x + this.panelWidth / 2 - 32 - toggleWidth;
+    const labelX = x - this.panelWidth / 2 + 32;
     let enabled = initialValue;
     
     // Label
-    const labelText = this.scene.add.text(x - 80, y, label, {
-      resolution: getRenderDensity(), fontFamily: 'Lilita One',
+    const labelText = this.scene.add.text(labelX, y, label, {
+      resolution: getRenderDensity(), ...gameDisplayStyle(label),
       fontSize: '20px',
       color: '#1B1030',
     }).setOrigin(0, 0.5);
+    const labelWidth = trackX - labelX - 16;
+    if (labelText.width > labelWidth) labelText.setFontSize(20 * labelWidth / labelText.width);
     this.container.add(labelText);
     
     // Toggle track
@@ -148,12 +173,12 @@ export class SettingsModal {
       // Track
       const trackColor = enabled ? colors.green : 0x8a8a8a;
       track.fillStyle(trackColor, 1);
-      track.fillRoundedRect(x + 40, y - toggleHeight / 2, toggleWidth, toggleHeight, toggleHeight / 2);
+      track.fillRoundedRect(trackX, y - toggleHeight / 2, toggleWidth, toggleHeight, toggleHeight / 2);
       track.lineStyle(3, colors.ink, 1);
-      track.strokeRoundedRect(x + 40, y - toggleHeight / 2, toggleWidth, toggleHeight, toggleHeight / 2);
+      track.strokeRoundedRect(trackX, y - toggleHeight / 2, toggleWidth, toggleHeight, toggleHeight / 2);
       
       // Knob
-      const knobX = enabled ? x + 40 + toggleWidth - toggleHeight / 2 - 2 : x + 40 + toggleHeight / 2 + 2;
+      const knobX = enabled ? trackX + toggleWidth - toggleHeight / 2 - 2 : trackX + toggleHeight / 2 + 2;
       knob.fillStyle(0xffffff, 1);
       knob.fillCircle(knobX, y, toggleHeight / 2 - 4);
       knob.lineStyle(2, colors.ink, 1);
@@ -166,7 +191,7 @@ export class SettingsModal {
     this.container.add(knob);
     
     // Interactive zone
-    const hitZone = this.scene.add.zone(x + 40 + toggleWidth / 2, y, toggleWidth + 20, Math.max(44, toggleHeight + 14));
+    const hitZone = this.scene.add.zone(trackX + toggleWidth / 2, y, toggleWidth + 20, Math.max(44, toggleHeight + 14)).setName(name);
     hitZone.setInteractive();
     hitZone.on('pointerdown', () => {
       enabled = !enabled;
@@ -176,21 +201,56 @@ export class SettingsModal {
     this.container.add(hitZone);
   }
 
-  private createVolume(y: number, get: () => number, set: (value: number) => void): void {
-    const valueText = this.scene.add.text(0, y, `${Math.round(get() * 100)}%`, {
-      resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '16px', color: '#442960',
-    }).setOrigin(0.5);
-    this.container.add(valueText);
-    for (const [x, delta, label] of [[-80, -0.1, '−'], [80, 0.1, '+']] as const) {
-      // Visual 40×30, touch target 48×44.
-      const button = this.scene.add.rectangle(x, y, 40, 30, 0xd9c6eb).setInteractive(new Phaser.Geom.Rectangle(-4, -7, 48, 44), Phaser.Geom.Rectangle.Contains);
-      button.on('pointerup', () => {
-        AudioSystem.unlock();
-        set(Math.round((get() + delta) * 100) / 100);
-        valueText.setText(`${Math.round(get() * 100)}%`);
-      });
-      this.container.add([button, this.scene.add.text(x, y, label, { resolution: getRenderDensity(), fontFamily: 'Fredoka', fontSize: '20px', color: '#27173d' }).setOrigin(0.5)]);
-    }
+  private createVolume(y: number, get: () => number, set: (value: number) => void, name: string): void {
+    const left = -this.panelWidth / 2 + 32;
+    const trackWidth = this.panelWidth - 64 - 60;
+    const track = this.scene.add.graphics();
+    const valueText = this.scene.add.text(this.panelWidth / 2 - 32, y, '', {
+      resolution: getRenderDensity(), ...gameDisplayStyle('0%'), fontSize: '18px', color: '#442960',
+    }).setOrigin(1, 0.5).setName(`settings-${name}-value`);
+    const draw = () => {
+      const value = Phaser.Math.Clamp(get(), 0, 1);
+      const knobX = left + trackWidth * value;
+      track.clear();
+      track.fillStyle(0xd9c6eb, 1);
+      track.fillRoundedRect(left, y - 6, trackWidth, 12, 6);
+      if (value > 0) {
+        track.fillGradientStyle(colors.violet, colors.blue, colors.violet, colors.blue, 1);
+        track.fillRoundedRect(left, y - 6, Math.max(12, trackWidth * value), 12, 6);
+      }
+      track.lineStyle(2, colors.ink, 1);
+      track.strokeRoundedRect(left, y - 6, trackWidth, 12, 6);
+      track.fillStyle(colors.ink, 1);
+      track.fillCircle(knobX, y + 3, 12);
+      track.fillStyle(colors.gold, 1);
+      track.fillCircle(knobX, y, 12);
+      track.lineStyle(2.5, colors.ink, 1);
+      track.strokeCircle(knobX, y, 12);
+      track.fillStyle(0xffffff, 0.7);
+      track.fillCircle(knobX - 3, y - 4, 4);
+      valueText.setText(`${Math.round(value * 100)}%`);
+    };
+    draw();
+    // The whole track accepts taps and drags, including a 44px-high touch target.
+    const hitZone = this.scene.add.zone(left + trackWidth / 2, y, trackWidth + 24, 44)
+      .setName(`settings-${name}-slider`).setInteractive({ useHandCursor: true });
+    const worldPoint = new Phaser.Math.Vector2();
+    const localPoint = new Phaser.Math.Vector2();
+    const update = (pointer: Phaser.Input.Pointer) => {
+      // Pointer positions are canvas pixels; undo camera zoom before the panel transform.
+      this.scene.cameras.main.getWorldPoint(pointer.x, pointer.y, worldPoint);
+      const local = this.container.getWorldTransformMatrix().applyInverse(worldPoint.x, worldPoint.y, localPoint);
+      const value = Phaser.Math.Clamp((local.x - left) / trackWidth, 0, 1);
+      set(value);
+      draw();
+    };
+    hitZone.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+      AudioSystem.unlock();
+      update(pointer);
+    });
+    this.scene.input.setDraggable(hitZone);
+    hitZone.on('drag', update);
+    this.container.add([track, valueText, hitZone]);
   }
 
   private createButton(
@@ -201,7 +261,7 @@ export class SettingsModal {
     colorLo: number,
     callback: () => void
   ): Phaser.GameObjects.Container {
-    const buttonWidth = 200;
+    const buttonWidth = Math.min(280, this.panelWidth - 64);
     const buttonHeight = 48;
     
     const buttonContainer = this.scene.add.container(x, y);
@@ -229,10 +289,11 @@ export class SettingsModal {
     
     // Text
     const buttonText = this.scene.add.text(0, -3, text, {
-      resolution: getRenderDensity(), fontFamily: 'Lilita One',
+      resolution: getRenderDensity(), ...gameDisplayStyle(text),
       fontSize: '18px',
       color: '#ffffff',
     }).setOrigin(0.5).setStroke('#1B1030', 4);
+    if (buttonText.width > buttonWidth - 22) buttonText.setFontSize(18 * (buttonWidth - 22) / buttonText.width);
     buttonContainer.add(buttonText);
     
     // Interactivity
@@ -269,7 +330,7 @@ export class SettingsModal {
     this.confirmContainer = this.scene.add.container(0, 0);
     
     // Darken the main panel
-    const darken = this.scene.add.rectangle(0, 0, 300, 360, 0x000000, 0.5);
+    const darken = this.scene.add.rectangle(0, 0, this.panelWidth, this.panelHeight, 0x000000, 0.5).setInteractive();
     this.confirmContainer.add(darken);
     
     // Confirm panel

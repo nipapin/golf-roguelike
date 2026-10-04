@@ -1,0 +1,172 @@
+{
+  "frames": {
+    "frame-0000": {
+      "frame": {
+        "x": 102,
+        "y": 178,
+        "w": 256,
+        "h": 236
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 102,
+        "y": 178,
+        "w": 256,
+        "h": 236
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0001": {
+      "frame": {
+        "x": 555,
+        "y": 178,
+        "w": 245,
+        "h": 235
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 111,
+        "y": 178,
+        "w": 245,
+        "h": 235
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0002": {
+      "frame": {
+        "x": 992,
+        "y": 178,
+        "w": 253,
+        "h": 236
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 105,
+        "y": 178,
+        "w": 253,
+        "h": 236
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0003": {
+      "frame": {
+        "x": 1433,
+        "y": 178,
+        "w": 255,
+        "h": 235
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 103,
+        "y": 178,
+        "w": 255,
+        "h": 235
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0004": {
+      "frame": {
+        "x": 102,
+        "y": 586,
+        "w": 256,
+        "h": 235
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 102,
+        "y": 143,
+        "w": 256,
+        "h": 235
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0005": {
+      "frame": {
+        "x": 547,
+        "y": 585,
+        "w": 255,
+        "h": 235
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 103,
+        "y": 142,
+        "w": 255,
+        "h": 235
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0006": {
+      "frame": {
+        "x": 987,
+        "y": 584,
+        "w": 258,
+        "h": 237
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 100,
+        "y": 141,
+        "w": 258,
+        "h": 237
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0007": {
+      "frame": {
+        "x": 1431,
+        "y": 584,
+        "w": 257,
+        "h": 236
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 101,
+        "y": 141,
+        "w": 257,
+        "h": 236
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    }
+  },
+  "meta": {
+    "image": "orc-walk-v2.png",
+    "size": {
+      "w": 1774,
+      "h": 887
+    },
+    "scale": "1"
+  }
+}

@@ -1,0 +1,172 @@
+{
+  "frames": {
+    "frame-0000": {
+      "frame": {
+        "x": 73,
+        "y": 110,
+        "w": 319,
+        "h": 307
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 73,
+        "y": 110,
+        "w": 319,
+        "h": 307
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0001": {
+      "frame": {
+        "x": 519,
+        "y": 110,
+        "w": 318,
+        "h": 307
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 75,
+        "y": 110,
+        "w": 318,
+        "h": 307
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0002": {
+      "frame": {
+        "x": 962,
+        "y": 110,
+        "w": 319,
+        "h": 306
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 75,
+        "y": 110,
+        "w": 319,
+        "h": 306
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0003": {
+      "frame": {
+        "x": 1407,
+        "y": 110,
+        "w": 315,
+        "h": 307
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 77,
+        "y": 110,
+        "w": 315,
+        "h": 307
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0004": {
+      "frame": {
+        "x": 75,
+        "y": 531,
+        "w": 323,
+        "h": 302
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 75,
+        "y": 88,
+        "w": 323,
+        "h": 302
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0005": {
+      "frame": {
+        "x": 523,
+        "y": 530,
+        "w": 319,
+        "h": 303
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 79,
+        "y": 87,
+        "w": 319,
+        "h": 303
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0006": {
+      "frame": {
+        "x": 964,
+        "y": 530,
+        "w": 319,
+        "h": 303
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 77,
+        "y": 87,
+        "w": 319,
+        "h": 303
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    },
+    "frame-0007": {
+      "frame": {
+        "x": 1407,
+        "y": 530,
+        "w": 321,
+        "h": 303
+      },
+      "rotated": false,
+      "trimmed": true,
+      "spriteSourceSize": {
+        "x": 77,
+        "y": 87,
+        "w": 321,
+        "h": 303
+      },
+      "sourceSize": {
+        "w": 444,
+        "h": 444
+      }
+    }
+  },
+  "meta": {
+    "image": "ogre-boss-walk-v2.png",
+    "size": {
+      "w": 1774,
+      "h": 887
+    },
+    "scale": "1"
+  }
+}

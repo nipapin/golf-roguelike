@@ -1,8 +1,8 @@
-import { drawCard, playCard } from '../core/GameActions';
-import { setupBattle, isTableauEmpty } from '../core/GameState';
+import { createDeck, setupBattle, isTableauEmpty, canConnectInBattle, findCardColumn, isCardExposed, getPowerType } from '../core/GameState';
 import { RNG } from '../core/RNG';
-import type { RunState, GameConfig, GameEvent } from '../core/types';
+import type { RunState, GameConfig, GameEvent, Card } from '../core/types';
 import { startRun } from '../core/GameActions';
+import { CASTLE_XP, castleLevel, MODULES, type CastleProgression, type ModuleKey } from './CastleProgression';
 
 export type UnitKind = 'soldier' | 'archer' | 'turret' | 'mortar';
 // Keep the legacy 'knight' upgrade key so paid levels survive the archer replacement.
@@ -12,13 +12,13 @@ export const DEFENDER_STATS: Record<
   UnitKind,
   { damage: number; interval: number; range: number; ttl: number; ammo: number }
 > = {
-  soldier: { damage: 1, interval: 1, range: 0.52, ttl: 18, ammo: 100 },
+  soldier: { damage: 2, interval: 1, range: 0.52, ttl: 18, ammo: 100 },
   archer: { damage: 2, interval: 1.5, range: 0.55, ttl: 24, ammo: 100 },
   turret: { damage: 2, interval: 0.25, range: 0.4, ttl: 600, ammo: 10 },
-  mortar: { damage: 9, interval: 2, range: 0.22, ttl: 45, ammo: 12 },
+  mortar: { damage: 9, interval: 2, range: 0.65, ttl: 45, ammo: 12 },
 };
 export const UPGRADE_VALUES: Record<UpgradeKey, { base: number; step: number }> = {
-  walls: { base: 30, step: 8 },
+  walls: { base: 40, step: 8 },
   soldier: { base: 1, step: 1 },
   knight: { base: 2, step: 1 },
   magazine: { base: 10, step: 5 },
@@ -28,17 +28,15 @@ export const UPGRADE_VALUES: Record<UpgradeKey, { base: number; step: number }> 
 export const upgradeValue = (key: UpgradeKey, level: number) =>
   UPGRADE_VALUES[key].base + UPGRADE_VALUES[key].step * level;
 export const SIEGE_PACING = {
-  firstSpawn: 1,
-  interval: 2,
-  intervalFloor: 1.25,
-  acceleration: 0.0125,
-  bossEvery: 21,
+  firstSpawn: 0,
+  interval: 5,
+  bossEvery: 20,
   enemyHp: 6,
   hpGrowth: 2,
-  groupSize: 3,
-  maxGroupSize: 5,
-  maxEnemies: 48,
+  groupSize: 5,
+  maxEnemies: 300,
 };
+export const CASTLE_RECYCLE_HP_COST = 5;
 export const emptyUpgrades = (): Upgrades => ({
   walls: 0,
   soldier: 0,
@@ -58,6 +56,26 @@ export const UPGRADE_KEYS: UpgradeKey[] = [
 export const UPGRADE_LIMIT = 10;
 export const upgradeCost = (level: number) => 10 + level * 8;
 export const STEP = 0.25;
+export const MELEE_RANGE = 0.06;
+/** Soldiers hold the last quarter of the approach to the castle. */
+export const SOLDIER_HOLD_PROGRESS = 0.75;
+const MIN_ASSIST_DRAW = 3;
+const MAX_ASSIST_DRAW = 7;
+export const CASTLE_ABILITIES = {
+  HEAL: { cost: 30, title: 'HEAL' },
+  BOMB: { cost: 100, title: 'BOMB' },
+  ECHO: { cost: 50, title: 'ECHO' },
+} as const;
+export type CastleAbility = keyof typeof CASTLE_ABILITIES;
+export const CHAIN_REWARD_ORDER = ['soldier', 'archer', 'turret', 'mortar', 'laser'] as const;
+export const CASTLE_GUARD_CARD_COUNT = 2;
+export const CASTLE_GUARD_REWARD = { normal: 1, bonus: 5, bonusChance: 0.2 } as const;
+/** Each reward repeats once per five cards, starting at its own tier. */
+export function chainRewardCounts(chain: number): Record<typeof CHAIN_REWARD_ORDER[number], number> {
+  return Object.fromEntries(
+    CHAIN_REWARD_ORDER.map((kind, index) => [kind, Math.max(0, Math.floor((chain + 4 - index) / 5))])
+  ) as Record<typeof CHAIN_REWARD_ORDER[number], number>;
+}
 export interface Invader {
   id: number;
   sprite: string;
@@ -68,6 +86,8 @@ export interface Invader {
   speed: number;
   damage: number;
   cooldown: number;
+  burning?: number;
+  burnDamage?: number;
 }
 export interface Defender {
   id: number;
@@ -82,6 +102,11 @@ export interface Defender {
   maxHp: number;
   progress: number;
 }
+export function soldierIsMarching(unit: Defender, enemies: readonly Invader[]): boolean {
+  return unit.kind === 'soldier' && !unit.engaged && unit.progress > SOLDIER_HOLD_PROGRESS &&
+    unit.hp > 0 && unit.ttl > 0 && unit.ammo > 0 &&
+    !enemies.some(enemy => enemy.hp > 0 && Math.abs(enemy.progress - unit.progress) <= MELEE_RANGE);
+}
 export interface SiegeState {
   started: boolean;
   elapsed: number;
@@ -95,23 +120,51 @@ export interface SiegeState {
   rngState: number;
   laserCharge: number;
 }
+export interface CastleRunStats {
+  roundsWon: number;
+  enemiesDefeated: number;
+  bossesDefeated: number;
+  cardsPlayed: number;
+  seconds: number;
+  goldEarned: number;
+}
+export const emptyCastleRunStats = (): CastleRunStats => ({
+  roundsWon: 0, enemiesDefeated: 0, bossesDefeated: 0,
+  cardsPlayed: 0, seconds: 0, goldEarned: 0,
+});
 export interface CastleRun {
   version: 1;
-  balanceVersion?: 2;
+  balanceVersion?: 2 | 3;
   id: string;
   siegeNumber: number;
   run: RunState;
   siege: SiegeState;
   upgrades: Upgrades;
+  progression: CastleProgression;
+  reserve: { red: number; black: number };
   usedPowers?: string[];
+  abilitiesUsed?: CastleAbility[];
+  emptyDraws?: number;
+  drawAssistAt?: number;
+  drawAssistRngState?: number;
+  /** Legacy save field; undo availability now depends only on move history. */
+  undoRemaining?: number;
+  inheritedCoins?: number;
+  runStats?: CastleRunStats;
 }
 export type SiegeEvent =
+  | { type: 'ability'; ability: CastleAbility }
+  | { type: 'melee'; enemy: number; unit: number }
   | { type: 'spawn'; enemy: Invader }
   | { type: 'deploy'; kind: UnitKind; id: number }
   | { type: 'reload'; id: number; ammo: number }
   | { type: 'boost'; effect: 'heal' | 'armor' | 'gold'; amount: number }
-  | { type: 'shot'; kind: UnitKind; unit: number; target: number; damage: number }
-  | { type: 'killed'; enemy: Invader }
+  | { type: 'shot'; kind: UnitKind; unit: number; target: number; damage: number; fire?: boolean }
+  | { type: 'killed'; enemy: Invader; coins: number }
+  | { type: 'level_up'; level: number }
+  | { type: 'module_bought'; key: ModuleKey; cost: number }
+  | { type: 'joker'; color: 'red' | 'black' }
+  | { type: 'detonation'; enemy: number; damage: number }
   | { type: 'unit_killed'; unit: Defender }
   | { type: 'castle_hit'; damage: number; enemy: number }
   | { type: 'laser'; final: boolean; damage: number }
@@ -129,7 +182,6 @@ const sentinel = {
   sprite: 'c_orc',
   intents: [{ type: 'defend' as const, value: 0 }],
 };
-const combatant = () => ({ ...sentinel, maxHp: sentinel.hp, currentIntentIndex: 0 });
 
 export function createCastleRun(
   seed: string,
@@ -139,14 +191,31 @@ export function createCastleRun(
   siegeNumber = 1
 ): CastleRun {
   const maxHp = upgradeValue('walls', upgrades.walls);
-  const initial = setupBattle(startRun(seed, config), sentinel, 7, config);
+  const dealConfig = { ...config, tableau: { ...config.tableau, rows: 5 } };
+  // Reserve jokers before shuffling/dealing so every tableau cell receives a card.
+  const initial = setupBattle(startRun(seed, config), sentinel, CASTLE_GUARD_CARD_COUNT + 1, dealConfig, {}, createDeck().filter((card) => !card.joker));
+  const battle = initial.battle!;
+  const ordinaryDeck = battle.deck.filter((card) => !card.joker);
+  const activeCard = battle.activeCard?.joker ? ordinaryDeck.shift()! : battle.activeCard;
   return {
     version: 1,
-    balanceVersion: 2,
+    balanceVersion: 3,
     id,
     siegeNumber,
     upgrades: { ...upgrades },
-    run: { ...initial, player: { ...initial.player, hp: maxHp, maxHp } },
+    progression: { xp: 0, level: 1, modules: [] },
+    reserve: { red: 0, black: 0 },
+    abilitiesUsed: [],
+    emptyDraws: 0,
+    drawAssistRngState: new RNG(seed + ':stock-assist').getState(),
+    undoRemaining: 3,
+    runStats: emptyCastleRunStats(),
+    run: { ...initial, player: { ...initial.player, hp: maxHp, maxHp }, battle: {
+      ...battle, allowRankWrap: false, activeCard, deck: ordinaryDeck,
+      tableau: battle.tableau.map((column) => ({ cards: column.cards.filter((card) => !card.joker) })),
+      powerCards: battle.powerCards.map((power, i) => ({ ...power, type: i === 0 ? 'WILD' : 'GUARD' })),
+      jokerMultiplier: 1, lifestealMultiplier: 0,
+    } },
     siege: {
       started: false,
       elapsed: 0,
@@ -168,12 +237,14 @@ export const siegeDifficulty = (siegeNumber: number) => {
   return {
     hp: 1 + tier * 0.08,
     speed: 1 + Math.min(0.3, tier * 0.015),
-    spawn: 1 / (1 + Math.min(0.6, tier * 0.03)),
   };
 };
 const clone = (state: CastleRun): CastleRun => ({
   ...state,
+  runStats: state.runStats ? { ...state.runStats } : emptyCastleRunStats(),
   run: { ...state.run, player: { ...state.run.player } },
+  progression: { ...state.progression, modules: [...state.progression.modules] },
+  reserve: { ...state.reserve },
   siege: {
     ...state.siege,
     enemies: state.siege.enemies.map((e) => ({ ...e })),
@@ -181,43 +252,58 @@ const clone = (state: CastleRun): CastleRun => ({
   },
 });
 
+function gainXp(state: CastleRun, amount: number, events: SiegeEvent[]) {
+  const previous = state.progression.level;
+  state.progression.xp += amount;
+  state.progression.level = castleLevel(state.progression.xp);
+  for (let level = previous + 1; level <= state.progression.level; level++) events.push({ type: 'level_up', level });
+}
+export function buyCastleModule(current: CastleRun, key: ModuleKey): SiegeResult {
+  const module = MODULES.find((item) => item.id === key);
+  if (current.run.phase !== 'battle' || !module || current.progression.level < module.level ||
+    current.progression.modules.includes(key) || current.siege.coins < module.cost) return { state: current, events: [] };
+  const state = clone(current);
+  state.siege.coins -= module.cost;
+  state.progression.modules.push(key);
+  if (key === 'shieldSoldiers') for (const unit of state.siege.units.filter((u) => u.kind === 'soldier')) {
+    unit.hp += 3; unit.maxHp += 3;
+  }
+  return { state, events: [{ type: 'module_bought', key, cost: module.cost }] };
+}
+export function activateCastleJoker(current: CastleRun, _color: 'red' | 'black'): SiegeResult {
+  return { state: current, events: [] };
+}
 function killDead(state: CastleRun, events: SiegeEvent[]) {
   const dead = state.siege.enemies.filter((e) => e.hp <= 0);
   for (const enemy of dead) {
     state.siege.kills++;
-    state.siege.coins += enemy.boss ? 5 : 1;
-    events.push({ type: 'killed', enemy: { ...enemy } });
+    const coins = enemy.boss ? 5 : 1;
+    state.siege.coins += coins;
+    const stats = state.runStats ??= emptyCastleRunStats();
+    stats.enemiesDefeated++;
+    stats.bossesDefeated += enemy.boss ? 1 : 0;
+    stats.goldEarned += coins;
+    gainXp(state, enemy.boss ? CASTLE_XP.boss : CASTLE_XP.kill, events);
+    events.push({ type: 'killed', enemy: { ...enemy }, coins });
   }
   state.siege.enemies = state.siege.enemies.filter((e) => e.hp > 0);
 }
-function laser(state: CastleRun, events: SiegeEvent[], final = false) {
-  const damage =
-    upgradeValue('laser', state.upgrades.laser) * (state.run.battle?.jokerMultiplier ?? 1);
-  const ratio =
-    ((state.run.battle?.lifestealMultiplier ?? 0) / (state.run.battle?.jokerMultiplier ?? 1)) * 0.3;
-  const previousHp = state.run.player.hp;
-  let healing = 0;
-  for (const enemy of state.siege.enemies) {
-    healing += Math.min(enemy.hp, damage) * ratio;
-    enemy.hp = final ? 0 : Math.max(0, enemy.hp - damage);
+function laser(state: CastleRun, events: SiegeEvent[], final = false, charge = 1) {
+  const damage = upgradeValue('laser', state.upgrades.laser) * charge;
+  const burning = !final && state.progression.modules.includes('volatileLaser')
+    ? state.siege.enemies.filter((enemy) => (enemy.burning ?? 0) > 0) : [];
+  for (const enemy of state.siege.enemies) enemy.hp = final ? 0 : Math.max(0, enemy.hp - damage);
+  for (const source of burning) {
+    for (const target of state.siege.enemies) if (Math.abs(target.progress - source.progress) <= .12) target.hp -= 12;
+    source.burning = 0;
+    events.push({ type: 'detonation', enemy: source.id, damage: 12 });
   }
-  if (healing)
-    state.run = {
-      ...state.run,
-      player: {
-        ...state.run.player,
-        hp: Math.min(state.run.player.maxHp, state.run.player.hp + healing),
-      },
-    };
-  const restored = state.run.player.hp - previousHp;
-  if (restored > 0) events.push({ type: 'boost', effect: 'heal', amount: restored });
   events.push({ type: 'laser', damage, final });
   killDead(state, events);
   state.siege.laserCharge = 0;
 }
-function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
-  const b = state.run.battle!;
-  const multiplier = b.jokerMultiplier ?? 1;
+function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[], charge = 1) {
+  const multiplier = 1;
   const stats = DEFENDER_STATS[kind];
   const base =
     kind === 'turret' || kind === 'soldier'
@@ -227,25 +313,33 @@ function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
         : upgradeValue('mortar', state.upgrades.mortar);
   const unit: Defender = {
     id:
-      kind === 'turret'
-        ? (state.siege.units.find((u) => u.kind === 'turret')?.id ?? state.siege.nextId++)
+      kind === 'turret' || kind === 'mortar'
+        ? (state.siege.units.find((u) => u.kind === kind)?.id ?? state.siege.nextId++)
         : state.siege.nextId++,
     kind,
-    damage: base * multiplier,
-    heal: ((b.lifestealMultiplier ?? 0) / multiplier) * 0.3,
+    damage: base * multiplier * (kind === 'mortar' ? charge : 1),
+    heal: 0,
     cooldown: 0,
     engaged: false,
-    hp: kind === 'soldier' || kind === 'archer' ? 1 : 6,
-    maxHp: kind === 'soldier' || kind === 'archer' ? 1 : 6,
+    hp: kind === 'soldier' ? (state.progression.modules.includes('shieldSoldiers') ? 6 : 3) : kind === 'archer' ? 2 : 6,
+    maxHp: kind === 'soldier' ? (state.progression.modules.includes('shieldSoldiers') ? 6 : 3) : kind === 'archer' ? 2 : 6,
     progress: 0.94,
     ttl: stats.ttl,
-    ammo: kind === 'turret' ? upgradeValue('magazine', state.upgrades.magazine) : stats.ammo,
+    ammo: kind === 'turret' ? upgradeValue('magazine', state.upgrades.magazine) * charge : stats.ammo,
   };
   if (kind === 'turret') {
     const turret = state.siege.units.find((u) => u.kind === 'turret');
     if (turret) {
       Object.assign(turret, unit, { cooldown: Math.max(0, turret.cooldown) });
       events.push({ type: 'reload', id: turret.id, ammo: turret.ammo });
+      return;
+    }
+  }
+  if (kind === 'mortar') {
+    const cannon = state.siege.units.find((u) => u.kind === 'mortar');
+    if (cannon) {
+      Object.assign(cannon, unit, { cooldown: Math.max(0, cannon.cooldown) });
+      events.push({ type: 'deploy', kind, id: cannon.id });
       return;
     }
   }
@@ -266,106 +360,128 @@ function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[]) {
 export function playCastleCard(
   current: CastleRun,
   cardId: string,
-  config: GameConfig
+  _config: GameConfig
 ): SiegeResult {
   if (current.run.phase !== 'battle') return { state: current, events: [] };
-  // Immediate powers are consumed once: undo must not farm healing, coins or bombs.
-  const used = new Set(current.usedPowers ?? []);
   const battle = current.run.battle!;
-  const input = used.has(cardId)
-    ? {
-        ...current.run,
-        battle: { ...battle, powerCards: battle.powerCards.filter((p) => p.cardId !== cardId) },
-      }
-    : current.run;
-  const played = playCard(input, cardId, config);
-  if (played.state === input || !played.state.battle) return { state: current, events: [] };
+  const columnIndex = findCardColumn(battle.tableau, cardId);
+  const card = columnIndex >= 0 ? battle.tableau[columnIndex].cards.at(-1) : undefined;
+  if (!card || card.joker || !isCardExposed(battle.tableau, cardId) ||
+    !canConnectInBattle(card, { ...battle, allowRankWrap: false }))
+    return { state: current, events: [] };
   const state = clone(current);
-  const chain = (current.run.battle?.chain.length ?? 0) + 1;
-  // Card legality, powers and joker order come from the same solitaire engine.
-  // The legacy duel's completion/reward events do not control this siege.
-  state.run = {
-    ...played.state,
-    phase: 'battle',
-    availableRewards: [],
-    battle: {
-      ...played.state.battle,
-      powerCards: battle.powerCards,
-      mode: 'solitaire',
-      enemy: combatant(),
-    },
-  };
-  if (
-    played.events.some(
-      (e) => e.type === 'power_activated' && ['HEAL', 'GUARD', 'GOLD', 'BOMB'].includes(e.powerType)
-    )
-  )
+  const used = new Set(current.usedPowers ?? []);
+  state.emptyDraws = 0;
+  state.drawAssistAt = undefined;
+  (state.runStats ??= emptyCastleRunStats()).cardsPlayed++;
+  const configuredPower = getPowerType(battle.powerCards, cardId);
+  const power = used.has(cardId) ? null : configuredPower === 'GUARD' || configuredPower === 'WILD' ? configuredPower : null;
+  const chain = [...battle.chain, card];
+  state.run = { ...current.run, battle: { ...battle, allowRankWrap: false,
+    tableau: battle.tableau.map((column, index) => index === columnIndex ? { cards: column.cards.slice(0, -1) } : column),
+    discard: battle.activeCard ? [...battle.discard, battle.activeCard] : battle.discard,
+    activeCard: card, chain, castleJokerExit: undefined, wildActive: power === 'WILD',
+    castleCritical: false,
+    powerCards: battle.powerCards.map((item) => item.type === 'GOLD' ? { ...item, type: 'GUARD' } : item),
+  } };
+  const cardEvents: GameEvent[] = [{ type: 'card_played', card, chainPosition: chain.length, damage: 0 }];
+  if (power) {
+    cardEvents.push({ type: 'power_activated', powerType: power, card });
+    if (power === 'WILD') cardEvents.push({ type: 'wild_activated' });
+    // All good cards are single-use, including persistent modifiers.
     used.add(cardId);
+  }
   state.usedPowers = [...used];
   state.siege.started = true;
-  const events: SiegeEvent[] = [
-    {
-      type: 'card',
-      chain,
-      events: played.events.filter(
-        (e) => !['tableau_cleared', 'enemy_died', 'battle_won', 'chain_resolved'].includes(e.type)
-      ),
-    },
-  ];
-  const changes = [
-    ['heal', state.run.player.hp - current.run.player.hp],
-    ['armor', state.run.player.armor - current.run.player.armor],
-    ['gold', state.run.player.gold - current.run.player.gold],
-  ] as const;
-  for (const [effect, amount] of changes)
-    if (amount > 0) events.push({ type: 'boost', effect, amount });
-  // BOMB blasts the whole lane; CRIT improves the newly deployed unit.
-  if (played.events.some((e) => e.type === 'power_activated' && e.powerType === 'BOMB')) {
-    state.siege.enemies.forEach((e) => {
-      e.hp -= config.powerCards.BOMB.flatDamage;
-    });
-    killDead(state, events);
+  const events: SiegeEvent[] = [{ type: 'card', chain: chain.length, events: cardEvents }];
+  gainXp(state, CASTLE_XP.card, events);
+  if (power === 'GUARD') {
+    const rng = RNG.fromState(state.run.rngState);
+    const amount = rng.next() < CASTLE_GUARD_REWARD.bonusChance ? CASTLE_GUARD_REWARD.bonus : CASTLE_GUARD_REWARD.normal;
+    state.run = { ...state.run, rngState: rng.getState(), player: { ...state.run.player, armor: state.run.player.armor + amount } };
+    events.push({ type: 'boost', effect: 'armor', amount });
   }
+  state.siege.laserCharge = chainRewardCounts(chain.length).laser;
   if (isTableauEmpty(state.run.battle!.tableau)) {
     laser(state, events, true);
+    (state.runStats ??= emptyCastleRunStats()).roundsWon++;
     state.run = { ...state.run, phase: 'victory' };
     events.push({ type: 'ended', victory: true });
   }
   return { state, events };
 }
-/** Preview uses a cloned RNG: seeing a recycled card never changes the shuffle. */
+/** A separate seeded stream keeps assistance rolls independent of the pack order. */
+function drawAssistRoll(current: CastleRun) {
+  const rng = current.drawAssistRngState === undefined
+    ? new RNG(current.run.seed + ':stock-assist') : RNG.fromState(current.drawAssistRngState);
+  const at = current.drawAssistAt ?? rng.nextInt(MIN_ASSIST_DRAW, MAX_ASSIST_DRAW);
+  return { at, rngState: rng.getState() };
+}
+/** Extract at most one card; every other stock card keeps its relative order. */
+function castleDrawIndex(current: CastleRun, deck: readonly Card[]): number {
+  const battle = current.run.battle!;
+  const opensMove = (candidate: Card, card: Card) => canConnectInBattle(card, {
+    ...battle, activeCard: candidate, wildActive: false, castleJokerExit: undefined, allowRankWrap: false,
+  });
+  const columns = battle.tableau.filter(column => column.cards.length);
+  if ((current.emptyDraws ?? 0) + 1 < drawAssistRoll(current).at || !deck.length ||
+    columns.some(column => canConnectInBattle(column.cards.at(-1)!, battle)) ||
+    columns.some(column => opensMove(deck[0], column.cards.at(-1)!))) return 0;
+  for (const column of [...columns].sort((a, b) => b.cards.length - a.cards.length)) {
+    const index = deck.findIndex(candidate => opensMove(candidate, column.cards.at(-1)!));
+    if (index >= 0) return index;
+  }
+  return 0;
+}
+/** Preview uses the same draw selection and a cloned RNG without changing state. */
 export function nextCastleCard(current: CastleRun) {
   const battle = current.run.battle;
   if (!battle) return undefined;
-  return battle.deck[0] ?? RNG.fromState(current.run.rngState).shuffle(battle.discard)[0];
+  const deck = battle.deck.length ? battle.deck : RNG.fromState(current.run.rngState).shuffle(battle.discard);
+  return deck[castleDrawIndex(current, deck)];
 }
-export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeResult {
+export function useCastleAbility(current: CastleRun, ability: CastleAbility, config: GameConfig): SiegeResult {
+  if (current.run.phase !== 'battle' || (current.abilitiesUsed ?? []).includes(ability) ||
+    current.siege.coins < CASTLE_ABILITIES[ability].cost ||
+    (ability === 'HEAL' && current.run.player.hp >= current.run.player.maxHp) ||
+    (ability === 'BOMB' && !current.siege.enemies.length) ||
+    (ability === 'ECHO' && !current.run.battle!.chain.length)) return { state: current, events: [] };
+  const state = clone(current);
+  state.siege.coins -= CASTLE_ABILITIES[ability].cost;
+  state.abilitiesUsed = [...(current.abilitiesUsed ?? []), ability];
+  const events: SiegeEvent[] = [{ type: 'ability', ability }];
+  if (ability === 'HEAL') {
+    const hp = Math.min(state.run.player.maxHp, state.run.player.hp + config.powerCards.HEAL.healAmount);
+    events.push({ type: 'boost', effect: 'heal', amount: hp - state.run.player.hp });
+    state.run = { ...state.run, player: { ...state.run.player, hp } };
+  } else if (ability === 'BOMB') {
+    for (const enemy of state.siege.enemies) enemy.hp -= config.powerCards.BOMB.flatDamage;
+    killDead(state, events);
+  } else {
+    const battle = state.run.battle!;
+    const chain = [...battle.chain, ...Array.from({ length: config.powerCards.ECHO.comboBonus }, () => battle.activeCard!)];
+    state.run = { ...state.run, battle: { ...battle, chain } };
+    state.siege.laserCharge = chainRewardCounts(chain.length).laser;
+  }
+  return { state, events };
+}
+export function drawCastleCard(current: CastleRun, _config: GameConfig): SiegeResult {
   if (current.run.phase !== 'battle') return { state: current, events: [] };
   const state = clone(current);
   const events: SiegeEvent[] = [];
   const chain = state.run.battle?.chain.length ?? 0;
+  const rewards = chainRewardCounts(chain);
   // Release all reached rewards once, before drawing resets joker/chain effects.
-  if (chain >= 1) {
-    for (let i = 0; i < upgradeValue('soldier', state.upgrades.soldier); i++)
-      deploy(state, 'soldier', events);
-  }
-  if (chain >= 2) deploy(state, 'archer', events);
-  if (chain >= 3) deploy(state, 'turret', events);
-  if (chain >= 4) deploy(state, 'mortar', events);
-  for (let tier = 5; tier <= chain; tier += 3) laser(state, events);
-  const critical = state.run.battle?.chain.some((card) =>
-    state.run.battle!.powerCards.some((power) => power.cardId === card.id && power.type === 'CRIT')
-  );
-  if (critical)
-    for (const event of events) {
-      if (event.type === 'deploy' || event.type === 'reload') {
-        const unit = state.siege.units.find((u) => u.id === event.id);
-        if (unit) unit.damage *= config.powerCards.CRIT.damageMultiplier;
-      }
-    }
+  for (let i = 0; i < rewards.soldier * upgradeValue('soldier', state.upgrades.soldier); i++)
+    deploy(state, 'soldier', events);
+  for (let i = 0; i < rewards.archer; i++) deploy(state, 'archer', events);
+  if (rewards.turret) deploy(state, 'turret', events, rewards.turret);
+  if (rewards.mortar) deploy(state, 'mortar', events, rewards.mortar);
+  if (rewards.laser) laser(state, events, false, rewards.laser);
   let run = state.run;
   const recycled = !!run.battle && run.battle.deck.length === 0 && run.battle.discard.length > 0;
   if (recycled && run.battle) {
+    const tableauIds = new Set(run.battle.tableau.flatMap(column => column.cards.map(card => card.id)));
     const rng = RNG.fromState(run.rngState);
     run = {
       ...run,
@@ -373,18 +489,36 @@ export function drawCastleCard(current: CastleRun, config: GameConfig): SiegeRes
       battle: { ...run.battle, deck: rng.shuffle(run.battle.discard), discard: [] },
     };
     run = { ...run, rngState: rng.getState() };
+    // Unplayed cards on the field retain their powers; recycled waste loses them.
+    run = { ...run, battle: { ...run.battle!,
+      powerCards: run.battle!.powerCards.filter(power => tableauIds.has(power.cardId)), wildActive: false,
+      castleCritical: false, jokerMultiplier: 1, lifestealMultiplier: 0, castleJokerExit: undefined } };
+    state.usedPowers = (state.usedPowers ?? []).filter(id => tableauIds.has(id));
+    run = { ...run, player: { ...run.player, hp: Math.max(0, run.player.hp - CASTLE_RECYCLE_HP_COST) } };
   }
-  const drawn = drawCard(
-    {
-      ...run,
-      battle: run.battle ? { ...run.battle, accumulatedDamage: 0, chainBaseDamage: 0 } : null,
-    },
-    config
-  );
-  state.run = { ...drawn.state, phase: 'battle' };
+  const battle = run.battle!;
+  const deck = [...battle.deck];
+  const assist = drawAssistRoll(current);
+  const [drawn] = deck.splice(castleDrawIndex(current, deck), 1);
+  const activeCard = drawn ?? battle.activeCard;
+  const discard = activeCard !== battle.activeCard && battle.activeCard ? [...battle.discard, battle.activeCard] : battle.discard;
+  state.run = { ...run, battle: { ...battle, deck, activeCard, discard, chain: [], accumulatedDamage: 0,
+    chainBaseDamage: 0, jokerMultiplier: 1, lifestealMultiplier: 0, castleJokerExit: undefined,
+    castleCritical: false,
+    wildActive: false, isFirstChain: false, turnNumber: battle.turnNumber + 1 } };
+  const nextBattle = state.run.battle!;
+  const playable = nextBattle.tableau.some(column => column.cards.length &&
+    canConnectInBattle(column.cards.at(-1)!, nextBattle));
+  state.emptyDraws = playable ? 0 : Math.min(MAX_ASSIST_DRAW - 1, (current.emptyDraws ?? 0) + (drawn ? 1 : 0));
+  state.drawAssistAt = playable ? undefined : assist.at;
+  state.drawAssistRngState = assist.rngState;
   state.siege.started = true;
   state.siege.laserCharge = 0;
   events.push({ type: 'draw', recycled });
+  if (state.run.player.hp <= 0) {
+    state.run = { ...state.run, phase: 'defeat' };
+    events.push({ type: 'ended', victory: false });
+  }
   return { state, events };
 }
 
@@ -397,10 +531,11 @@ export function stepSiege(current: CastleRun): SiegeResult {
     events: SiegeEvent[] = [];
   const difficulty = siegeDifficulty(state.siegeNumber);
   siege.elapsed += STEP;
+  (state.runStats ??= emptyCastleRunStats()).seconds += STEP;
   siege.spawnIn -= STEP;
-  if (siege.spawnIn <= 0 && siege.enemies.length < SIEGE_PACING.maxEnemies) {
+  if (siege.spawnIn <= 0) {
     const level = Math.floor(siege.elapsed / 30);
-    const size = Math.min(SIEGE_PACING.maxGroupSize, SIEGE_PACING.groupSize + level);
+    const size = SIEGE_PACING.groupSize * Math.max(1, state.siegeNumber);
     const rng = RNG.fromState(siege.rngState);
     for (let i = 0; i < size && siege.enemies.length < SIEGE_PACING.maxEnemies; i++) {
       siege.spawned++;
@@ -416,7 +551,8 @@ export function stepSiege(current: CastleRun): SiegeResult {
         boss,
         hp,
         maxHp: hp,
-        progress: i * 0.035,
+        // World coordinates occupy 78% of the screen; ports span screen x=10–50%.
+        progress: (0.1 + rng.next() * 0.4) / 0.78,
         speed: ((boss ? 0.025 : 0.032) + rng.next() * 0.006) * difficulty.speed,
         damage: boss ? 4 : 1 + Math.floor(level / 2),
         cooldown: 0,
@@ -425,28 +561,31 @@ export function stepSiege(current: CastleRun): SiegeResult {
       events.push({ type: 'spawn', enemy: { ...enemy } });
     }
     siege.rngState = rng.getState();
-    siege.spawnIn =
-      difficulty.spawn *
-      Math.max(
-        SIEGE_PACING.intervalFloor,
-        SIEGE_PACING.interval - Math.floor(siege.elapsed / 2) * SIEGE_PACING.acceleration
-      );
+    siege.spawnIn = SIEGE_PACING.interval;
   }
+  for (const enemy of siege.enemies) if ((enemy.burning ?? 0) > 0) {
+    enemy.hp -= (enemy.burnDamage ?? 2) * Math.min(STEP, enemy.burning!);
+    enemy.burning = Math.max(0, enemy.burning! - STEP);
+  }
+  killDead(state, events);
   for (const unit of siege.units) {
-    if (unit.engaged && unit.kind !== 'turret') unit.ttl -= STEP;
+    if (unit.engaged && unit.kind !== 'turret' && unit.kind !== 'mortar') unit.ttl -= STEP;
     unit.cooldown -= STEP;
     const mobile = unit.kind === 'soldier';
+    if (mobile) unit.progress = Math.max(SOLDIER_HOLD_PROGRESS, unit.progress);
     const nearby = siege.enemies.some(
-      (e) => e.hp > 0 && Math.abs(e.progress - unit.progress) <= 0.045
+      (e) => e.hp > 0 && Math.abs(e.progress - unit.progress) <= MELEE_RANGE
     );
-    if (mobile && !nearby) unit.progress = Math.max(0, unit.progress - 0.065 * STEP);
+    if (mobile && nearby) unit.engaged = true;
+    if (soldierIsMarching(unit, siege.enemies))
+      unit.progress = Math.max(SOLDIER_HOLD_PROGRESS, unit.progress - 0.065 * STEP);
     if (unit.hp <= 0 || unit.ttl <= 0 || unit.ammo <= 0 || unit.cooldown > 0) continue;
     const stats = DEFENDER_STATS[unit.kind];
     const range = stats.range;
     const targets = siege.enemies
       .filter(
         (e) =>
-          e.hp > 0 && (mobile ? Math.abs(e.progress - unit.progress) <= 0.045 : e.progress >= range)
+          e.hp > 0 && (mobile ? Math.abs(e.progress - unit.progress) <= MELEE_RANGE : e.progress >= range)
       )
       .sort((a, b) => b.progress - a.progress);
     if (!targets.length) continue;
@@ -465,24 +604,32 @@ export function stepSiege(current: CastleRun): SiegeResult {
             hp: Math.min(state.run.player.maxHp, state.run.player.hp + damage * unit.heal),
           },
         };
-      events.push({ type: 'shot', kind: unit.kind, unit: unit.id, target: target.id, damage });
+      const fire = unit.kind === 'archer' && state.progression.modules.includes('fireArrows');
+      if (fire) { target.burning = 4; target.burnDamage = 2; }
+      events.push({ type: 'shot', kind: unit.kind, unit: unit.id, target: target.id, damage, ...(fire ? { fire: true } : {}) });
     }
   }
   killDead(state, events);
+  for (const unit of siege.units) {
+    if (unit.kind !== 'turret' && unit.kind !== 'mortar' && (unit.ttl <= 0 || unit.ammo <= 0))
+      events.push({ type: 'unit_killed', unit: { ...unit } });
+  }
   siege.units = siege.units.filter(
-    (u) => u.hp > 0 && (u.kind === 'turret' || (u.ttl > 0 && u.ammo > 0))
+    (u) => u.hp > 0 && (u.kind === 'turret' || u.kind === 'mortar' || (u.ttl > 0 && u.ammo > 0))
   );
   for (const enemy of siege.enemies) {
     const opponent = siege.units.find(
       (u) =>
         u.hp > 0 &&
-        (u.kind === 'soldier' || u.kind === 'archer') &&
-        Math.abs(u.progress - enemy.progress) <= 0.06
+        u.kind === 'soldier' &&
+        Math.abs(u.progress - enemy.progress) <= MELEE_RANGE
     );
     enemy.cooldown -= STEP;
     if (opponent) {
+      opponent.engaged = true;
       if (enemy.cooldown <= 0) {
         enemy.cooldown = 1;
+        events.push({ type: 'melee', enemy: enemy.id, unit: opponent.id });
         opponent.hp = Math.max(0, opponent.hp - enemy.damage);
         if (opponent.hp === 0) events.push({ type: 'unit_killed', unit: { ...opponent } });
       }
@@ -491,7 +638,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
     enemy.progress = Math.min(0.94, enemy.progress + enemy.speed * STEP);
     if (enemy.progress >= 0.94 && enemy.cooldown <= 0) {
       enemy.cooldown = enemy.boss ? 3 : 3.5;
-      const blocked = Math.min(state.run.player.armor, enemy.damage);
+      const blocked = enemy.boss ? 0 : Math.min(state.run.player.armor, enemy.damage);
       const damage = enemy.damage - blocked;
       state.run = {
         ...state.run,
@@ -514,4 +661,4 @@ export function stepSiege(current: CastleRun): SiegeResult {
   return { state, events };
 }
 export const earnedCoins = (state: CastleRun) =>
-  state.siege.coins + state.run.player.gold + (state.run.phase === 'victory' ? 10 : 0);
+  state.siege.coins;

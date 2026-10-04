@@ -1,0 +1,57 @@
+YANNZ – GAME MUSIC PACK LICENSE
+--------------------------------
+
+These tracks are composed and produced by YannZ (Yanni Ziangos). All rights remain with the composer. This document grants you a limited license to use the music under the terms below.
+
+1. Grant of License  
+   You are granted a perpetual, worldwide, non‑exclusive, royalty‑free, non‑transferable license to use the music in your project, provided you abide by these terms.  
+   **Note:** This license is intended for independent (“indie”) game developers. If you represent a large studio, publisher, or enterprise-level company, you must request a separate commercial license—please contact yziango@gmail.com.
+
+2. Permitted Uses  
+   You **MAY**:  
+   - Use the tracks in commercial or non‑commercial indie games, prototypes, jams, and apps.  
+   - Include them in trailers, livestreams, video content, and social media posts.  
+   - Edit, loop, cut, fade or otherwise modify the tracks to fit your needs.  
+   - Share your final project publicly (Steam, Itch.io, consoles, mobile stores, etc.).  
+   - Upload gameplay videos using these tracks to platforms like YouTube or Twitch.
+
+3. Prohibited Uses  
+   You **MAY NOT**:  
+   - Sell, resell, sublicense, or redistribute the music as standalone audio (even if modified).  
+   - Claim the music or any derivative as your own composition.  
+   - Use the music in any hateful, discriminatory, pornographic, or otherwise harmful content.  
+   - Use the music in projects that violate any laws or rights of third parties.  
+   - Use this indie license for large-scale, enterprise, or high‑budget productions.
+
+4. Credit Requirement  
+   You **MUST** credit as follows, visibly in your project’s credits, store page, or description:
+
+     Music by YannZ – https://yannz41.itch.io  
+     Spotify: https://open.spotify.com/intl-it/artist/76CUcHd0t0XViSm9YBbHBw  
+     Contact: yziango@gmail.com
+
+5. Disclaimer & Liability  
+   The music is provided “AS IS” without warranty of any kind. YannZ is not liable for any damages arising from your use of the music.
+
+6. Support & More  
+   - Discover more tracks and stay updated at https://yannz.io/links  
+   - Download additional free packs at https://yannz41.itch.io/  
+   - For custom commissions or enterprise licensing, contact yziango@gmail.com
+
+7. Metadata Integrity  
+   All audio files you download come with embedded metadata (ID3 tags, Vorbis comments, etc.) that identify the track title, composer (YannZ), copyright notice, and license terms. You **MUST NOT** remove, alter, or obscure any of these metadata fields when using or redistributing the music. Doing so violates this license and terminates your right to use the music.
+
+Thank you for using my music. I’d love to see your project—feel free to reach out or tag me online!
+
+—  
+YannZ  
+Composer | Session Musician | Game Audio Artist  
+
+Itch.io page
+https://yannz41.itch.io   
+
+Spotify artist profile
+https://open.spotify.com/intl-it/artist/76CUcHd0t0XViSm9YBbHBw
+
+
+Rights protected under international copyright law and SACEM (EU)

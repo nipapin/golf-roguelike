@@ -28,7 +28,7 @@ Historical initial audio recipe (superseded by CI v1): SFX were silence-trimmed,
 
 ## Gameplay additions
 
-NEXT peeks at the stock's first card. With exhausted stock it previews the deterministic discard shuffle using a copied RNG. No tableau is redealt. Recycling plays a 900ms animated fan / gather sequence; siege time pauses during that animation.
+The castle stock is a closed pile matching the active card in size. Tap the pile to draw; there is no separate DRAW button. Draw cards fly from the pile to the active slot. Empty stock shows a shuffle arrow and the explicit 5 HP cost; it does not preview the shuffled discard. No tableau is redealt. Recycling gathers cards into the stock; siege time pauses during that animation.
 
 UNDO restores the previous successful tableau card and chain, costs one castle HP, and leaves live combat and already triggered effects intact. Immediate HEAL/GUARD/GOLD/BOMB powers are consumed once to prevent replay farming. Drawing commits deployment and clears undo. Undo is unavailable with one HP or after the run ends.
 

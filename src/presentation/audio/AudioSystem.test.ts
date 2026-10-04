@@ -7,6 +7,7 @@ class AudioParamStub {
   linearRampToValueAtTime = vi.fn();
   exponentialRampToValueAtTime = vi.fn();
   setTargetAtTime = vi.fn();
+  cancelScheduledValues = vi.fn();
 }
 class AudioNodeStub {
   gain = new AudioParamStub();
@@ -21,7 +22,7 @@ class AudioNodeStub {
   connect = vi.fn();
   disconnect = vi.fn();
   start = vi.fn();
-  stop = vi.fn(() => this.onended?.());
+  stop = vi.fn((_when?: number) => this.onended?.());
   buffer: unknown;
   type = '';
   onended: (() => void) | null = null;
@@ -99,7 +100,7 @@ it('mixes quieter SFX and actually starts one music loop after a gesture', async
   expect(ContextStub.instances).toHaveLength(1);
   const context = ContextStub.instances[0];
   expect(context.gains[0].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.22, 0, 0.04);
-  expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.18, 0, 0.08);
+  expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.12, 0, 0.08);
   expect(
     context.sources.filter((source) => (source as AudioNodeStub & { loop?: boolean }).loop)
   ).toHaveLength(1);
@@ -132,7 +133,7 @@ it('persists independent volumes and resumes a suspended context on a new gestur
   expect(context.state).toBe('running');
 });
 
-it('keeps one soundtrack playing and filters it outside battle', async () => {
+it('crossfades menu and battle tracks, keeps their positions and reuses the menu loop on results', async () => {
   const { AudioSystem } = await import('./AudioSystem');
   await AudioSystem.init();
   AudioSystem.unlock();
@@ -141,15 +142,31 @@ it('keeps one soundtrack playing and filters it outside battle', async () => {
     (source) => (source as AudioNodeStub & { loop?: boolean }).loop
   )!;
   const filter = context.filters[0];
+  context.currentTime = 5;
   AudioSystem.setMusicScene('battle');
-  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(18000, 0, 0.25);
+  const battle = context.sources.at(-1)!;
+  expect(battle.buffer).not.toBe(music.buffer);
+  expect(music.stop).toHaveBeenCalledWith(5.6);
+  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(7000, 5, 0.6);
+  const before = context.sources.length;
+  AudioSystem.setMusicScene('battle');
+  expect(context.sources).toHaveLength(before);
+  context.currentTime = 12;
   AudioSystem.setMusicScene('defeat');
-  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(650, 0, 0.25);
+  const resumedMenu = context.sources.at(-1)!;
+  expect(resumedMenu.buffer).toBe(music.buffer);
+  expect(resumedMenu.start).toHaveBeenCalledWith(0, 5);
+  expect(battle.stop).toHaveBeenCalledWith(12.6);
+  expect(filter.frequency.setTargetAtTime).toHaveBeenLastCalledWith(4200, 12, 0.6);
   AudioSystem.setMusicScene('menu');
-  expect(music.stop).not.toHaveBeenCalled();
-  expect(
-    context.sources.filter((source) => (source as AudioNodeStub & { loop?: boolean }).loop)
-  ).toHaveLength(1);
+  expect(context.sources.at(-1)).toBe(resumedMenu);
+  context.currentTime = 15;
+  AudioSystem.isMusicEnabled = false;
+  context.currentTime = 30;
+  AudioSystem.setMusicScene('battle');
+  expect(context.sources.at(-1)).toBe(resumedMenu);
+  AudioSystem.isMusicEnabled = true;
+  expect(context.sources.at(-1)!.start).toHaveBeenCalledWith(0, 7);
 });
 
 it('uses recorded rising combo and distinct power buffers without oscillators', async () => {
@@ -174,9 +191,15 @@ it('loads the replacement music and versioned recorded cues instead of cached le
   const { AudioSystem } = await import('./AudioSystem');
   await AudioSystem.init();
   const urls = vi.mocked(fetch).mock.calls.map((call) => String(call[0]));
-  expect(urls).toContain('/audio/hd-v3/hope-battle.mp3');
-  expect(urls).toContain('/audio/ci-v1/card-1.mp3');
-  expect(urls.filter((url) => url.includes('/ci-v1/'))).toHaveLength(31);
+  expect(urls).toContain('/audio/user-sfx-v1/menu.mp3');
+  expect(urls).toContain('/audio/user-sfx-v1/game.mp3');
+  expect(urls).toContain('/audio/user-sfx-v1/card_01.mp3');
+  expect(urls).toContain('/audio/user-sfx-v1/laser.mp3');
+  expect(urls).toContain('/audio/user-sfx-v1/arrow_02.mp3');
+  expect(urls).toContain('/audio/user-sfx-v1/sword_05.mp3');
+  expect(urls).not.toContain('/audio/ci-v1/laser.mp3');
+  expect(urls).not.toContain('/audio/lucid-v1/quiet-piano.ogg');
+  expect(urls.filter((url) => url.includes('/soft-v1/'))).toHaveLength(2);
   expect(new Set(urls).size).toBe(urls.length);
   expect(urls).not.toContain('/audio/heartfelt-battle.mp3');
   expect(urls).not.toContain('/audio/combo-up.mp3');
@@ -216,6 +239,76 @@ it('coalesces castle damage bursts and limits overlapping laser tails', async ()
   expect(first.stop).toHaveBeenCalledOnce();
 });
 
+it('caps a long firing recording to one shot cycle, fades its cutoff and cleans up when it ends', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const source = new AudioNodeStub();
+  // Web Audio schedules stop in the future; onended arrives only at that deadline.
+  source.stop.mockImplementation(() => {});
+  const create = vi.spyOn(context, 'createBufferSource').mockReturnValueOnce(source);
+  context.currentTime = 10;
+  AudioSystem.play('turret_shot', { duration: 0.25, pitchShift: 0.5, volume: 0.8 });
+  const gain = context.gains.at(-1)!;
+  expect(source.start).toHaveBeenCalledWith(0);
+  expect(source.playbackRate.value).toBe(1.5);
+  expect(source.stop).toHaveBeenCalledWith(10.25);
+  expect(gain.gain.setValueAtTime).toHaveBeenCalledWith(0.8, 10.235);
+  expect(gain.gain.linearRampToValueAtTime).toHaveBeenCalledWith(0, 10.25);
+  expect(source.disconnect).not.toHaveBeenCalled();
+  const system = AudioSystem as unknown as { activeVoices: { soundId: string }[] };
+  expect(system.activeVoices.map((voice) => voice.soundId)).toContain('turret_shot');
+  source.onended!();
+  expect(system.activeVoices).toHaveLength(0);
+  expect(source.disconnect).toHaveBeenCalledOnce();
+  expect(gain.disconnect).toHaveBeenCalledOnce();
+  create.mockRestore();
+
+  // Existing effects retain their full recordings unless their caller supplies a cap.
+  AudioSystem.play('mortar_shot');
+  expect(context.sources.at(-1)!.stop).not.toHaveBeenCalled();
+  expect(context.gains.at(-1)!.gain.linearRampToValueAtTime).not.toHaveBeenCalled();
+});
+
+it('stops the turret channel with a short fade, replacing scheduled cutoffs without stopping other effects or music', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const music = context.sources.find((source) => (source as AudioNodeStub & { loop?: boolean }).loop)!;
+  const first = new AudioNodeStub(), second = new AudioNodeStub();
+  first.stop.mockImplementation(() => {});
+  second.stop.mockImplementation(() => {});
+  const create = vi.spyOn(context, 'createBufferSource').mockReturnValueOnce(first).mockReturnValueOnce(second);
+  context.currentTime = 10;
+  AudioSystem.play('turret_shot', { duration: 0.25 });
+  const firstGain = context.gains.at(-1)!;
+  context.currentTime = 10.2;
+  AudioSystem.play('turret_shot', { duration: 0.25 });
+  const secondGain = context.gains.at(-1)!;
+  create.mockRestore();
+  AudioSystem.play('laser_blast');
+  const laser = context.sources.at(-1)!;
+  context.currentTime = 10.21;
+  AudioSystem.stopSound('turret_shot');
+  for (const [source, gain] of [[first, firstGain], [second, secondGain]]) {
+    expect(gain.gain.cancelScheduledValues).toHaveBeenCalledWith(10.21);
+    expect(gain.gain.linearRampToValueAtTime).toHaveBeenLastCalledWith(0, 10.22);
+    expect(source.stop.mock.calls.at(-1)![0]).toBeCloseTo(10.222, 6);
+    source.onended!();
+    expect(source.disconnect).toHaveBeenCalledOnce();
+    expect(gain.disconnect).toHaveBeenCalledOnce();
+  }
+  expect(laser.stop).not.toHaveBeenCalled();
+  expect(music.stop).not.toHaveBeenCalled();
+  const system = AudioSystem as unknown as { activeVoices: { soundId: string }[] };
+  expect(system.activeVoices.map((voice) => voice.soundId)).toEqual(['laser_blast']);
+  AudioSystem.stopSound('turret_shot');
+  expect(first.stop).toHaveBeenCalledTimes(2);
+  expect(second.stop).toHaveBeenCalledTimes(2);
+});
+
 it('routes both buses through master compression with headroom', async () => {
   const { AudioSystem } = await import('./AudioSystem');
   await AudioSystem.init();
@@ -240,4 +333,67 @@ it('leaves the first card as foley and grows later combo accents', async () => {
   context.currentTime += 0.1;
   AudioSystem.playCombo(20);
   expect(context.gains.at(-1)!.gain.value).toBeGreaterThan(firstLevel);
+});
+
+it('varies weapon, critical and placement takes without repeating and shares the event throttle', async () => {
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init();
+  AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  const random = vi.spyOn(Math, 'random').mockReturnValue(0);
+  for (const id of ['archer_shot', 'soldier_shot', 'power_crit', 'unit_deploy'] as const) {
+    AudioSystem.play(id);
+    const first = context.sources.at(-1)!;
+    AudioSystem.play(id);
+    expect(context.sources.at(-1)).toBe(first);
+    context.currentTime += 0.2;
+    AudioSystem.play(id);
+    expect(context.sources.at(-1)!.buffer).not.toBe(first.buffer);
+    context.currentTime += 0.2;
+  }
+  random.mockRestore();
+});
+
+it('applies separate music overrides and mute to the selected scene', async () => {
+  const { emptyConfig } = await import('../../configurator/config');
+  const config = emptyConfig();
+  config.sounds.music = { volume: 0.5 };
+  config.sounds.music_battle = { url: '/assets/custom/battle.mp3', muted: true };
+  vi.stubGlobal('fetch', vi.fn(async () => ({ ok: true, json: async () => config,
+    arrayBuffer: async () => new ArrayBuffer(0) })));
+  const runtime = await import('../../configurator/runtime');
+  await runtime.loadAssetConfig();
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init(); AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.06, 0, 0.08);
+  AudioSystem.setMusicScene('battle');
+  expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0, 0, 0.08);
+  AudioSystem.setMusicScene('menu');
+  expect(context.gains[1].gain.setTargetAtTime).toHaveBeenLastCalledWith(0.06, 0, 0.08);
+  expect(vi.mocked(fetch).mock.calls.map((call) => String(call[0]))).toContain('/assets/custom/battle.mp3');
+});
+
+it('replaces one shared-file event independently and applies its volume, pitch and mute', async () => {
+  const { emptyConfig } = await import('../../configurator/config');
+  const config = emptyConfig();
+  config.sounds.card_play_1 = { url: '/assets/custom/card.wav', volume: 0.5, rate: 0.75 };
+  config.sounds.archer_shot = { muted: true };
+  vi.stubGlobal('fetch', vi.fn(async (url: string) => ({ ok: true, json: async () => config,
+    arrayBuffer: async () => Object.assign(new ArrayBuffer(0), { url }) })));
+  const runtime = await import('../../configurator/runtime');
+  await runtime.loadAssetConfig();
+  const { AudioSystem } = await import('./AudioSystem');
+  await AudioSystem.init(); AudioSystem.unlock();
+  const context = ContextStub.instances[0];
+  AudioSystem.play('card_play_1', { volume: 1 });
+  const custom = context.sources.at(-1)!;
+  expect(custom.playbackRate.value).toBe(0.75);
+  expect(context.gains.at(-1)!.gain.value).toBe(0.5);
+  AudioSystem.play('card_play');
+  expect(context.sources.at(-1)!.buffer).not.toBe(custom.buffer);
+  const before = context.sources.length;
+  AudioSystem.play('archer_shot');
+  expect(context.sources.length).toBe(before);
+  expect(vi.mocked(fetch).mock.calls.map((call) => String(call[0]))).toContain('/assets/custom/card.wav');
 });

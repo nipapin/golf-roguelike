@@ -154,7 +154,7 @@ describe('playCard', () => {
       const state = createTestBattleState(seed);
       const battle = state.battle!;
 
-      // Find a playable card (only diff === 1, since we don't have aceKingWrap relic)
+      // Use an adjacent ordinary card to exercise the standard legal-play path.
       const activeRank = battle.activeCard!.rank;
       let playableCard: Card | null = null;
 

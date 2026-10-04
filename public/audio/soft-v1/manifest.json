@@ -1,0 +1,92 @@
+{
+  "laser": {
+    "source": ".local/audio-sources/scifi/Audio/laserLarge_000.ogg",
+    "sourceSha256": "a56d95794cd732d6c2d66ce488c14cf557fe526c282897c9a77675c2bd9b77e6",
+    "lowpassHz": 5200,
+    "gain": 0.4884611601258587,
+    "durationSeconds": 0.6766458333333333,
+    "peakBeforeEncoding": 0.2780537009239197,
+    "outputSha256": "0dc55c9a0f14db4964df38ba8e8e64b4ab32ae1d86830cf494d10e22daaa7750"
+  },
+  "sword": {
+    "source": ".local/audio-sources/rpg/Audio/knifeSlice.ogg",
+    "sourceSha256": "4cd96dc630bed9840c15f1dd2306da2cc56a4da26a5d3f1a03c5a7265ac5e54f",
+    "lowpassHz": 6000,
+    "gain": 0.5727587983173043,
+    "durationSeconds": 0.5995416666666666,
+    "peakBeforeEncoding": 0.4028084874153137,
+    "outputSha256": "147bdca12a295728207f05e1430ca905904ca465c5aea6f66d665106d7a7c6d9"
+  },
+  "step-1": {
+    "source": ".local/audio-sources/rpg/Audio/footstep04.ogg",
+    "sourceSha256": "fd264d72a7cd622b82abde202f4ed09fa7de95d34c36473ee938ce66cdf39830",
+    "lowpassHz": 4200,
+    "gain": 0.5610426796334306,
+    "durationSeconds": 0.32283333333333336,
+    "peakBeforeEncoding": 0.3991940915584564,
+    "outputSha256": "8905555d68411662ef218a08cac457c393b2636402b684806fa8ff64cb8662da"
+  },
+  "step-2": {
+    "source": ".local/audio-sources/rpg/Audio/footstep06.ogg",
+    "sourceSha256": "6cabfe7ae95d227a84066c6e17014ac31cc7c89b14ef51d7877e98352d4a64fb",
+    "lowpassHz": 4200,
+    "gain": 0.39895180347511194,
+    "durationSeconds": 0.242125,
+    "peakBeforeEncoding": 0.4055822491645813,
+    "outputSha256": "0bdc17872a1425b153d60eab3fa7a464609fd02492a973bb2e8b7e6581466eb0"
+  },
+  "reload": {
+    "source": ".local/audio-sources/rpg/Audio/metalLatch.ogg",
+    "sourceSha256": "ba9ba60b172b3ebc131a940f25793cd2e207aca7af73dc80d637277f060f1708",
+    "lowpassHz": 5400,
+    "gain": 0.43249178155035517,
+    "durationSeconds": 0.2613333333333333,
+    "peakBeforeEncoding": 0.5,
+    "outputSha256": "e49b1feeebd546a21d8c751deda88642f274064f854070b936c96fa5210be24c"
+  },
+  "deploy": {
+    "source": ".local/audio-sources/rpg/Audio/cloth1.ogg",
+    "sourceSha256": "ddb93a3671233f95da0e0b10367f082f7eb42fa6caaddcf776410aa8833c747d",
+    "lowpassHz": 5200,
+    "gain": 0.7713385910758143,
+    "durationSeconds": 0.6610416666666666,
+    "peakBeforeEncoding": 0.5,
+    "outputSha256": "50d35b6dff70ff0692ff0ddfd1f9c7fd47694188967ef365c32b8d8e12ab328a"
+  },
+  "arrow": {
+    "source": "public/audio/ci-v1/arrow.mp3",
+    "sourceSha256": "cf21f6cabd5d23da83bdc1d0b61808243ad0cff80e1fba0f83ee5623c7a7e083",
+    "lowpassHz": 5600,
+    "gain": 0.5856486704688431,
+    "durationSeconds": 0.3,
+    "peakBeforeEncoding": 0.374088853597641,
+    "outputSha256": "9651286fda634414fde3b1ca3a035a4d2ed0aa0529a6ea1e67dc57fc887a8f0c"
+  },
+  "turret": {
+    "source": "public/audio/ci-v1/gun.mp3",
+    "sourceSha256": "098987d9130892578d96b59301e670d77ad9d722a2a5eb9160b17a4cc3022933",
+    "lowpassHz": 3800,
+    "gain": 0.38110345614772073,
+    "durationSeconds": 0.35,
+    "peakBeforeEncoding": 0.18786941468715668,
+    "outputSha256": "f0d9624a228b8b40ce70b9d5af25871cd116e40856ab1c03dc61b8b929627bb5"
+  },
+  "mortar": {
+    "source": "public/audio/ci-v1/bomb.mp3",
+    "sourceSha256": "10adbaafa4149b9f97d2e7e60d277b1648f79d7f023e9d589627481dcfc48355",
+    "lowpassHz": 4200,
+    "gain": 0.5328649249952905,
+    "durationSeconds": 0.8058958333333334,
+    "peakBeforeEncoding": 0.3972633481025696,
+    "outputSha256": "e17d6ae36380fea70b10b7e60157fb434bd58f0b0a0d511479eeb0669ed30dd9"
+  },
+  "wall-hit": {
+    "source": "public/audio/ci-v1/wall-hit.mp3",
+    "sourceSha256": "2d16634d3043a2ecf7cb9525b37c6efdc990a05d89ca8e1c7497dcc7b69b9862",
+    "lowpassHz": 3800,
+    "gain": 0.4503507744662963,
+    "durationSeconds": 0.45,
+    "peakBeforeEncoding": 0.354687362909317,
+    "outputSha256": "5ff771dc154531e56e0dd20bb4ece0f9e03f328a1e0b2424a00ce3dfa0bc40cb"
+  }
+}

@@ -1,4 +1,5 @@
 import type Phaser from 'phaser';
+import { viewportUiScale } from './desktopLayout';
 
 /** Highest canvas density we render at. DPR 3 phones look identical at 2 and save ~45% fill-rate. */
 export const MAX_RENDER_DENSITY = 2;
@@ -10,12 +11,16 @@ export function setRenderDensity(value: number): void {
   renderDensity = Math.max(1, Math.min(MAX_RENDER_DENSITY, Number.isFinite(value) ? value : 1));
 }
 export function getRenderDensity(): number { return renderDensity; }
+export function getViewportUiScale(scene: Pick<Phaser.Scene, 'scale'>): number {
+  return viewportUiScale(scene.scale.width / renderDensity, scene.scale.height / renderDensity);
+}
 export function viewport(scene: Pick<Phaser.Scene, 'scale'>) {
-  return { width: scene.scale.width / renderDensity, height: scene.scale.height / renderDensity };
+  const scale = renderDensity * getViewportUiScale(scene);
+  return { width: scene.scale.width / scale, height: scene.scale.height / scale };
 }
 export function configureViewport(scene: Phaser.Scene): void {
   const size = viewport(scene);
-  scene.cameras.main.setOrigin(.5, .5).setZoom(renderDensity).centerOn(size.width / 2, size.height / 2);
+  scene.cameras.main.setOrigin(.5, .5).setZoom(renderDensity * getViewportUiScale(scene)).centerOn(size.width / 2, size.height / 2);
 }
 
 export interface SafeInsets { top: number; bottom: number }

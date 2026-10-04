@@ -1,0 +1,373 @@
+[
+  {
+    "key": "knight-extra",
+    "title": "Рыцарь",
+    "file": "knight-extra.png",
+    "atlas": "knight-extra.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      314,
+      627,
+      940,
+      1254
+    ],
+    "animations": {
+      "idle": {
+        "start": 0,
+        "end": 3,
+        "frameRate": 6,
+        "repeat": -1
+      },
+      "hurt": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 8,
+        "end": 15,
+        "frameRate": 10,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "archer-extra",
+    "title": "Лучник",
+    "file": "archer-extra.png",
+    "atlas": "archer-extra.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      323,
+      647,
+      945,
+      1254
+    ],
+    "animations": {
+      "idle": {
+        "start": 0,
+        "end": 3,
+        "frameRate": 6,
+        "repeat": -1
+      },
+      "hurt": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 8,
+        "end": 15,
+        "frameRate": 10,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "goblin",
+    "title": "Гоблин",
+    "file": "goblin.png",
+    "atlas": "goblin.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      314,
+      627,
+      940,
+      1254
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": -1,
+        "asset": "goblin-walk-v2"
+      },
+      "attack": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": 0
+      },
+      "hurt": {
+        "start": 8,
+        "end": 11,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 12,
+        "end": 15,
+        "frameRate": 6,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "orc",
+    "title": "Орк",
+    "file": "orc.png",
+    "atlas": "orc.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      314,
+      627,
+      940,
+      1254
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": -1,
+        "asset": "orc-walk-v2"
+      },
+      "attack": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": 0
+      },
+      "hurt": {
+        "start": 8,
+        "end": 11,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 12,
+        "end": 15,
+        "frameRate": 6,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "reaper",
+    "title": "Жнец",
+    "file": "reaper.png",
+    "atlas": "reaper.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      314,
+      627,
+      940,
+      1254
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 3,
+        "frameRate": 8,
+        "repeat": -1
+      },
+      "attack": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": 0
+      },
+      "hurt": {
+        "start": 8,
+        "end": 11,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 12,
+        "end": 15,
+        "frameRate": 6,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "ogre-boss",
+    "title": "Огр-босс",
+    "file": "ogre-boss.png",
+    "atlas": "ogre-boss.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      314,
+      627,
+      940,
+      1254
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": -1,
+        "asset": "ogre-boss-walk-v2"
+      },
+      "attack": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": 0
+      },
+      "hurt": {
+        "start": 8,
+        "end": 11,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 12,
+        "end": 15,
+        "frameRate": 6,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "reaper-boss",
+    "title": "Жнец-босс",
+    "file": "reaper-boss.png",
+    "atlas": "reaper-boss.atlas.json",
+    "columns": 4,
+    "rows": 4,
+    "hidden": false,
+    "sheetWidth": 1254,
+    "sheetHeight": 1254,
+    "rowBoundaries": [
+      0,
+      314,
+      627,
+      940,
+      1254
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 3,
+        "frameRate": 8,
+        "repeat": -1
+      },
+      "attack": {
+        "start": 4,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": 0
+      },
+      "hurt": {
+        "start": 8,
+        "end": 11,
+        "frameRate": 12,
+        "repeat": 0
+      },
+      "dead": {
+        "start": 12,
+        "end": 15,
+        "frameRate": 6,
+        "repeat": 0
+      }
+    }
+  },
+  {
+    "key": "goblin-walk-v2",
+    "title": "Гоблин — ходьба",
+    "file": "goblin-walk-v2.png",
+    "atlas": "goblin-walk-v2.atlas.json",
+    "columns": 4,
+    "rows": 2,
+    "hidden": true,
+    "sheetWidth": 1774,
+    "sheetHeight": 887,
+    "rowBoundaries": [
+      0,
+      444,
+      887
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": -1
+      }
+    }
+  },
+  {
+    "key": "orc-walk-v2",
+    "title": "Орк — ходьба",
+    "file": "orc-walk-v2.png",
+    "atlas": "orc-walk-v2.atlas.json",
+    "columns": 4,
+    "rows": 2,
+    "hidden": true,
+    "sheetWidth": 1774,
+    "sheetHeight": 887,
+    "rowBoundaries": [
+      0,
+      444,
+      887
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": -1
+      }
+    }
+  },
+  {
+    "key": "ogre-boss-walk-v2",
+    "title": "Огр-босс — ходьба",
+    "file": "ogre-boss-walk-v2.png",
+    "atlas": "ogre-boss-walk-v2.atlas.json",
+    "columns": 4,
+    "rows": 2,
+    "hidden": true,
+    "sheetWidth": 1774,
+    "sheetHeight": 887,
+    "rowBoundaries": [
+      0,
+      444,
+      887
+    ],
+    "animations": {
+      "walk": {
+        "start": 0,
+        "end": 7,
+        "frameRate": 10,
+        "repeat": -1
+      }
+    }
+  }
+]

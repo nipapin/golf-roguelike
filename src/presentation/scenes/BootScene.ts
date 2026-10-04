@@ -1,9 +1,12 @@
+import { assetUrl } from '../../configurator/runtime';
 import { VFX_KEYS, createCombatAnimations } from '../design/CombatVFX';
 import { viewport, configureViewport, getRenderDensity } from '../design/viewport';
 import Phaser from 'phaser';
 import { colors } from '../design/tokens';
 
 import { preloadCardboardArt, createCardboardAnimations } from '../../castle/CardboardArt';
+import { preloadExportedArt, createExportedAnimations } from '../../castle/ExportedArt';
+import { preloadGeneratedActors, createGeneratedActorAnimations } from '../../castle/GeneratedActors';
 export class BootScene extends Phaser.Scene {
   constructor() {
     super('BootScene');
@@ -12,15 +15,20 @@ export class BootScene extends Phaser.Scene {
   preload(): void {
     configureViewport(this);
     for (const key of VFX_KEYS)
-      this.load.atlas('vfx-' + key, '/assets/vfx/' + key + '.webp', '/assets/vfx/' + key + '.json');
+      this.load.atlas('vfx-' + key, assetUrl('/assets/vfx/' + key + '.webp'), assetUrl('/assets/vfx/' + key + '.json'));
 
     preloadCardboardArt(this);
+    preloadExportedArt(this);
+    preloadGeneratedActors(this);
+    this.load.image('menu-story-wide', assetUrl('/assets/menu-story-v1/menu-wide.png'));
+    this.load.image('menu-story-ultrawide', assetUrl('/assets/menu-story-v1/menu-ultrawide.png'));
+    this.load.image('menu-story-portrait', assetUrl('/assets/menu-story-v1/menu-portrait.png'));
 
-    this.load.svg('coin', '/assets/coin.svg', { width: 96, height: 96 });
+    this.load.svg('coin', assetUrl('/assets/coin.svg'), { width: 96, height: 96 });
 
     // Load crown overlay for boss
     // Explicit size: SVGs without intrinsic width/height fail WebGL upload ("texImage2D: bad image data").
-    this.load.svg('crown', '/assets/enemies/crown.svg', { width: 128, height: 96 });
+    this.load.svg('crown', assetUrl('/assets/enemies/crown.svg'), { width: 128, height: 96 });
 
     // (game-icons.net SVGs are not used by any scene; they are no longer loaded at boot.)
 
@@ -63,6 +71,8 @@ export class BootScene extends Phaser.Scene {
   create(): void {
     configureViewport(this);
     // Create enemy animations
+    createGeneratedActorAnimations(this);
+    createExportedAnimations(this);
     createCardboardAnimations(this);
     createCombatAnimations(this);
 

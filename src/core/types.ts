@@ -56,6 +56,11 @@ export interface TableauColumn {
 }
 
 export interface BattleState {
+  /** Ordinary ranks wrap between Ace and King by default; castle rounds disable it. */
+  readonly allowRankWrap?: boolean;
+  /** Castle reserve permits a color-matched exit without inserting a physical joker. */
+  readonly castleJokerExit?: 'red' | 'black';
+  readonly castleCritical?: boolean;
   readonly mode?: 'solitaire' | 'boss';
   readonly tableau: TableauColumn[];
   readonly deck: Card[];

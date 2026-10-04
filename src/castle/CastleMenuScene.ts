@@ -1,4 +1,4 @@
-import { cardboardActor } from './CardboardArt';
+import { menuScrim } from './CastleMenuUI';
 import Phaser from 'phaser';
 import {
   viewport,
@@ -8,11 +8,14 @@ import {
 } from '../presentation/design/viewport';
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
-import { castleArt } from './CastleArt';
+import { SettingsModal } from '../presentation/design/SettingsModal';
+import { gameDisplayStyle } from '../presentation/design/displayFont';
 import { showCastleWorkshop } from './CastleWorkshop';
 import { castleManager } from './CastleManager';
 import { trainingCompleted, resetTrainingSession } from './CastleTutorial';
-import { siegeDifficulty } from './CastleDefense';
+
+import { isDesktopViewport } from '../presentation/design/desktopLayout';
+import { coverImage } from '../presentation/design/coverImage';
 
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const modal = gamePopup(scene, 'DEFEND THE CASTLE', 'One solitaire. A whole siege.', 560);
@@ -20,23 +23,23 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const lines = [
     [
       'PLAY ±1',
-      'Take an open card one rank above or below the active card. A ↔ K works. WILD accepts any card.',
+      'Take an open card one rank above or below the active card. A ↔ K is blocked; Q ↔ K works. WILD allows any next rank.',
     ],
     [
       'BUILD A CHAIN',
-      '1: soldier · 2: archer · 3: build / reload ONE turret\n4: arc cannon · 5: laser. Rewards stay banked until you DRAW from stock. Then all reached rewards deploy. Soldiers march: 1 HP / 1 damage.',
+      '1 soldier · 2 archer · 3 turret reload · 4 cannon · 5 laser. Tap the stock to deploy all banked rewards. Rewards repeat every five cards; all are available from round one.',
     ],
     [
       'THE ROAD IS REAL TIME',
-      'Groups of 3–5 enemies march toward your castle. Every 20 regular invaders brings a supermonster. Pause or switch apps to stop time.',
+      'Enemies emerge from ground portals. All defenses are available through card chains. Boss attacks bypass armor. Pause or switch apps to stop time.',
     ],
     [
       'CARDS KEEP YOU ALIVE',
-      'Suits grant repairs, armor and coins. NEXT previews stock; UNDO returns your last card for 1 castle HP. Red joker heals; black joker boosts new defenders ×5. Their order matters.',
+      'Tap stock to draw. Empty stock: shuffle for 5 HP; recycled cards lose powers, field cards keep them. It glows without moves. 1 WILD, 2 GUARD. Undo reverses a step, including draws and WILD, without a limit. HEAL/BOMB/ECHO: 30/100/50 gold, once.',
     ],
     [
       'FINISH TO WIN',
-      'Clear all columns for the final world-clearing blast. Coins from kills and diamonds are banked even if your castle falls. Upgrade in the workshop. Winning advances siege difficulty. Losing resets it to siege 1. Your upgrades and best run stay.',
+      'Clear all columns to win. Gold, HP and armor carry forward; abilities and undos reset. Enemies drop gold. Defeat ends the run. New run: full HP, no armor or gold.',
     ],
   ];
   const available = modal.height - 166,
@@ -45,7 +48,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     modal.content.add(
       scene.add.text(-modal.width / 2 + 18, modal.top + 106 + i * step, title, {
         resolution: getRenderDensity(),
-        fontFamily: 'Lilita One',
+        ...gameDisplayStyle(title),
         fontSize: '16px',
         color: '#ffe35a',
       })
@@ -53,7 +56,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     modal.content.add(
       scene.add.text(-modal.width / 2 + 18, modal.top + 127 + i * step, body, {
         resolution: getRenderDensity(),
-        fontFamily: 'Fredoka',
+        fontFamily: 'Fredoka, Rubik, sans-serif',
         fontSize: '12px',
         color: '#f4e9ff',
         wordWrap: { width: modal.width - 36 },
@@ -67,135 +70,255 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
   return modal.root;
 }
 export class CastleMenuScene extends Phaser.Scene {
+  private settings!: SettingsModal;
   constructor() {
     super('StartScene');
   }
   create(): void {
     configureViewport(this);
     AudioSystem.setMusicScene('menu');
-    const { width: w, height: h } = viewport(this),
-      safe = safeArea(this),
-      manager = castleManager();
-    this.cameras.main.setBackgroundColor('#213e48');
-    this.add.image(w / 2, h * 0.32, 'cardboard-battlefield').setDisplaySize(w, h * 0.64);
-    this.add.rectangle(w / 2, h * 0.77, w, h * 0.46, 0x254650).setStrokeStyle(3, 0x6d989e);
-    this.text(w / 2, safe.top + 38, 'CASTLE\nSOLITAIRE', 38, '#fff1b3')
-      .setAlign('center')
-      .setStroke('#1b1030', 7);
-    this.text(w / 2, safe.top + 108, 'Build a chain. Hold the castle.', 16, '#fff8eb');
-    castleArt(this, w * 0.68, safe.top + Math.min(335, safe.height * 0.49), 1.35);
-    const enemy = cardboardActor(
-      this,
-      'c_orc',
-      w * 0.2,
-      safe.top + Math.min(335, safe.height * 0.49),
-      85
-    );
-    enemy.play('c_orc-idle');
-    this.tweens.add({
-      targets: enemy,
-      x: w * 0.27,
-      duration: 1800,
-      yoyo: true,
-      repeat: -1,
-      ease: 'Sine.inOut',
-    });
-    const meta = manager.service.readMeta(),
-      saved = manager.service.load();
-    const next = meta.currentStreak + 1;
-    const threat = siegeDifficulty(next);
-    this.text(
-      w / 2,
-      safe.top + 140,
-      `NEXT SIEGE #${next} · ENEMY HP +${Math.round((threat.hp - 1) * 100)}%`,
-      13,
-      '#ffda9a'
-    );
-    this.text(
-      w / 2,
-      safe.top + 162,
-      `BEST RUN · SIEGE #${meta.bestSiege} · ${meta.bestKills} KILLS`,
-      12,
-      '#bfe1e3'
-    );
-    const buttons = this.add.container(w / 2, safe.bottom - 227);
-    this.add.image(w / 2 - 39, safe.bottom - 285, 'coin').setDisplaySize(26, 26);
-    this.text(w / 2 + 17, safe.bottom - 285, String(meta.coins), 24, '#ffe35a');
-    popupButton(
-      this,
-      buttons,
-      0,
-      w - 48,
-      saved?.run.phase === 'battle' ? 'CONTINUE SIEGE' : 'NEW SIEGE',
-      () => {
-        AudioSystem.unlock();
-        if (!trainingCompleted()) {
-          this.scene.start('CastleScene', {
-            tutorial: true,
-            finish: saved?.run.phase === 'battle' ? 'resume' : 'start',
-          });
-          return;
-        }
-        if (saved?.run.phase === 'battle') manager.resume();
-        else manager.start();
-        this.scene.start('CastleScene', { tutorial: false });
-      }
-    );
-    popupButton(this, buttons, 62, w - 48, 'WORKSHOP', () => this.workshop(), true);
-    popupButton(
-      this,
-      buttons,
-      124,
-      (w - 60) / 2,
-      'TRAINING',
-      () => this.scene.start('CastleScene', { tutorial: true, finish: 'menu' }),
-      true
-    ).setX(-(w - 36) / 4);
-    popupButton(this, buttons, 124, (w - 60) / 2, 'CREDITS', () => this.credits(), true).setX(
-      (w - 36) / 4
-    );
-    popupButton(this, buttons, 186, w - 48, 'RESET PROGRESS', () => this.resetProgress(), true);
-    if (saved?.run.phase === 'battle') {
-      const restart = this.text(w / 2, safe.bottom - 334, 'START A NEW SIEGE', 13, '#ffe3b2');
-      restart
-        .setPadding(12, 12)
-        .setInteractive()
-        .on('pointerup', () => {
-          const modal = gamePopup(
-            this,
-            'START OVER?',
-            'Your current siege will end. Earned coins will be banked.',
-            270
-          );
-          popupButton(this, modal.content, 35, modal.width - 36, 'NEW SIEGE', () => {
-            manager.resume();
-            if (manager.state) {
-              manager.state.run = { ...manager.state.run, phase: 'defeat' };
-              manager.service.settle(manager.state);
-            }
-            manager.start();
-            this.scene.start('CastleScene', { tutorial: false });
-          });
-          popupButton(
-            this,
-            modal.content,
-            97,
-            modal.width - 36,
-            'KEEP PLAYING',
-            () => modal.root.destroy(),
-            true
-          );
-        });
+    const { width: w, height: h } = viewport(this);
+    const safe = safeArea(this);
+    const desktop = isDesktopViewport(w, h);
+    const landscape = desktop || w / h >= 1.2;
+    const compactWide = landscape && !desktop;
+    const menuX = landscape ? w * (compactWide ? 0.75 : 0.79) : w / 2;
+    const manager = castleManager();
+    const meta = manager.service.readMeta();
+    const saved = manager.service.load();
+    const continuing = saved?.run.phase === 'battle';
+    const buttonWidth = landscape
+      ? Math.min(364, w * (compactWide ? 0.43 : 0.32))
+      : Math.min(w - 48, 368);
+    const firstButtonY = landscape
+      ? safe.top + safe.height * (compactWide ? 0.51 : 0.55)
+      : safe.bottom - (continuing ? 198 : 136);
+    const artKey = landscape
+      ? w / h >= 2.1
+        ? 'menu-story-ultrawide'
+        : 'menu-story-wide'
+      : 'menu-story-portrait';
+    this.cameras.main.setBackgroundColor('#102333');
+    coverImage(this, artKey, 0, 0, w, h).setDepth(-10);
+    if (landscape) {
+      menuScrim(
+        this,
+        'menu-story-side-v1',
+        0,
+        0,
+        w,
+        h,
+        [
+          [0, 'rgba(9,22,34,0)'],
+          [0.46, 'rgba(9,22,34,0)'],
+          [0.66, 'rgba(9,22,34,.55)'],
+          [0.75, 'rgba(9,22,34,.8)'],
+          [1, 'rgba(9,22,34,.55)'],
+        ],
+        true
+      ).setDepth(40);
     }
+    menuScrim(this, 'menu-story-vertical-v1', 0, 0, w, h, [
+      [0, 'rgba(9,22,34,.4)'],
+      [0.24, 'rgba(9,22,34,0)'],
+      [0.67, 'rgba(9,22,34,0)'],
+      [0.86, 'rgba(9,22,34,.25)'],
+      [1, 'rgba(9,22,34,.78)'],
+    ]).setDepth(41);
+
+    const titleY = landscape
+      ? safe.top + safe.height * (compactWide ? 0.13 : 0.18)
+      : safe.top + (safe.height < 620 ? 28 : 52);
+    const logoSize = desktop ? 60 : compactWide ? 31 : w >= 430 ? 53 : w < 350 ? 39 : 45;
+    this.text(menuX, titleY, 'CASTLE', logoSize * 0.86, '#fff1b3')
+      .setStroke('#1b1030', 5)
+      .setDepth(100);
+    this.text(menuX, titleY + logoSize * 0.93, 'SOLITAIRE', logoSize, '#fff1b3')
+      .setStroke('#1b1030', 5)
+      .setDepth(100);
+    if (!compactWide && safe.height >= 620) {
+      this.text(
+        menuX,
+        titleY + logoSize * 1.77,
+        'Собери цепочку. Защити замок.',
+        desktop ? 16 : 14,
+        '#fff3d7'
+      )
+        .setStroke('#19313c', 1.5)
+        .setDepth(100);
+    }
+
+    const buttons = this.add.container(menuX, firstButtonY).setDepth(100).setName('menu-actions');
+    let row = 0;
+    if (continuing) {
+      popupButton(this, buttons, row++ * 62, buttonWidth, 'ПРОДОЛЖИТЬ', () =>
+        this.beginSiege(true)
+      ).setName('menu-continue');
+    }
+    popupButton(
+      this,
+      buttons,
+      row++ * 62,
+      buttonWidth,
+      'НОВАЯ ИГРА',
+      () => {
+        if (continuing) this.startOver();
+        else this.beginSiege(false);
+      },
+      continuing
+    ).setName('menu-new-game');
+    popupButton(
+      this,
+      buttons,
+      row * 62,
+      buttonWidth,
+      'НАСТРОЙКИ',
+      () => this.settings.show(),
+      true
+    ).setName('menu-settings');
+
+    if (continuing)
+      this.text(
+        menuX,
+        firstButtonY - 47,
+        'ОСАДА ' + saved.siegeNumber + '  •  УРОВЕНЬ ' + saved.progression.level,
+        compactWide ? 10 : 14,
+        '#ffe5a7'
+      )
+        .setStroke('#19313c', 1.5)
+        .setDepth(100);
+    const record =
+      meta.bestSiege > 0 || meta.bestKills > 0
+        ? 'Лучшая осада: ' + meta.bestSiege + '  •  ' + meta.bestKills + ' врагов'
+        : 'Карты решают. Замок держится.';
+    const footer = this.text(
+      menuX,
+      safe.bottom - 18,
+      record,
+      desktop ? 16 : compactWide ? 9 : w < 350 ? 12 : 14,
+      '#f1e2bf'
+    )
+      .setStroke('#19313c', 1.5)
+      .setDepth(100);
+    const footerWidth = landscape ? buttonWidth + 12 : w - 32;
+    if (footer.width > footerWidth) footer.setScale(footerWidth / footer.width);
+
+    this.settings = new SettingsModal(this, {
+      variant: 'menu',
+      onResume: () => {},
+      onRestart: () => {},
+      onMainMenu: () => {},
+      onMore: () => this.moreMenu(),
+    });
+    const escape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && this.settings.isVisible()) this.settings.hide();
+    };
+    this.input.keyboard?.on('keydown', escape);
     const resize = () => this.scene.restart();
     this.scale.on('resize', resize);
-    this.events.once('shutdown', () => this.scale.off('resize', resize));
+    this.events.once('shutdown', () => {
+      this.scale.off('resize', resize);
+      this.input.keyboard?.off('keydown', escape);
+      this.settings.destroy();
+    });
   }
+
+  private beginSiege(resume: boolean): void {
+    const manager = castleManager();
+    AudioSystem.unlock();
+    if (!trainingCompleted()) {
+      this.scene.start('CastleScene', { tutorial: true, finish: resume ? 'resume' : 'start' });
+      return;
+    }
+    if (resume) manager.resume();
+    else manager.start();
+    this.scene.start('CastleScene', { tutorial: false });
+  }
+
+  private moreMenu(): void {
+    if (this.children.getByName('menu-options')) return;
+    const modal = gamePopup(this, 'ДОПОЛНИТЕЛЬНО', '', 470);
+    modal.root.setName('menu-options');
+    const rows: [string, string, () => void][] = [
+      ['МОЙ ЗАМОК', 'castle', () => this.workshop()],
+      [
+        'ОБУЧЕНИЕ',
+        'training',
+        () => this.scene.start('CastleScene', { tutorial: true, finish: 'menu' }),
+      ],
+      ['ПРАВИЛА', 'rules', () => siegeRules(this, () => {})],
+      ['ОБ ИГРЕ', 'credits', () => this.credits()],
+    ];
+    const columns = modal.height < 430 ? 2 : 1;
+    const rowWidth = (modal.width - 40 - (columns - 1) * 12) / columns;
+    rows.forEach(([label, name, action], index) => {
+      const button = popupButton(
+        this,
+        modal.content,
+        modal.top + 108 + Math.floor(index / columns) * 58,
+        rowWidth,
+        label,
+        () => {
+          modal.root.destroy();
+          action();
+        },
+        true
+      ).setName('menu-option-' + name);
+      if (columns === 2) button.setX(((index % 2 ? 1 : -1) * (rowWidth + 12)) / 2);
+      const text = button.list.find(
+        (child) => child instanceof Phaser.GameObjects.Text
+      ) as Phaser.GameObjects.Text;
+      if (text.width > rowWidth - 20) text.setFontSize((21 * (rowWidth - 20)) / text.width);
+    });
+    const reset = this.text(0, modal.height / 2 - 98, 'Сбросить прогресс', 13, '#ffb8b4')
+      .setPadding(18, 12)
+      .setInteractive({ useHandCursor: true })
+      .setName('menu-reset');
+    reset.on('pointerup', () => {
+      modal.root.destroy();
+      this.resetProgress();
+    });
+    modal.content.add(reset);
+    popupButton(this, modal.content, modal.height / 2 - 42, modal.width - 40, 'НАЗАД', () => {
+      modal.root.destroy();
+      this.settings.show();
+    }).setName('menu-options-back');
+  }
+
+  private startOver(): void {
+    const manager = castleManager();
+    const modal = gamePopup(
+      this,
+      'НАЧАТЬ ЗАНОВО?',
+      'Текущая осада закончится. Заработанные монеты сохранятся.',
+      270
+    );
+    modal.root.setName('menu-new-confirm');
+    popupButton(this, modal.content, 35, modal.width - 36, 'НОВАЯ ИГРА', () => {
+      manager.resume();
+      if (manager.state) {
+        manager.state.run = { ...manager.state.run, phase: 'defeat' };
+        manager.service.settle(manager.state);
+        manager.save();
+      }
+      this.beginSiege(false);
+    }).setName('menu-confirm-new');
+    popupButton(
+      this,
+      modal.content,
+      97,
+      modal.width - 36,
+      'НАЗАД',
+      () => modal.root.destroy(),
+      true
+    ).setName('menu-cancel-new');
+  }
+
   private text(x: number, y: number, text: string, size: number, color = '#fff8eb') {
     return this.add
       .text(x, y, text, {
         resolution: getRenderDensity(),
-        fontFamily: 'Lilita One',
+        ...gameDisplayStyle(text),
         fontSize: `${size}px`,
         color,
       })
@@ -204,12 +327,12 @@ export class CastleMenuScene extends Phaser.Scene {
   private credits(): void {
     const modal = gamePopup(this, 'CREDITS', 'Artists, audio and licenses', 400);
     const content =
-      'Models & animation · Kenney · CC0\nCombat VFX · Kalponic Studio / Jony\nFree Stylized Sprite VFX · CC BY 4.0\nMusic · MintoDog / Hope · CC0\nSFX · Chequered Ink · 400 Sounds Pack\nProcessed game cues · commercial license\nFonts · Google Fonts · SIL OFL 1.1\nDefense · Golf Rogue';
+      'Models & animation · Kenney · CC0\nCombat VFX · Kalponic Studio / Jony · CC BY 4.0\nMusic by YannZ – https://yannz41.itch.io\nSpotify: https://open.spotify.com/intl-it/artist/\n76CUcHd0t0XViSm9YBbHBw\nContact: yziango@gmail.com\nFoley & laser · Kenney · CC0\nOther SFX · Chequered Ink · commercial license\nFonts · Google Fonts · SIL OFL 1.1';
     modal.content.add(
       this.add
         .text(0, modal.top + 110, content, {
           resolution: getRenderDensity(),
-          fontFamily: 'Fredoka',
+          ...gameDisplayStyle(content),
           fontSize: '12px',
           color: '#f4e9ff',
           align: 'center',

@@ -1,6 +1,9 @@
+import { assetUrl } from '../configurator/runtime';
 import type Phaser from 'phaser';
 import { cardboardAssets, type CardboardAssetId } from './CardboardAssets';
 import runtime from './cardboardRuntime.json';
+import { exportedActors, exportedSprite } from './ExportedArt';
+import { generatedActorSprite } from './GeneratedActors';
 
 export const siegeActors = {
   c_angel1: 'soldier',
@@ -16,7 +19,7 @@ export const siegeActors = {
 export function preloadCardboardArt(scene: Phaser.Scene): void {
   for (const [id, asset] of Object.entries(cardboardAssets)) {
     if (!scene.textures.exists(asset.key))
-      scene.load.image(asset.key, `/assets/cardboard-runtime/${id}.webp`);
+      scene.load.image(asset.key, assetUrl(`/assets/cardboard-runtime/${id}.webp`));
   }
 }
 
@@ -30,7 +33,7 @@ export function cardboardArt(
   return scene.add
     .image(x, y, cardboardAssets[id].key)
     .setOrigin(0.5, 1)
-    .setScale(height / runtime[id].height);
+    .setScale(height / artHeight(scene, id));
 }
 
 export function cardboardActor(
@@ -40,11 +43,16 @@ export function cardboardActor(
   y: number,
   height: number
 ): Phaser.GameObjects.Sprite {
+  const exported = exportedActors[actor];
+  if (exported && scene.textures.exists(`ae-${exported}`))
+    return exportedSprite(scene, exported, x, y, height);
+  const generated = generatedActorSprite(scene, actor, x, y, height);
+  if (generated) return generated;
   const id = siegeActors[actor];
   return scene.add
     .sprite(x, y, cardboardAssets[id].key)
     .setOrigin(0.5, 1)
-    .setScale(height / runtime[id].height);
+    .setScale(height / artHeight(scene, id));
 }
 
 /** Keep existing action names while animating whole paper puppets with transforms. */
@@ -72,4 +80,11 @@ export function rockCardboardPuppet(scene: Phaser.Scene, object: Phaser.GameObje
     repeat: -1,
     ease: 'Sine.inOut',
   });
+}
+
+// Replacement images retain the intended visual height even with different dimensions.
+function artHeight(scene: Phaser.Scene, id: CardboardAssetId): number {
+  const url = `/assets/cardboard-runtime/${id}.webp`;
+  return assetUrl(url) === url ? runtime[id].height
+    : scene.textures.get(cardboardAssets[id].key).getSourceImage().height;
 }

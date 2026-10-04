@@ -1,0 +1,68 @@
+<!doctype html>
+<html lang="ru"><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Все анимации — предпросмотр</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#122b32;color:#f6edd4;font:16px system-ui;padding:28px}h1{font-size:26px;margin:0 0 8px}p{color:#bccdd0;max-width:850px;line-height:1.5}main{display:grid;grid-template-columns:repeat(auto-fit,minmax(270px,1fr));gap:18px;margin:24px 0}article{background:#1c3c44;border:1px solid #55717a;border-radius:16px;padding:16px}h2{font-size:18px;margin:0 0 12px}canvas{width:100%;aspect-ratio:1;display:block;background:radial-gradient(ellipse at bottom,#365b63,#19383f);border-radius:12px}select,button,input{font:inherit;color:inherit;background:#234752;border:1px solid #6f929b;border-radius:8px;padding:8px}select{width:100%;margin-top:12px}a{color:#e7bd68}header{display:flex;gap:12px;align-items:center;flex-wrap:wrap}small{display:block;color:#bdd0d2;margin:10px 0}.error{color:#ffb4a8}
+</style>
+<h1>Все анимации</h1>
+<nav><a href="preview.html">Недостающие анимации</a> · <a href="/">Игра</a></nav>
+<p>Выбери действие под персонажем. В каждой карточке собраны его исходные и новые анимации. Автоповтор позволяет постоянно смотреть движение и эффекты; его можно отключить для однократного проигрывания.</p>
+<header><button id="pause">Пауза</button><button id="restart">Повторить</button><button id="nextframe">Следующий кадр</button><label><input id="loop" type="checkbox" checked> Автоповтор</label><label>Скорость <input id="speed" type="range" min="0.25" max="2" step="0.25" value="1"></label><span id="rate">×1</span><a href="animations.json">JSON анимаций</a></header>
+<main></main>
+<script type="module">
+const names={idle:'Ожидание',idleOriginal:'Ожидание — исходное',walk:'Ходьба',attack:'Атака',hurt:'Получение урона',dead:'Смерть',reveal:'Появление',effect:'Эффект'};
+const main=document.querySelector('main'),cards=[];
+let paused=false,loop=true,speed=1,last=performance.now();
+document.querySelector('#pause').onclick=e=>{paused=!paused;e.target.textContent=paused?'Продолжить':'Пауза'};
+document.querySelector('#restart').onclick=()=>cards.forEach(c=>c.elapsed=0);
+document.querySelector('#loop').onchange=e=>{loop=e.target.checked;cards.forEach(c=>c.elapsed=0)};
+document.querySelector('#nextframe').onclick=()=>{paused=true;document.querySelector('#pause').textContent='Продолжить';cards.forEach(c=>{c.elapsed+=1/c.asset.animations[c.action].frameRate+0.00001})};
+document.querySelector('#speed').oninput=e=>{speed=Number(e.target.value);document.querySelector('#rate').textContent='×'+speed};
+try{
+ const revision=Date.now();
+ const assets=await fetch('animations.json?v='+revision,{cache:'no-store'}).then(r=>{if(!r.ok)throw Error('Не удалось загрузить каталог');return r.json()});
+ const manifest=await fetch('/assets/ae-export/manifest.json?v='+revision).then(r=>r.json());
+ const titles={knight:'Рыцарь',archer:'Лучник',cannon:'Пушка — стоп-кадр в ожидании',turret:'Турель',castle:'Замок','castle-gate-cover':'Передняя часть ворот'};
+ for(const [id,a] of Object.entries(manifest.assets))assets.push({...a,key:'game-'+id,title:titles[id]??id,group:'Из игры',multiatlas:true,animations:a.animations});
+ const effects={slash:'Удар',heal:'Лечение',shield:'Щит',smoke:'Дым',reward:'Награда',stagger:'Оглушение',magic:'Магия'};
+ for(const [id,title] of Object.entries(effects))assets.push({key:'vfx-'+id,title,group:'Эффекты',atlas:'/assets/vfx/'+id+'.json',file:'/assets/vfx/'+id+'.webp',framePrefix:id+'-',zeroPad:0,animations:{effect:{start:0,end:15,frameRate:id==='slash'?40:28,repeat:0}}});
+ const sources=new Map();
+ for(const asset of assets){
+  const atlas=await fetch(asset.atlas+'?v='+revision).then(r=>r.json()),frames=new Map();
+  const pages=asset.multiatlas?atlas.textures:[{image:asset.file,frames:atlas.frames}];
+  for(const sourcePage of pages){const image=new Image();image.src=(asset.multiatlas?'/assets/ae-export/'+sourcePage.image:sourcePage.image)+'?v='+revision;await image.decode();
+   const entries=Array.isArray(sourcePage.frames)?sourcePage.frames.map(f=>[f.filename,f]):Object.entries(sourcePage.frames);
+   for(const [name,tile] of entries){const f=tile.frame;frames.set(name,{...tile,image,sourceSize:tile.sourceSize??{w:f.w,h:f.h},spriteSourceSize:tile.spriteSourceSize??{x:0,y:0,w:f.w,h:f.h}})}
+  }
+  if(asset.group==='Эффекты')asset.animations.effect.end=frames.size-1;
+  sources.set(asset.key,{asset,frames});
+ }
+ // One character card combines the original AE actions with additional poses.
+ // Animation entries retain their own texture source and exact original ranges.
+ for(const id of ['knight','archer']){
+  const combined=assets.find(a=>a.key===id+'-extra'),original=assets.find(a=>a.key==='game-'+id);
+  if(!combined||!original)continue;
+  for(const [action,animation] of Object.entries(original.animations)){
+   const name=combined.animations[action]?action+'Original':action;
+   combined.animations[name]={...animation,asset:original.key};
+  }
+  combined.group='';original.hidden=true;
+ }
+ for(const asset of assets.filter(a=>!a.hidden)){
+  const article=document.createElement('article'),title=document.createElement('h2'),canvas=document.createElement('canvas'),select=document.createElement('select'),info=document.createElement('small'),link=document.createElement('a');
+  title.textContent=asset.title+(asset.group?' · '+asset.group:'');canvas.width=384;canvas.height=384;article.dataset.asset=asset.key;
+  const order=['idle','idleOriginal','walk','reveal','attack','hurt','dead','effect'];
+  for(const key of Object.keys(asset.animations).sort((a,b)=>order.indexOf(a)-order.indexOf(b))){const option=document.createElement('option');option.value=key;option.textContent=names[key]??key;select.append(option)}
+  link.href=asset.file;link.textContent='Открыть PNG';link.target='_blank';
+  const card={asset,sources,ctx:canvas.getContext('2d'),action:select.value,elapsed:0,info};cards.push(card);
+  const updateLink=()=>{const a=sources.get(asset.animations[card.action].asset??asset.key).asset;link.href=a.file??a.atlas;link.textContent=a.multiatlas?'Открыть атлас':'Открыть PNG'};
+  select.onchange=()=>{card.action=select.value;card.elapsed=0;updateLink()};updateLink();
+  article.append(title,canvas,select,info,link);main.append(article);
+ }
+}catch(e){const p=document.createElement('p');p.className='error';p.textContent='Не удалось загрузить каталог анимаций: '+e.message;main.append(p)}
+function tick(now){const dt=Math.min((now-last)/1000,0.1);last=now;
+ for(const c of cards){if(!paused)c.elapsed+=dt*speed;const a=c.asset.animations[c.action],source=c.sources.get(a.asset??c.asset.key),count=a.end-a.start+1;let n=Math.floor(c.elapsed*a.frameRate);n=a.repeat===-1?n%count:loop?Math.min(n%(count+(c.action==='effect'?0:Math.ceil(a.frameRate*.3))),count-1):Math.min(n,count-1);const index=a.start+n,t=source.frames.get((source.asset.framePrefix??'frame-')+String(index).padStart(source.asset.zeroPad??4,'0')),f=t.frame,s=t.spriteSourceSize,z=t.sourceSize,k=Math.min(368/z.w,368/z.h);c.ctx.clearRect(0,0,384,384);c.ctx.drawImage(t.image,f.x,f.y,f.w,f.h,(384-z.w*k)/2+s.x*k,376-z.h*k+s.y*k,f.w*k,f.h*k);c.info.textContent=`Кадр ${index} · ${a.frameRate} fps · ${a.start}–${a.end}`}
+ requestAnimationFrame(tick)
+}requestAnimationFrame(tick);
+</script>
+</html>

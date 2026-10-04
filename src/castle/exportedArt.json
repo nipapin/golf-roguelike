@@ -1,0 +1,176 @@
+{
+  "assets": {
+    "archer": {
+      "key": "ae-archer",
+      "atlas": "/assets/ae-export/archer.json",
+      "frameWidth": 384,
+      "frameHeight": 384,
+      "frameCount": 25,
+      "bounds": [
+        11,
+        3,
+        384,
+        384
+      ],
+      "animations": {
+        "idle": {
+          "start": 0,
+          "end": 2,
+          "frameRate": 30,
+          "repeat": -1
+        },
+        "attack": {
+          "start": 0,
+          "end": 19,
+          "frameRate": 30,
+          "repeat": 0
+        }
+      }
+    },
+    "cannon": {
+      "key": "ae-cannon",
+      "atlas": "/assets/ae-export/cannon.json",
+      "frameWidth": 384,
+      "frameHeight": 384,
+      "frameCount": 40,
+      "bounds": [
+        3,
+        16,
+        384,
+        372
+      ],
+      "animations": {
+        "reveal": {
+          "start": 0,
+          "end": 19,
+          "frameRate": 30,
+          "repeat": 0
+        },
+        "attack": {
+          "start": 20,
+          "end": 39,
+          "frameRate": 30,
+          "repeat": 0
+        },
+        "idle": {
+          "start": 39,
+          "end": 39,
+          "frameRate": 30,
+          "repeat": -1
+        }
+      }
+    },
+    "castle": {
+      "key": "ae-castle",
+      "atlas": "/assets/ae-export/castle.json",
+      "frameWidth": 512,
+      "frameHeight": 256,
+      "frameCount": 120,
+      "bounds": [
+        15,
+        5,
+        501,
+        256
+      ],
+      "animations": {
+        "idle": {
+          "start": 0,
+          "end": 119,
+          "frameRate": 30,
+          "repeat": -1
+        }
+      }
+    },
+    "knight": {
+      "key": "ae-knight",
+      "atlas": "/assets/ae-export/knight.json",
+      "frameWidth": 384,
+      "frameHeight": 384,
+      "frameCount": 40,
+      "bounds": [
+        0,
+        0,
+        384,
+        384
+      ],
+      "animations": {
+        "walk": {
+          "start": 0,
+          "end": 15,
+          "frameRate": 30,
+          "repeat": -1
+        },
+        "attack": {
+          "start": 16,
+          "end": 36,
+          "frameRate": 30,
+          "repeat": 0
+        },
+        "idle": {
+          "start": 15,
+          "end": 15,
+          "frameRate": 30,
+          "repeat": -1
+        }
+      }
+    },
+    "turret": {
+      "key": "ae-turret",
+      "atlas": "/assets/ae-export/turret.json",
+      "frameWidth": 384,
+      "frameHeight": 384,
+      "frameCount": 64,
+      "bounds": [
+        0,
+        9,
+        384,
+        384
+      ],
+      "animations": {
+        "reveal": {
+          "start": 0,
+          "end": 29,
+          "frameRate": 30,
+          "repeat": 0
+        },
+        "attack": {
+          "start": 32,
+          "end": 61,
+          "frameRate": 30,
+          "repeat": 0
+        },
+        "idle": {
+          "start": 29,
+          "end": 29,
+          "frameRate": 30,
+          "repeat": -1
+        }
+      }
+    },
+    "castle-gate-cover": {
+      "key": "ae-castle-gate-cover",
+      "atlas": "/assets/ae-export/castle-gate-cover.json",
+      "frameWidth": 512,
+      "frameHeight": 256,
+      "frameCount": 120,
+      "bounds": [
+        238,
+        12,
+        501,
+        256
+      ],
+      "animations": {
+        "idle": {
+          "start": 0,
+          "end": 119,
+          "frameRate": 30,
+          "repeat": -1
+        }
+      }
+    }
+  },
+  "warnings": [
+    "cannon/idle: 39..58 requested; only 40 cells supplied; using frame 39.",
+    "turret/reveal: repeat normalized to 0 (deployment plays once)."
+  ]
+}

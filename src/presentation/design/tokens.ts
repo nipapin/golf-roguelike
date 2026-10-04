@@ -1,4 +1,6 @@
+import { configuredColors } from '../../configurator/runtime';
 import { getSafeInsets, type SafeInsets } from './viewport';
+import { desktopCastleGeometry, isDesktopViewport } from './desktopLayout';
 
 /**
  * Design tokens from visual/STYLE.md
@@ -106,10 +108,12 @@ export const fonts = {
 /**
  * Calculate card dimensions based on screen width
  */
-export function getCardMetrics(screenWidth: number) {
-  const side = 8;
-  const gap = 4;
-  const cw = Math.min((screenWidth - 2 * side - 6 * gap) / 7, 56);
+export function getCardMetrics(screenWidth: number, screenHeight?: number, insets: SafeInsets = getSafeInsets()) {
+  const desktop = screenHeight !== undefined && isDesktopViewport(screenWidth, screenHeight)
+    ? desktopCastleGeometry(screenWidth, screenHeight, insets) : null;
+  const side = desktop?.boardX ?? 8;
+  const gap = desktop?.gap ?? 4;
+  const cw = desktop?.cw ?? Math.min((screenWidth - 2 * side - 6 * gap) / 7, 56);
   const ch = cw * 1.65;
   const strip = cw * 0.58;
   const r = cw * 0.16;
@@ -226,19 +230,47 @@ export const suitColors = {
 export type Suit = keyof typeof suitColors;
 
 /** Compact siege arena; reclaim excess sky for readable, less overlapped cards. */
-export function getCastleLayoutMetrics(width: number, height: number, insets?: SafeInsets) {
-  const base = getLayoutMetrics(width, height - 56, insets);
-  const extra = Math.max(0, base.arenaHeight - Math.min(200, width * 0.48));
-  const strip = Math.min(base.ch * 0.95, base.strip + extra / 4);
-  const shift = (strip - base.strip) * 4;
+export function getCastleLayoutMetrics(width: number, height: number, insets?: SafeInsets, tableauRows = 5) {
+  if (isDesktopViewport(width, height)) {
+    const desktop = desktopCastleGeometry(width, height, insets ?? getSafeInsets(), tableauRows);
+    return { ...getLayoutMetrics(width, height, insets), ...getCardMetrics(width, height, insets), ...desktop };
+  }
+  const base = getLayoutMetrics(width, height, insets);
+  const { cw, ch, strip } = base;
+  const trayHeight = ch + 172, trayTop = height - base.safeBottom - trayHeight;
+  const tableauHeight = ch + strip * (tableauRows - 1);
+  const tableauTop = trayTop - 12 - tableauHeight;
+  const tableTop = tableauTop - 8, arenaTop = base.safeTop + 42;
+  const span = Math.min(280, width - 32), activeY = trayTop + 60;
+  const comboY = activeY + ch + 18, rewardY = comboY + 29;
   return {
-    ...base,
-    strip,
-    arenaHeight: base.arenaHeight - shift,
-    tableauHeight: base.tableauHeight + shift,
-    tableauTop: base.tableauTop - shift,
-    tableTop: base.tableTop - shift,
-    tableHeight: base.tableHeight + shift,
-    bannerTop: base.bannerTop - shift,
+    ...base, desktop: false, arenaTop, arenaHeight: Math.max(40, tableTop - arenaTop - 6),
+    tableauTop, tableauHeight, tableTop, tableHeight: height - tableTop,
+    trayTop, trayHeight, bannerTop: tableTop, bannerHeight: 0,
+    boardX: base.side, boardWidth: width - 16,
+    bannerX: 8, bannerWidth: width - 16,
+    controlsX: 0, controlsWidth: width, controlsTop: trayTop, controlsHeight: trayHeight,
+    rewardX: (width - Math.min(240, width - 32)) / 2,
+    rewardY, rewardWidth: Math.min(240, width - 32), jokerY: rewardY + 40,
+    activeX: width / 2 + span * .31 - cw / 2, activeY,
+    stockPileX: width / 2 - span * .31 - cw / 2,
+    stockPileY: activeY, stockPileScale: 1,
+    barsX: width / 2 - span / 2 + 24, barsY: trayTop, barsWidth: span - 32,
+    comboX: (width - span) / 2, comboValueX: (width + span) / 2, comboY,
+    undoX: width / 2, undoY: activeY + ch / 2,
+    undoWidth: 36, undoHeight: 36,
+    activeScale: 1, activeW: cw, activeH: ch,
   };
+}
+
+/** Cards and UI are drawn in code. Their palette is editable alongside file assets. */
+export function applyConfiguredColors(): void {
+  for (const [key, value] of Object.entries(configuredColors())) {
+    if (Object.hasOwn(colors, key)) Object.assign(colors, { [key]: parseInt(value.slice(1), 16) });
+  }
+  for (const [index, tier] of comboTiers.entries()) Object.assign(tier, { color: colors[`tier${index + 1}` as 'tier1'] });
+  Object.assign(suitColors.spades, { suit: colors.spade, fx: colors.spadeFx });
+  Object.assign(suitColors.hearts, { suit: colors.heart, fx: colors.heartFx });
+  Object.assign(suitColors.clubs, { suit: colors.club, fx: colors.clubFx });
+  Object.assign(suitColors.diamonds, { suit: colors.diamond, fx: colors.diamondFx });
 }

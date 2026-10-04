@@ -1,0 +1,62 @@
+{
+  "castle": {
+    "frameWidth": 512,
+    "frameHeight": 256,
+    "displayHeight": 158,
+    "mounts": {
+      "gate": [237, 244],
+      "archer": [180, 125],
+      "turret": [95, 40],
+      "mortar": [424, 44]
+    },
+    "depths": {
+      "gate": 20,
+      "facade": 22,
+      "mounts": 26,
+      "gateSoldiers": 23,
+      "cover": 30,
+      "gateCover": 24,
+      "fieldSoldiers": 42
+    }
+  },
+  "attacks": {
+    "archer": { "releaseFrame": 11, "muzzle": [-105, -190] },
+    "cannon": { "releaseFrame": 28, "muzzle": [-150, -135] },
+    "turret": { "releaseFrame": 32, "muzzle": [-151, -144] }
+  },
+  "projectiles": {
+    "arrow": {
+      "texture": "cardboard-arrow",
+      "file": null,
+      "animation": null,
+      "width": 32,
+      "height": 8,
+      "angleOffset": 180,
+      "arc": 12,
+      "duration": 250,
+      "tint": "#ffffff"
+    },
+    "fireArrow": {
+      "texture": "cardboard-arrow",
+      "file": null,
+      "animation": null,
+      "width": 32,
+      "height": 8,
+      "angleOffset": 180,
+      "arc": 12,
+      "duration": 250,
+      "tint": "#ff9944"
+    },
+    "cannonball": {
+      "texture": null,
+      "file": null,
+      "animation": null,
+      "width": 12,
+      "height": 12,
+      "angleOffset": 0,
+      "arc": 45,
+      "duration": 320,
+      "tint": "#ffffff"
+    }
+  }
+}

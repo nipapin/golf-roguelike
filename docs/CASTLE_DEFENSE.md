@@ -1,5 +1,7 @@
 # Castle Solitaire — first playable defense version
 
+> Historical design notes. Current castle rules and presentation are documented in [CASTLE-TD-IMPLEMENTATION.md](CASTLE-TD-IMPLEMENTATION.md).
+
 One 54-card Golf Solitaire board powers a real-time castle siege. Keep the rank ±1 / A↔K rules, WILD and the two colored jokers. Never re-deal the tableau between waves.
 
 The first card or draw starts the siege. Enemies arrive from the left and attack the castle on the right. Completing the tableau fires a final blast, defeats the remaining invaders and wins the siege. A fallen castle ends the run; the same deck, army, enemy positions, magazines, health and seeded RNG resume after reload. Pause/settings, app backgrounding and the menu stop simulation time; returning never catches up missed real time.

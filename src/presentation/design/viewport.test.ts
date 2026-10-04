@@ -20,3 +20,13 @@ it('caps canvas density and rejects invalid values', () => {
   setRenderDensity(3); expect(getRenderDensity()).toBe(2);
   setRenderDensity(NaN); expect(getRenderDensity()).toBe(1);
 });
+it.each([1, 2])('keeps Full HD card hit areas aligned with the scaled camera at density %d', density => {
+  setRenderDensity(density);
+  const camera = { setOrigin: vi.fn(), setZoom: vi.fn(), centerOn: vi.fn() };
+  Object.values(camera).forEach(fn => fn.mockReturnValue(camera));
+  const scene = { scale: { width: 1920 * density, height: 1080 * density }, cameras: { main: camera } } as unknown as Phaser.Scene;
+  expect(viewport(scene)).toEqual({ width: 1280, height: 720 });
+  configureViewport(scene);
+  expect(camera.setZoom).toHaveBeenCalledWith(density * 1.5);
+  expect(camera.centerOn).toHaveBeenCalledWith(640, 360);
+});

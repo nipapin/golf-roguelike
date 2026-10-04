@@ -7,7 +7,7 @@ describe('interactive training', () => {
     const { manager, ids } = createTraining();
     const battle = manager.state!.run.battle!;
     const cards = [...battle.tableau.flatMap((c) => c.cards), ...battle.deck, battle.activeCard!];
-    expect(new Set(cards.map((c) => c.id)).size).toBe(54);
+    expect(new Set(cards.map((c) => c.id)).size).toBe(52);
     const before = manager.state;
     manager.play(ids[3]); // King cannot follow 7.
     expect(manager.state).toBe(before);
@@ -15,7 +15,8 @@ describe('interactive training', () => {
     manager.play(ids[1]);
     const hp = manager.state!.run.player.hp;
     expect(manager.undo()).toBe(true);
-    expect(manager.state!.run.player.hp).toBe(hp - 1);
+    expect(manager.state!.run.player.hp).toBe(hp);
+    expect(manager.undoDepth).toBe(1);
     expect(manager.state!.run.battle!.activeCard!.rank).toBe(6);
     manager.play(ids[1]);
     manager.play(ids[2]);
