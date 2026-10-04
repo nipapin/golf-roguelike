@@ -7,7 +7,8 @@ The castle mode uses a coherent Kenney low-poly diorama style. GLB models are re
 | Castle, gate, flag, landscape | Kenney, [Castle Kit](https://kenney.nl/assets/castle-kit) | CC0 |
 | Turret and mortar models | Kenney, [Tower Defense Kit](https://kenney.nl/assets/tower-defense-kit) | CC0 |
 | Animated human and orc | Kenney, [Mini Dungeon](https://kenney.nl/assets/mini-dungeon) | CC0 |
-| All gameplay SFX | Chequered Ink, [400 Sounds Pack](https://ci.itch.io/400-sounds-pack), processed game cues | Commercial-use license; not CC0 |
+| Card / UI / item SFX | Chequered Ink, [400 Sounds Pack](https://ci.itch.io/400-sounds-pack), processed game cues | Commercial-use license; not CC0 |
+| Combat and voices | kurt / Kenney / Tim Rockk (see audio credits) | CC0 |
 | Orchestral combat loop | MintoDog, [Hope](https://opengameart.org/content/hopeorchestral-battle-music) | CC0 |
 
 Kenney license files are included in `public/assets/kenney/licenses`. Existing attributed VFX remain under their original license in the game's credits.
@@ -30,8 +31,8 @@ Historical initial audio recipe (superseded by CI v1): SFX were silence-trimmed,
 
 The castle stock is a closed pile matching the active card in size. Tap the pile to draw; there is no separate DRAW button. Draw cards fly from the pile to the active slot. Empty stock shows a shuffle arrow and the explicit 5 HP cost; it does not preview the shuffled discard. No tableau is redealt. Recycling gathers cards into the stock; siege time pauses during that animation.
 
-UNDO restores the previous successful tableau card and chain, costs one castle HP, and leaves live combat and already triggered effects intact. Immediate HEAL/GUARD/GOLD/BOMB powers are consumed once to prevent replay farming. Drawing commits deployment and clears undo. Undo is unavailable with one HP or after the run ends.
+UNDO restores the previous accepted step, including draws, WILD and abilities, without a usage limit or HP cost. It restores the full saved siege state and rewards, preventing duplicated loot. It is unavailable after the run ends. Recycling removes powers only from waste; tableau cards retain their powers.
 
 The difficulty streak advances per new siege and resets after defeat. Total attempts, best siege, best kills, coins and workshop upgrades are tracked separately. Resuming a saved siege keeps its saved difficulty. Old wallets migrate to a fresh streak without losing permanent progression.
 
-The active SFX revision is CI v1. See `public/audio/RECORDED_AUDIO_CREDITS.md` for current files, processing and source provenance; older render instructions describe the initial audio assets.
+The active SFX bank uses user-sfx-v1 recordings with earlier cues for events outside that pack. See `public/audio/RECORDED_AUDIO_CREDITS.md` for current files, processing and source provenance; older render instructions describe the initial audio assets.

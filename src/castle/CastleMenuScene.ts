@@ -1,4 +1,5 @@
 import { menuScrim } from './CastleMenuUI';
+import { getLanguage, setLanguage } from '../localization/i18n';
 import Phaser from 'phaser';
 import {
   viewport,
@@ -125,6 +126,15 @@ export class CastleMenuScene extends Phaser.Scene {
       [0.86, 'rgba(9,22,34,.25)'],
       [1, 'rgba(9,22,34,.78)'],
     ]).setDepth(41);
+
+    const language = this.text(w - 45, safe.top + 13,
+      getLanguage() === 'ru' ? 'RU / EN' : 'EN / RU', 12, '#ffe35a')
+      .setPadding(8).setDepth(100).setInteractive({ useHandCursor: true })
+      .setName('menu-language');
+    language.on('pointerup', () => {
+      setLanguage(getLanguage() === 'ru' ? 'en' : 'ru');
+      this.scene.restart();
+    });
 
     const titleY = landscape
       ? safe.top + safe.height * (compactWide ? 0.13 : 0.18)
