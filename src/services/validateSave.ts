@@ -10,7 +10,7 @@ const integer = (value: unknown): value is number =>
 const text = (value: unknown): value is string => typeof value === 'string' && value.length > 0;
 const arrayOf = (value: unknown, check: (item: unknown) => boolean): value is unknown[] =>
   Array.isArray(value) && value.every(check);
-const powers = ['CRIT', 'HEAL', 'GUARD', 'GOLD', 'BOMB', 'WILD', 'ECHO'];
+const powers = ['CRIT', 'HEAL', 'GUARD', 'GOLD', 'BOMB', 'ECHO'];
 
 function card(value: unknown): boolean {
   return (

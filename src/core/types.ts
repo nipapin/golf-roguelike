@@ -1,6 +1,6 @@
 import type { RunFormula } from './RunStructure';
 export type Suit = 'spades' | 'hearts' | 'diamonds' | 'clubs';
-export type PowerType = 'CRIT' | 'HEAL' | 'GUARD' | 'GOLD' | 'BOMB' | 'WILD' | 'ECHO';
+export type PowerType = 'CRIT' | 'HEAL' | 'GUARD' | 'GOLD' | 'BOMB' | 'ECHO';
 
 export interface Card {
   readonly joker?: 'red' | 'black';
@@ -114,7 +114,6 @@ export interface GameConfig {
     readonly GUARD: { readonly armorAmount: number };
     readonly GOLD: { readonly goldAmount: number };
     readonly BOMB: { readonly flatDamage: number };
-    readonly WILD: { readonly description: string };
     readonly ECHO: { readonly comboBonus: number };
   };
   readonly tableau: {
@@ -166,7 +165,6 @@ export type GameEvent =
   | { type: 'gold_gained'; amount: number }
   | { type: 'tableau_cleared'; bonusReward: boolean }
   | { type: 'deck_reshuffled' }
-  | { type: 'wild_activated' }
   | { type: 'joker_activated'; color: 'red' | 'black' }
   | { type: 'battle_won' }
   | { type: 'battle_lost' }

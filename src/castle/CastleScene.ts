@@ -1106,7 +1106,6 @@ export class CastleScene extends Phaser.Scene {
                   `CRIT BANKED · NEXT DEPLOY ×${gameConfig.powerCards.CRIT.damageMultiplier}`,
                   '#ffd789'
                 );
-              if (e.powerType === 'WILD') this.callout('WILD · ANY NEXT CARD', '#a8ffff');
               if (e.powerType === 'BOMB') {
                 this.callout(`BOMB · ${gameConfig.powerCards.BOMB.flatDamage} DAMAGE`, '#ffb196');
                 for (const view of [...this.invaders.values()].slice(0, 8))

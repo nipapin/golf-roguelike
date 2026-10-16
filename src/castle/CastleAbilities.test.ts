@@ -253,43 +253,38 @@ describe('one-use paid round abilities', () => {
       replayed.events.some((event) => event.type === 'boost' && event.effect === 'armor')
     ).toBe(false);
   });
-  it('keeps GUARD and WILD on the field through reshuffle and save, then activates them normally', () => {
+  it('keeps multiple GUARDs on the field through reshuffle and save, then activates them normally', () => {
     const { manager, ids } = createTraining();
     const battle = manager.state!.run.battle!;
     const powers = [{ cardId: ids[3], type: 'GUARD' as const },
       { cardId: ids[2], type: 'GUARD' as const },
-      { cardId: ids[7], type: 'WILD' as const }];
+      { cardId: ids[7], type: 'GUARD' as const }];
     manager.state!.run = { ...manager.state!.run, battle: { ...battle,
       deck: [], discard: [...battle.discard, ...battle.deck], powerCards: powers } };
     const before = structuredClone(manager.state!);
     manager.draw();
     expect(manager.state!.run.battle!.powerCards).toEqual(powers);
+    const activeCard = manager.state!.run.battle!.activeCard!;
+    manager.state!.run = { ...manager.state!.run, battle: { ...manager.state!.run.battle!, activeCard: { ...activeCard, rank: 13 } } };
     const storage = memoryStorage(), reopened = new CastleManager(storage);
     reopened.service.save(manager.state!);
     expect(reopened.resume()).toBe(true);
     expect(reopened.state!.run.battle!.powerCards).toEqual(powers);
-    reopened.state!.run = { ...reopened.state!.run,
-      battle: { ...reopened.state!.run.battle!, wildActive: true } };
     const armor = reopened.state!.run.player.armor;
     reopened.play(ids[3]);
     expect([1, 5]).toContain(reopened.state!.run.player.armor - armor);
-    reopened.state!.run = { ...reopened.state!.run,
-      battle: { ...reopened.state!.run.battle!, wildActive: true } };
-    reopened.play(ids[7]);
-    expect(reopened.state!.usedPowers).toContain(ids[7]);
-    expect(reopened.state!.run.battle!.wildActive).toBe(true);
     const hpBeforeUndo = manager.state!.run.player.hp;
     expect(manager.undo().success).toBe(true);
     expect(manager.state!.run.player.hp).toBe(hpBeforeUndo - 1);
     const expectedBefore = { ...before, run: { ...before.run, player: { ...before.run.player, hp: manager.state!.run.player.hp } } };
     expect(manager.state).toEqual(expectedBefore);
   });
-  it('strips the recycled GUARD while preserving unused GUARD and WILD on the field', () => {
+  it('strips the recycled GUARD while preserving unused GUARDs on the field', () => {
     const { manager, ids } = createTraining();
     const battle = manager.state!.run.battle!;
     manager.state!.run = { ...manager.state!.run, battle: { ...battle,
       powerCards: [{ cardId: ids[0], type: 'GUARD' }, { cardId: ids[3], type: 'GUARD' },
-        { cardId: ids[7], type: 'WILD' }] } };
+        { cardId: ids[7], type: 'GUARD' }] } };
     manager.play(ids[0]);
     const current = manager.state!.run.battle!;
     manager.state!.run = { ...manager.state!.run, battle: { ...current,
@@ -297,7 +292,7 @@ describe('one-use paid round abilities', () => {
     const armor = manager.state!.run.player.armor;
     manager.draw();
     expect(manager.state!.run.battle!.powerCards).toEqual([
-      { cardId: ids[3], type: 'GUARD' }, { cardId: ids[7], type: 'WILD' },
+      { cardId: ids[3], type: 'GUARD' }, { cardId: ids[7], type: 'GUARD' },
     ]);
     expect(manager.state!.usedPowers).not.toContain(ids[0]);
     expect(manager.state!.run.player.armor).toBe(armor);

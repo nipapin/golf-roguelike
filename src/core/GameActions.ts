@@ -174,7 +174,6 @@ export function playCard(
   // Handle power card effects
   if (powerType) {
     events.push({ type: 'power_activated', powerType, card });
-    if (powerType === 'WILD') events.push({ type: 'wild_activated' });
   }
 
   // Update accumulated damage
@@ -189,7 +188,7 @@ export function playCard(
     activeCard: card,
     chain: [...battle.chain, card],
     accumulatedDamage: newAccumulatedDamage,
-    wildActive: powerType === 'WILD',
+    wildActive: false,
     chainBaseDamage: baseDamage,
     jokerMultiplier,
     lifestealMultiplier,

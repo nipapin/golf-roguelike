@@ -29,7 +29,6 @@ const mockConfig: GameConfig = {
     GUARD: { armorAmount: 8 },
     GOLD: { goldAmount: 8 },
     BOMB: { flatDamage: 12 },
-    WILD: { description: 'Next play connects to any rank' },
     ECHO: { comboBonus: 2 },
   },
   tableau: { columns: 7, rows: 5 },

@@ -69,15 +69,14 @@ describe('rank policies shared by UI and gameplay', () => {
     expect(getPlayableCards(battle)).toEqual([card(target, 'clubs')]);
     expect(hasLegalMovesForUI(battle)).toBe(true);
   });
-  it('does not advertise a covered card even when WILD is active', () => {
+  it('does not advertise a covered card even when rank wraps', () => {
     const battle = {
       ...battleFixture().battle!,
-      allowRankWrap: false,
+      allowRankWrap: true,
       activeCard: card(13),
-      wildActive: true,
-      tableau: [{ cards: [card(1, 'clubs'), card(7, 'spades')] }],
+      tableau: [{ cards: [card(1, 'clubs'), card(12, 'spades')] }],
     };
     expect(isPlayable(battle, card(1, 'clubs').id)).toBe(false);
-    expect(getPlayableCards(battle)).toEqual([card(7, 'spades')]);
+    expect(getPlayableCards(battle)).toEqual([card(12, 'spades')]);
   });
 });

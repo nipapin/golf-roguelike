@@ -362,7 +362,6 @@ class AudioSystemClass {
       GUARD: 'power_guard',
       GOLD: 'power_gold',
       BOMB: 'power_bomb',
-      WILD: 'power_wild',
       ECHO: 'power_echo',
       RED_JOKER: 'power_red_joker',
       BLACK_JOKER: 'power_black_joker',

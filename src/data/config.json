@@ -25,9 +25,6 @@
     "BOMB": {
       "flatDamage": 12
     },
-    "WILD": {
-      "description": "Next play connects to any rank"
-    },
     "ECHO": {
       "comboBonus": 2
     }

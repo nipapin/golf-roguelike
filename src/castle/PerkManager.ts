@@ -369,10 +369,6 @@ export class PerkManager {
     return Math.max(1, baseCost - stacks * 2);
   }
 
-  getExtraWilds(): number {
-    return this.effectValue('wild_reserve', 'extraWilds', 0);
-  }
-
   getExtraJokers(): number {
     return this.effectValue('jester', 'jokers', 0);
   }

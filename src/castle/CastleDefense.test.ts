@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { config, memoryStorage } from '../test/fixtures';
 import { getPlayableCards } from '../core/GameRules';
-import { canConnectInBattle } from '../core/GameState';
 import { chooseGreedyCard } from '../core/Simulation';
 import { CastleService } from './CastleService';
 import {
@@ -79,7 +78,7 @@ function forcedChain(length: number) {
   };
   return { state, chain };
 }
-function rankFixture(activeRank: number, targetRank: number, wild = false) {
+function rankFixture(activeRank: number, targetRank: number) {
   const state = start(),
     battle = state.run.battle!;
   const pack = [
@@ -98,7 +97,6 @@ function rankFixture(activeRank: number, targetRank: number, wild = false) {
       deck: pack.filter((card) => card !== active && card !== target),
       discard: [],
       powerCards: [],
-      wildActive: wild,
     },
   };
   return { state, target };
@@ -121,16 +119,6 @@ describe('castle rank sequence with wrap-around', () => {
     expect(result.state.run.battle!.chain).toHaveLength(1);
     expect(result.state.runStats!.cardsPlayed).toBe(1);
     expect(fixture.state.runStats!.cardsPlayed).toBe(0);
-  });
-  it.each([
-    [1, 13],
-    [13, 1],
-  ])('permits WILD %i to %i and consumes its rank exception', (active, target) => {
-    const fixture = rankFixture(active, target, true);
-    const result = playCastleCard(fixture.state, fixture.target.id, config);
-    expect(result.state.run.battle!.activeCard).toEqual(fixture.target);
-    expect(result.state.run.battle!.wildActive).toBe(false);
-    expect(result.state.run.battle!.allowRankWrap).toBe(true);
   });
   it('continues an empty-stock chain until the player explicitly clicks reshuffle', () => {
     const state = start(),
@@ -160,7 +148,7 @@ describe('castle rank sequence with wrap-around', () => {
         ],
         powerCards: [
           { cardId: first.id, type: 'GUARD' },
-          { cardId: second.id, type: 'WILD' },
+          { cardId: second.id, type: 'GUARD' },
         ],
       },
     };
@@ -175,21 +163,19 @@ describe('castle rank sequence with wrap-around', () => {
     expect(getPlayableCards(played.run.battle!).map((card) => card.id)).toContain(second.id);
     played = playCastleCard(played, second.id, config).state;
     expect(played.run.player.hp).toBe(hp);
-    expect(played.run.battle!.wildActive).toBe(true);
     expect(played.run.battle!.chain).toHaveLength(2);
     expect(played.run.battle!.deck).toEqual([]);
     const shuffled = drawCastleCard(played, config);
     expect(shuffled.events).toContainEqual({ type: 'draw', recycled: true });
     expect(shuffled.state.run.player.hp).toBe(hp - CASTLE_RECYCLE_HP_COST);
     expect(shuffled.state.run.battle!.chain).toEqual([]);
-    expect(shuffled.state.run.battle!.wildActive).toBe(false);
     expect(shuffled.state.run.battle!.powerCards).toEqual([]);
     expect(ids(shuffled.state)).toEqual(original);
   });
 });
 
 describe('castle siege', () => {
-  it('deals five complete rows and 16 stock cards without jokers and with one WILD across 500 seeds', () => {
+  it('deals five complete rows and 16 stock cards without jokers and with three GUARDs across 500 seeds', () => {
     for (let seed = 0; seed < 500; seed++) {
       const state = start(`stock-${seed}`);
       const battle = state.run.battle!;
@@ -200,8 +186,7 @@ describe('castle siege', () => {
       expect(battle.tableau.every((column) => column.cards.length === 5)).toBe(true);
       expect(battle.deck).toHaveLength(16);
       expect(battle.powerCards).toHaveLength(3);
-      expect(battle.powerCards.filter((power) => power.type === 'WILD')).toHaveLength(1);
-      expect(battle.powerCards.filter((power) => power.type === 'GUARD')).toHaveLength(2);
+      expect(battle.powerCards.filter((power) => power.type === 'GUARD')).toHaveLength(3);
       expect(
         battle.powerCards.every((power) =>
           battle.tableau.some((column) => column.cards.some((card) => card.id === power.cardId))

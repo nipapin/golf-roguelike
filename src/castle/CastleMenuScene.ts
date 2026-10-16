@@ -25,7 +25,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const lines = [
     [
       'PLAY ±1',
-      'Take an open card one rank above or below the active card. A ↔ K is blocked; Q ↔ K works. WILD allows any next rank.',
+      'Take an open card one rank above or below the active card. A ↔ K is blocked; Q ↔ K works. GUARD cards give armor.',
     ],
     [
       'BUILD A CHAIN',
@@ -37,7 +37,7 @@ export function siegeRules(scene: Phaser.Scene, close: () => void) {
     ],
     [
       'CARDS KEEP YOU ALIVE',
-      'Tap stock to draw. Empty stock: shuffle for 5 HP; recycled cards lose powers, field cards keep them. It glows without moves. 1 WILD, 2 GUARD. Undo reverses a step, including draws and WILD, without a limit. HEAL/BOMB/ECHO: 30/100/50 gold, once.',
+      'Tap stock to draw. Empty stock: shuffle for 5 HP; recycled cards lose powers, field cards keep them. It glows without moves. GUARD cards give armor. Undo reverses a step, including draws, without a limit. HEAL/BOMB/ECHO: 30/100/50 gold, once.',
     ],
     [
       'FINISH TO WIN',

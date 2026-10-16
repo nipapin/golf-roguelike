@@ -1,6 +1,5 @@
 import { describe, expect, it } from 'vitest';
 import { config } from '../test/fixtures';
-import { canConnectInBattle } from '../core/GameState';
 import { chooseGreedyCard } from '../core/Simulation';
 import { MODULES, XP_THRESHOLDS } from './CastleProgression';
 import {
@@ -157,13 +156,6 @@ describe('removed joker contract', () => {
     expect(activateCastleJoker(state, 'red').state).toBe(state);
     expect(state.run.battle!.jokerMultiplier).toBe(1);
     expect(state.run.battle!.lifestealMultiplier).toBe(0);
-  });
-  it('allows a WILD connection regardless of card suit and rank', () => {
-    const state = fresh();
-    state.run = { ...state.run, battle: { ...state.run.battle!, wildActive: true } };
-    expect(
-      canConnectInBattle({ id: 'red-target', rank: 12, suit: 'hearts' }, state.run.battle!)
-    ).toBe(true);
   });
 });
 it('measures fresh-run pressure with a boss every twentieth spawn, independently of core unlocks', () => {

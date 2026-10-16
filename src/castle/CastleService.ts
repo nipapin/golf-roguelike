@@ -212,7 +212,6 @@ function migrateRules(v: Record<string, unknown>): boolean {
       (Array.isArray(battle.discard) ? battle.discard.pop() : undefined);
   }
   if (Array.isArray(battle.powerCards)) {
-    let wild = false;
     let guards = 0;
     battle.powerCards = battle.powerCards.flatMap((power) => {
       if (!record(power)) return [power]; // Validation still rejects damaged records.
@@ -225,14 +224,12 @@ function migrateRules(v: Record<string, unknown>): boolean {
         changed = true;
         return [];
       }
+      // WILD cards are no longer supported; remove them.
       if (power.type === 'WILD') {
-        if (wild) {
-          changed = true;
-          return [];
-        }
-        wild = true;
+        changed = true;
+        return [];
       }
-      if (power.type === 'GUARD' && ++guards > 2) {
+      if (power.type === 'GUARD' && ++guards > 3) {
         changed = true;
         return [];
       }
@@ -406,11 +403,15 @@ export class CastleService {
   }
   beginSiege(): CastleSiegeStart {
     const meta = this.readMeta();
-    const carryover =
+    let carryover =
       meta.continuation?.siegeNumber === meta.currentStreak &&
       meta.claimed.includes(meta.continuation.sourceSiege)
         ? meta.continuation
         : undefined;
+    // Migrate deprecated perks (wild_reserve was removed with the WILD card).
+    if (carryover?.perks) {
+      carryover = { ...carryover, perks: carryover.perks.filter((p) => p.id !== 'wild_reserve') };
+    }
     delete meta.continuation;
     meta.siegesStarted++;
     meta.currentStreak++;
@@ -540,6 +541,10 @@ export class CastleService {
       }
       if (record(v) && v.balanceVersion !== 3) migrateProgressionAndReserve(v);
       if (record(v)) migrateRules(v);
+      // Migrate deprecated perks (wild_reserve was removed with the WILD card).
+      if (record(v) && Array.isArray(v.perks)) {
+        v.perks = v.perks.filter((p) => record(p) && p.id !== 'wild_reserve');
+      }
       if (!validRun(v)) return null;
       // Merge legacy duplicate cannons into one without summing their magazines.
       const turrets = v.siege.units.filter((u) => u.kind === 'turret');

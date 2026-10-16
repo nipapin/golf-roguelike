@@ -10,7 +10,7 @@ export function showRules(scene: Phaser.Scene, onClose?: () => void): void {
   const { content, width, top } = modal;
   const rules = [
     ['1 · TAKE AN OPEN CARD', 'Tap the bottom card of a column. Its rank must be ±1 from your active card.'],
-    ['5 → 6 → 7 → 6', 'Build a chain to deal more damage. A ↔ K also works. WILD allows any next card. Gold outlines show valid moves.'],
+    ['5 → 6 → 7 → 6', 'Build a chain to deal more damage. A ↔ K also works. GUARD cards give armor. Gold outlines show valid moves.'],
     ['2 · DRAW / END TURN', 'Bank your damage and draw. A chain of 3+ cards stops the enemy; with 0–2 cards it acts.'],
     ['3 · FINISH THE SOLITAIRE', 'Enemies change; your cards stay. Clear all columns to face the boss with collected cards. Red joker heals 30%; black joker gives ×5 damage.'],
   ];

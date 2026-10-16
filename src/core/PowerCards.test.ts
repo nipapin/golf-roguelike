@@ -21,18 +21,6 @@ function fixture(powerType: PowerType, suit: Suit = 'spades'): RunState {
 }
 
 describe('power cards', () => {
-  it('WILD permits any next rank and is consumed by that play', () => {
-    const initial = fixture('WILD');
-    const state = { ...initial, battle: { ...initial.battle!, tableau: [...initial.battle!.tableau, { cards: [{ id: 'spare', rank: 3, suit: 'clubs' as const }] }] } };
-    const first = playCard(state, 'power', config);
-    expect(first.state.battle!.wildActive).toBe(true);
-    expect(first.events.find(e => e.type === 'card_played')).toMatchObject({ damage: 2 });
-    const next = playCard(first.state, 'next', config);
-    expect(next.state).not.toBe(first.state);
-    expect(next.state.battle!.wildActive).toBe(false);
-    expect(playCard(next.state, 'spare', config).state).toBe(next.state);
-  });
-
   it('ECHO increases the played card damage position by the configured bonus', () => {
     const result = playCard(fixture('ECHO'), 'power', config);
     expect(result.events.find((event) => event.type === 'card_played')).toMatchObject({
@@ -89,10 +77,10 @@ describe('power cards', () => {
   });
 });
 
-it('deals all seven power types across seeded normal encounters', () => {
+it('deals all six power types across seeded normal encounters', () => {
   const dealt = new Set<string>();
   for (let i = 0; i < 40; i++) {
     for (const power of battleFixture(`power-variety-${i}`).battle!.powerCards) dealt.add(power.type);
   }
-  expect([...dealt].sort()).toEqual(['BOMB', 'CRIT', 'ECHO', 'GOLD', 'GUARD', 'HEAL', 'WILD']);
+  expect([...dealt].sort()).toEqual(['BOMB', 'CRIT', 'ECHO', 'GOLD', 'GUARD', 'HEAL']);
 });

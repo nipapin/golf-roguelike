@@ -187,7 +187,7 @@ export class StartScene extends Phaser.Scene {
     const cardH = 90;
     const cards = [
       { rank: 'Q', suit: '♣', color: colors.club, offsetX: -70, angle: -15, power: 'BOMB' },
-      { rank: '5', suit: '♠', color: colors.spade, offsetX: -25, angle: -5, power: 'WILD' },
+      { rank: '5', suit: '♠', color: colors.spade, offsetX: -25, angle: -5, power: 'GUARD' },
       { rank: 'A', suit: '♠', color: colors.spade, offsetX: 30, angle: 8, power: 'CRIT' },
     ];
 
@@ -233,7 +233,7 @@ export class StartScene extends Phaser.Scene {
         const badgeY = cardH / 2 + 2;
         const powerColors: Record<string, number[]> = {
           CRIT: [0xff9a00, 0xff3a1a],
-          WILD: [0x39d9ff, 0xff3db8],
+          GUARD: [0x50bfff, 0x2090cc],
           BOMB: [0xff3b30, 0x1b1030],
         };
         const [pwHi, pwLo] = powerColors[card.power] || [0xffcc00, 0xff8800];

@@ -20,7 +20,7 @@ const prepare = () => {
 };
 
 describe('castle move undo', () => {
-  it('undoes more than three mixed steps through WILD, drawing and reloading', () => {
+  it('undoes more than three mixed steps through drawing and reloading', () => {
     const storage = memoryStorage(), manager = new CastleManager(storage);
     const training = createTraining();
     manager.state = training.manager.state;
@@ -36,15 +36,12 @@ describe('castle move undo', () => {
     play(0); play(1); play(2);
     snapshots.push(structuredClone(manager.state!));
     manager.draw();
-    play(7); // WILD 8 follows drawn 9.
-    expect(manager.state!.run.battle!.wildActive).toBe(true);
-    play(3); // WILD allows King after 8.
-    expect(manager.state!.run.battle!.wildActive).toBe(false);
-    play(4); play(5);
+    play(7); // 10 follows drawn 9 (GUARD gives armor).
+    play(6); // 10 -> J
+    play(5); play(4); // J -> Q -> K
     const reopened = new CastleManager(storage);
     expect(reopened.resume()).toBe(true);
     expect(reopened.undoDepth).toBe(8);
-    let undoCount = 0;
     for (const snapshot of snapshots.reverse()) {
       expect(reopened.canUndo).toBe(true);
       const hpBefore = reopened.state!.run.player.hp;
@@ -54,7 +51,6 @@ describe('castle move undo', () => {
       expect(reopened.state!.run.player.hp).toBe(hpBefore - 1);
       const expected = { ...snapshot, run: { ...snapshot.run, player: { ...snapshot.run.player, hp: reopened.state!.run.player.hp } } };
       expect(reopened.state).toEqual(expected);
-      undoCount++;
     }
     expect(reopened.canUndo).toBe(false);
     expect(reopened.undo().success).toBe(false);

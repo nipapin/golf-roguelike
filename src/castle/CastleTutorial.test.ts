@@ -3,13 +3,13 @@ import { createTraining } from './CastleTutorial';
 import { nextCastleCard } from './CastleDefense';
 
 describe('interactive training', () => {
-  it('uses a complete deck and teaches real undo, deployment and WILD rules', () => {
+  it('uses a complete deck and teaches real undo, deployment and GUARD rules', () => {
     const { manager, ids } = createTraining();
     const battle = manager.state!.run.battle!;
     const cards = [...battle.tableau.flatMap((c) => c.cards), ...battle.deck, battle.activeCard!];
     expect(new Set(cards.map((c) => c.id)).size).toBe(52);
     const before = manager.state;
-    manager.play(ids[3]); // King cannot follow 7.
+    manager.play(ids[3]); // Jack cannot follow 7 without a chain.
     expect(manager.state).toBe(before);
     manager.play(ids[0]);
     manager.play(ids[1]);
@@ -27,9 +27,12 @@ describe('interactive training', () => {
     manager.draw();
     expect(manager.state!.run.battle!.activeCard!.id).toBe(preview.id);
     expect(manager.state!.siege.units.some((u) => u.kind === 'turret')).toBe(true);
-    manager.play(ids[7]);
-    expect(manager.state!.run.battle!.wildActive).toBe(true);
-    for (const id of ids.slice(3, 7)) manager.play(id);
+    // Play 10 (GUARD), J, Q, K, A to reach 5 cards for laser
+    manager.play(ids[7]); // 10 (GUARD) from 9
+    manager.play(ids[6]); // J from 10
+    manager.play(ids[5]); // Q from J
+    manager.play(ids[4]); // K from Q
+    manager.play(ids[3]); // A from K (wrap)
     expect(manager.state!.run.battle!.chain.length).toBe(5);
     const result = manager.draw()!;
     expect(result.events.some((e) => e.type === 'laser')).toBe(true);

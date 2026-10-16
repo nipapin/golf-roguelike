@@ -290,7 +290,6 @@ export class CardVisual {
       GUARD: '🛡',
       GOLD: '💰',
       BOMB: '💣',
-      WILD: '🃏',
       ECHO: '〰',
     };
 

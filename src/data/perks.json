@@ -109,15 +109,6 @@
       "effect": { "type": "cardCounter", "showNextCard": true, "drawAssistAt": 2 }
     },
     {
-      "id": "wild_reserve",
-      "rarity": "uncommon",
-      "category": "deck",
-      "stack": { "max": 2 },
-      "name": { "en": "Wild Reserve", "ru": "Дикий резерв" },
-      "description": { "en": "+1 WILD card each round.", "ru": "+1 карта WILD каждый раунд." },
-      "effect": { "type": "wildReserve", "extraWilds": 1 }
-    },
-    {
       "id": "jester",
       "rarity": "rare",
       "category": "deck",

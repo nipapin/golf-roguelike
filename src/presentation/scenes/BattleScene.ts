@@ -20,7 +20,7 @@ import type { RunState, Card, BattleState, PowerType } from '../../core/types';
 const parseHex = (value: string): number => parseInt(value.replace('#', ''), 16);
 
 const POWER_TINTS: Record<PowerType, number> = {
-  CRIT: 0xff6633, HEAL: 0x3aef98, GUARD: 0x50bfff, GOLD: 0xffd34a, BOMB: 0xff9a30, WILD: 0x80eaff, ECHO: 0xc58aff,
+  CRIT: 0xff6633, HEAL: 0x3aef98, GUARD: 0x50bfff, GOLD: 0xffd34a, BOMB: 0xff9a30, ECHO: 0xc58aff,
 };
 
 export class BattleScene extends Phaser.Scene {
@@ -718,10 +718,10 @@ export class BattleScene extends Phaser.Scene {
     this.activeCardVisual.getContainer().setScale(activeScale);
     this.activeCardVisual.setDepth(55);
 
-    // Active rule hint — power state overrides base rank rule.
+    // Active rule hint — joker cards show their color rule.
     const labelY = activeY + activeH / 2 + 12;
     this.activeLabel = this.add
-      .text(activeX, labelY, battle.wildActive ? 'WILD · ANY CARD' : battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1', {
+      .text(activeX, labelY, battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1', {
         resolution: getRenderDensity(), fontFamily: 'Fredoka',
         fontSize: '11px',
         color: '#9a8aba',
@@ -739,7 +739,7 @@ export class BattleScene extends Phaser.Scene {
     } else {
       this.comboBanner.update(0, 0);
     }
-    this.activeLabel?.setText(battle.wildActive ? 'WILD · ANY CARD' : battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1');
+    this.activeLabel?.setText(battle.activeCard?.joker === 'red' ? 'RED · RED NEXT' : battle.activeCard?.joker === 'black' ? 'BLACK · BLACK NEXT' : 'ACTIVE · ±1');
   }
 
   private updateDrawPile(battle: BattleState): void {
@@ -1113,7 +1113,6 @@ export class BattleScene extends Phaser.Scene {
       GUARD: { color: 0x50bfff, symbol: '⬡', text: 'GUARD' },
       GOLD: { color: 0xffd34a, symbol: '🪙', text: 'GOLD' },
       BOMB: { color: 0xff9a30, symbol: '✹', text: 'BOMB' },
-      WILD: { color: 0x80eaff, symbol: '🃏', text: 'WILD · ANY CARD' },
       ECHO: { color: 0xc58aff, symbol: '◎', text: 'ECHO +2' },
       RED_JOKER: { color: 0xff557c, symbol: '♥', text: 'LIFESTEAL 30%' },
       BLACK_JOKER: { color: 0xb795ff, symbol: '♛', text: 'CHAIN CRIT ×5' },
@@ -1129,8 +1128,6 @@ export class BattleScene extends Phaser.Scene {
       playCombatVFX(this, 'shield', viewport(this).width - 60, this.layout.playerHudTop + 15, 76);
     } else if (power === 'GOLD') {
       playCombatVFX(this, 'reward', viewport(this).width * .58, this.layout.hudTop + 20, 80);
-    } else if (power === 'WILD') {
-      playCombatVFX(this, 'magic', viewport(this).width * .76, this.layout.trayTop + this.layout.activeH / 2, 96);
     } else if (power === 'ECHO') {
       playCombatVFX(this, 'slash', x, y, arenaSize, 0xc58aff, 20);
       this.time.delayedCall(140, () => playCombatVFX(this, 'slash', x, y, arenaSize, 0xc58aff, -20));
@@ -1153,10 +1150,6 @@ export class BattleScene extends Phaser.Scene {
         this.tweens.add({ targets: ring, scale: power === 'BOMB' ? 5 : 4, alpha: 0, duration: 420, delay: i * 75, onComplete: () => ring.destroy() });
       }
       if (power === 'BOMB') this.cameras.main.shake(140, .004);
-    } else if (power === 'WILD') {
-      const bolt = this.add.graphics().lineStyle(5, theme.color).setDepth(180);
-      bolt.beginPath(); bolt.moveTo(x + 12, y - 40); bolt.lineTo(x - 12, y); bolt.lineTo(x + 12, y); bolt.lineTo(x - 12, y + 40); bolt.strokePath();
-      this.tweens.add({ targets: bolt, alpha: 0, duration: 380, onComplete: () => bolt.destroy() });
     } else {
       for (let i = 0; i < 5; i++) {
         const icon = power === 'GOLD'

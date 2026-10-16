@@ -50,11 +50,11 @@ export function createTraining(): { manager: CastleManager; ids: string[] } {
   const active = take(7, 'clubs');
   const chain = [take(4, 'clubs'), take(5, 'clubs'), take(6, 'clubs')];
   const tops = [
-    take(13, 'hearts'),
-    take(12, 'spades'),
-    take(11, 'diamonds'),
-    take(10, 'hearts'),
-    take(8, 'clubs'),
+    take(1, 'hearts'),
+    take(13, 'spades'),
+    take(12, 'diamonds'),
+    take(11, 'hearts'),
+    take(10, 'clubs'),
     take(3, 'hearts'),
   ];
   const next = take(9, 'spades');
@@ -73,7 +73,7 @@ export function createTraining(): { manager: CastleManager; ids: string[] } {
         activeCard: active,
         tableau,
         deck: [next, ...pool],
-        powerCards: [{ cardId: tops[4].id, type: 'WILD' }],
+        powerCards: [{ cardId: tops[4].id, type: 'GUARD' }],
       },
     },
   };
@@ -82,7 +82,7 @@ export function createTraining(): { manager: CastleManager; ids: string[] } {
 export const trainingSteps = [
   ['Play the 6', 'The active card is 7. Only an open 6 or 8 connects. Tap the glowing 6.'],
   ['Continue with 5', 'Removing the 6 reveals the 5. Build your chain with the newly opened card.'],
-  ['Try the reverse arrow', 'The reverse arrow beside the stock restores your previous step, including stock draws and WILD. Undo is free and unlimited while there are earlier moves in this round. Tap it.'],
+  ['Try the reverse arrow', 'The reverse arrow beside the stock restores your previous step, including stock draws. Undo is free and unlimited while there are earlier moves in this round. Tap it.'],
   ['Play the 5 again', 'Continue the restored chain with 5. You can undo again whenever you need to.'],
   [
     'Reach three cards',
@@ -94,16 +94,16 @@ export const trainingSteps = [
     'Soldiers leave the gate; archers stand on walls; weapons mount to towers. Every reward is available from the first round through card chains.',
   ],
   [
-    'Play the WILD 8',
-    'From active 9 you can play 8. This special card lets the next card have any rank.',
+    'Play the GUARD 10',
+    'From active 9 you can play 10. GUARD cards give armor when played.',
   ],
-  ['Use WILD: play King', 'Normally 8 cannot connect to King. WILD allows this one connection.'],
-  ['King → Queen', 'Continue downward with Queen. Kings and Aces wrap around: K ↔ A connects both ways.'],
-  ['Queen → Jack', 'Four cards bank an arc cannon as well as the earlier rewards.'],
-  ['Jack → 10', 'Five cards charge a 40-damage laser. Rewards repeat every five cards: 6 banks another soldier, 7 another archer; 10 doubles all rewards.'],
+  ['10 → Jack', 'Continue upward with Jack. Build longer chains for bigger rewards.'],
+  ['Jack → Queen', 'Continue with Queen.'],
+  ['Queen → King', 'Four cards bank an arc cannon as well as the earlier rewards.'],
+  ['King → Ace', 'Kings and Aces wrap: K ↔ A connects both ways. Five cards charge a 40-damage laser.'],
   ['Fire the laser', 'Tap the closed stock. Drawing deploys your banked rewards and fires the charged laser.'],
   [
     'Ready for the siege',
-    'Clear every column to win. Kills give coins. HEAL costs 30, BOMB 100, ECHO 50; each can be used once per round. ECHO adds two chain positions. Each board has one WILD. Empty stock does not end the round: finish any available chain, then tap the empty stock marked with a shuffle arrow and heart for 5 HP. Recycled waste loses its powers; cards on the field keep them. The reverse arrow restores the previous step, including draws and WILD, with no undo limit.',
+    'Clear every column to win. Kills give coins. HEAL costs 30, BOMB 100, ECHO 50; each can be used once per round. ECHO adds two chain positions. GUARD cards give armor. Empty stock does not end the round: finish any available chain, then tap the empty stock marked with a shuffle arrow and heart for 5 HP. Recycled waste loses its powers; cards on the field keep them. The reverse arrow restores the previous step, including draws, with no undo limit.',
   ],
 ];

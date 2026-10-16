@@ -208,17 +208,6 @@ export class CastleManager {
         newDeck.push(card);
       }
     }
-    const extraWilds = perkManager.getExtraWilds();
-    for (let i = 0; i < extraWilds; i++) {
-      const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
-      const card: Card = {
-        id: String(nextId++),
-        suit: suits[rng.nextInt(0, suits.length - 1)],
-        rank: rng.nextInt(1, 13),
-      };
-      newDeck.push(card);
-      newPowerCards.push({ cardId: card.id, type: 'WILD' });
-    }
     const extraJokers = perkManager.getExtraJokers();
     for (let i = 0; i < extraJokers; i++) {
       const jokerCard = createJokerCard(String(nextId++), rng);

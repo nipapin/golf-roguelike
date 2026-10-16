@@ -5,7 +5,7 @@ import relicsData from '../data/relics.json';
 import { RNG } from './RNG';
 
 const all = relicsData.relics as Relic[];
-const POWERS: PowerType[] = ['CRIT', 'HEAL', 'GUARD', 'GOLD', 'BOMB', 'WILD', 'ECHO'];
+const POWERS: PowerType[] = ['CRIT', 'HEAL', 'GUARD', 'GOLD', 'BOMB', 'ECHO'];
 const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs'];
 
 // The exact lookups the code used before RelicManager (DamageCalculator / GameActions / GameRules).

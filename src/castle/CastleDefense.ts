@@ -243,7 +243,7 @@ export function createCastleRun(
     run: { ...initial, player: { ...initial.player, hp: maxHp, maxHp }, battle: {
       ...battle, allowRankWrap: true, activeCard, deck: ordinaryDeck,
       tableau: battle.tableau.map((column) => ({ cards: column.cards.filter((card) => !card.joker) })),
-      powerCards: battle.powerCards.map((power, i) => ({ ...power, type: i === 0 ? 'WILD' : 'GUARD' })),
+      powerCards: battle.powerCards.map((power) => ({ ...power, type: 'GUARD' })),
       jokerMultiplier: 1, lifestealMultiplier: 0,
     } },
     siege: {
@@ -453,7 +453,7 @@ export function playCastleCard(
   state.drawAssistAt = undefined;
   (state.runStats ??= emptyCastleRunStats()).cardsPlayed++;
   const configuredPower = getPowerType(battle.powerCards, cardId);
-  const power = used.has(cardId) ? null : configuredPower === 'GUARD' || configuredPower === 'WILD' ? configuredPower : null;
+  const power = used.has(cardId) ? null : configuredPower === 'GUARD' ? configuredPower : null;
   
   const linkBonus = perkManager.getLinkBonus(card, battle.activeCard, battle.chain.length);
   const chain = [...battle.chain, card];
@@ -461,14 +461,13 @@ export function playCastleCard(
   state.run = { ...current.run, battle: { ...battle, allowRankWrap: true,
     tableau: battle.tableau.map((column, index) => index === columnIndex ? { cards: column.cards.slice(0, -1) } : column),
     discard: battle.activeCard ? [...battle.discard, battle.activeCard] : battle.discard,
-    activeCard: card, chain, castleJokerExit: undefined, wildActive: power === 'WILD',
+    activeCard: card, chain, castleJokerExit: undefined, wildActive: false,
     castleCritical: false,
     powerCards: battle.powerCards.map((item) => item.type === 'GOLD' ? { ...item, type: 'GUARD' } : item),
   } };
   const cardEvents: GameEvent[] = [{ type: 'card_played', card, chainPosition: chain.length, damage: 0 }];
   if (power) {
     cardEvents.push({ type: 'power_activated', powerType: power, card });
-    if (power === 'WILD') cardEvents.push({ type: 'wild_activated' });
     used.add(cardId);
   }
   state.usedPowers = [...used];

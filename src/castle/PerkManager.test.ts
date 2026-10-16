@@ -199,7 +199,6 @@ describe('perk offer generation', () => {
   });
 
   it('filters out already-owned non-stackable perks', () => {
-    const rng = new RNG('filter-test');
     const owned = [{ id: 'royal_court', stacks: 1 }];
     for (let i = 0; i < 10; i++) {
       const offer = generatePerkOffer(owned, 3, 0, 0, 0, new RNG(`filter-${i}`));
@@ -219,8 +218,8 @@ describe('perk offer generation', () => {
 });
 
 describe('perk definitions', () => {
-  it('has 33 perks defined', () => {
-    expect(PERKS.length).toBe(33);
+  it('has 32 perks defined', () => {
+    expect(PERKS.length).toBe(32);
   });
 
   it('all perks have required fields', () => {

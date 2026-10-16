@@ -16,7 +16,7 @@ it('creates a 54-card deck with exactly two distinct jokers', () => {
   expect(isSavedRun(battleFixture())).toBe(true);
 });
 
-it('keeps ordinary ±1 rules without WILD', () => {
+it('keeps ordinary ±1 rules for rank connections', () => {
   for (let rank = 1; rank <= 13; rank++) {
     const accepted = [6, 8].includes(rank);
     expect(canConnect(ordinary(rank, 'spades'), ordinary(7, 'clubs'), false)).toBe(accepted);

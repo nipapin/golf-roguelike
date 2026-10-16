@@ -13,7 +13,7 @@ import {
 import { RNG } from './RNG';
 
 const SUITS: Suit[] = ['spades', 'hearts', 'diamonds', 'clubs'];
-const POWER_TYPES: PowerType[] = ['CRIT', 'HEAL', 'GUARD', 'GOLD', 'BOMB', 'WILD', 'ECHO'];
+const POWER_TYPES: PowerType[] = ['CRIT', 'HEAL', 'GUARD', 'GOLD', 'BOMB', 'ECHO'];
 
 export function createDeck(): Card[] {
   const deck: Card[] = [];

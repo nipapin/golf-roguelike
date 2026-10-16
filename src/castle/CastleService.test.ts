@@ -254,8 +254,8 @@ describe('castle saves and retired-resource migration', () => {
       battle: {
         ...battle,
         powerCards: [
-          { cardId: cards[0].id, type: 'WILD' },
-          { cardId: cards[1].id, type: 'WILD' },
+          { cardId: cards[0].id, type: 'GUARD' },
+          { cardId: cards[1].id, type: 'GUARD' },
           { cardId: cards[2].id, type: 'GUARD' },
           { cardId: cards[3].id, type: 'CRIT' },
           { cardId: cards[4].id, type: 'HEAL' },
@@ -274,7 +274,8 @@ describe('castle saves and retired-resource migration', () => {
     expect(restored.run.battle!.deck).toEqual(battle.deck);
     expect(restored.run.battle!.activeCard).toEqual(battle.activeCard);
     expect(restored.run.battle!.powerCards).toEqual([
-      { cardId: cards[0].id, type: 'WILD' },
+      { cardId: cards[0].id, type: 'GUARD' },
+      { cardId: cards[1].id, type: 'GUARD' },
       { cardId: cards[2].id, type: 'GUARD' },
     ]);
     expect(restored.run.battle!.jokerMultiplier).toBe(1);
@@ -312,7 +313,7 @@ describe('castle saves and retired-resource migration', () => {
     expect(history.entries).toHaveLength(1);
     expect(history.entries[0].state.abilitiesUsed).toEqual([]);
   });
-  it('caps migrated GUARD cards at two without removing already earned armor', () => {
+  it('caps migrated GUARD cards at three without removing already earned armor', () => {
     const service = new CastleService(memoryStorage()),
       state = initial();
     state.run = { ...state.run, player: { ...state.run.player, armor: 33 } };
@@ -327,7 +328,7 @@ describe('castle saves and retired-resource migration', () => {
     service.save(state, { cost: 0, entries: [{ cost: 0, state: initial() }] });
     const restored = service.load()!;
     expect(restored.run.player.armor).toBe(33);
-    expect(restored.run.battle!.powerCards).toEqual(state.run.battle!.powerCards.slice(0, 2));
+    expect(restored.run.battle!.powerCards).toEqual(state.run.battle!.powerCards.slice(0, 3));
     expect(service.loadUndoHistory(restored).entries).toEqual([]);
   });
 });
