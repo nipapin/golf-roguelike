@@ -1,1 +1,73 @@
-<!doctype html><html lang="en"><head><meta charset="UTF-8"/><meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1"/><meta name="theme-color" content="#213E48"/><meta name="apple-mobile-web-app-capable" content="yes"/><meta name="mobile-web-app-capable" content="yes"/><meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/><meta name="apple-mobile-web-app-title" content="Castle Solitaire"/><meta name="format-detection" content="telephone=no"/><meta name="description" content="Build chains, deploy defenders and protect your castle with one solitaire. A roguelike card game for mobile and desktop."/><meta property="og:type" content="website"/><meta property="og:title" content="Castle Solitaire"/><meta property="og:description" content="Build chains, deploy defenders and protect your castle with one solitaire."/><meta property="og:image" content="/share-image.svg"/><meta property="og:image:width" content="1200"/><meta property="og:image:height" content="630"/><meta name="twitter:card" content="summary_large_image"/><meta name="twitter:title" content="Castle Solitaire"/><meta name="twitter:description" content="Build chains, deploy defenders and protect your castle with one solitaire."/><meta name="twitter:image" content="/share-image.svg"/><link rel="manifest" href="/manifest.webmanifest"/><link rel="icon" type="image/svg+xml" href="/icon.svg"/><link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png"/><link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/><title>Castle Solitaire</title><link rel="preconnect" href="https://fonts.googleapis.com"><link rel="preconnect" href="https://fonts.gstatic.com" crossorigin></head><body><div id="game"></div><script type="module" src="/src/main.ts"></script></body></html>
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover,user-scalable=no,maximum-scale=1"/>
+  <meta name="theme-color" content="#213E48"/>
+  <meta name="apple-mobile-web-app-capable" content="yes"/>
+  <meta name="mobile-web-app-capable" content="yes"/>
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent"/>
+  <meta name="apple-mobile-web-app-title" content="Castle Solitaire"/>
+  <meta name="format-detection" content="telephone=no"/>
+  <meta name="description" content="Build chains, deploy defenders and protect your castle with one solitaire. A roguelike card game for mobile and desktop."/>
+  <meta property="og:type" content="website"/>
+  <meta property="og:title" content="Castle Solitaire"/>
+  <meta property="og:description" content="Build chains, deploy defenders and protect your castle with one solitaire."/>
+  <meta property="og:image" content="/share-image.png"/>
+  <meta property="og:image:width" content="1200"/>
+  <meta property="og:image:height" content="630"/>
+  <meta name="twitter:card" content="summary_large_image"/>
+  <meta name="twitter:title" content="Castle Solitaire"/>
+  <meta name="twitter:description" content="Build chains, deploy defenders and protect your castle with one solitaire."/>
+  <meta name="twitter:image" content="/share-image.png"/>
+  <link rel="manifest" href="/manifest.webmanifest"/>
+  <link rel="icon" type="image/svg+xml" href="/icon.svg"/>
+  <link rel="icon" type="image/png" sizes="192x192" href="/icons/icon-192.png"/>
+  <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png"/>
+  <title>Castle Solitaire</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com"/>
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin/>
+  <style>
+    *{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+    :root{--sat:env(safe-area-inset-top,0px);--sab:env(safe-area-inset-bottom,0px)}
+    html,body{margin:0;width:100%;height:100dvh;overflow:hidden;background:#213E48}
+    body{position:fixed;inset:0;font-family:system-ui,sans-serif;overscroll-behavior:none;touch-action:none;-webkit-user-select:none;user-select:none}
+    #game{position:absolute;inset:0;max-width:480px;margin-inline:auto;overflow:hidden;background:#213E48}
+    @media(min-width:900px)and (min-aspect-ratio:6/5){#game{max-width:none}}
+    canvas{display:block!important;width:100%!important;height:100%!important;image-rendering:auto}
+    
+    /* Loading screen - inline for instant display */
+    #loader{position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(180deg,#213E48 0%,#142638 100%);z-index:1000;transition:opacity .4s ease-out}
+    #loader.hidden{opacity:0;pointer-events:none}
+    #loader-logo{width:120px;height:120px;margin-bottom:24px;animation:pulse 2s ease-in-out infinite}
+    @keyframes pulse{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.05);opacity:.85}}
+    #loader-title{font-size:28px;font-weight:bold;color:#fff1b3;text-shadow:0 2px 4px rgba(0,0,0,.3);margin-bottom:8px;letter-spacing:1px}
+    #loader-subtitle{font-size:18px;color:#a2cbdc;margin-bottom:32px}
+    #loader-bar-bg{width:200px;height:8px;background:rgba(255,255,255,.15);border-radius:4px;overflow:hidden}
+    #loader-bar{width:0%;height:100%;background:linear-gradient(90deg,#FFE55C,#FFC21A);border-radius:4px;transition:width .2s ease-out}
+    #loader-text{margin-top:12px;font-size:12px;color:#7aa0b8}
+  </style>
+</head>
+<body>
+  <div id="game" role="application" aria-label="Castle Solitaire game">
+    <div id="loader" role="progressbar" aria-valuemin="0" aria-valuemax="100" aria-valuenow="0" aria-label="Loading Castle Solitaire">
+      <svg id="loader-logo" viewBox="0 0 120 120" fill="none" xmlns="http://www.w3.org/2000/svg">
+        <rect x="10" y="60" width="100" height="50" rx="4" fill="#355b68"/>
+        <rect x="20" y="40" width="80" height="30" rx="2" fill="#4a7080"/>
+        <rect x="35" y="25" width="50" height="20" rx="2" fill="#5a8898"/>
+        <polygon points="60,5 90,25 30,25" fill="#FFE55C"/>
+        <rect x="50" y="75" width="20" height="35" rx="2" fill="#1B1030"/>
+        <rect x="25" y="50" width="12" height="15" fill="#7aa0b8"/>
+        <rect x="83" y="50" width="12" height="15" fill="#7aa0b8"/>
+        <rect x="25" y="70" width="12" height="15" fill="#7aa0b8"/>
+        <rect x="83" y="70" width="12" height="15" fill="#7aa0b8"/>
+      </svg>
+      <div id="loader-title">CASTLE</div>
+      <div id="loader-subtitle">SOLITAIRE</div>
+      <div id="loader-bar-bg"><div id="loader-bar"></div></div>
+      <div id="loader-text">Loading...</div>
+    </div>
+  </div>
+  <script type="module" src="/src/loader.ts"></script>
+</body>
+</html>

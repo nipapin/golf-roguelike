@@ -17,6 +17,7 @@ import { trainingCompleted, resetTrainingSession } from './CastleTutorial';
 
 import { isDesktopViewport } from '../presentation/design/desktopLayout';
 import { coverImage } from '../presentation/design/coverImage';
+import { fadeIn } from '../presentation/juice/transitions';
 
 export function siegeRules(scene: Phaser.Scene, close: () => void) {
   const modal = gamePopup(scene, 'DEFEND THE CASTLE', 'One solitaire. A whole siege.', 560);
@@ -78,6 +79,7 @@ export class CastleMenuScene extends Phaser.Scene {
   create(): void {
     configureViewport(this);
     AudioSystem.setMusicScene('menu');
+    fadeIn(this, { duration: 350 });
     const { width: w, height: h } = viewport(this);
     const safe = safeArea(this);
     const desktop = isDesktopViewport(w, h);
