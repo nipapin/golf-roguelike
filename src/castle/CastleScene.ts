@@ -2,6 +2,7 @@ import { cardboardActor, type siegeActors } from './CardboardArt';
 import Phaser from 'phaser';
 import { viewport, configureViewport, getRenderDensity } from '../presentation/design/viewport';
 import { getCastleLayoutMetrics } from '../presentation/design/tokens';
+import { isDesktopViewport } from '../presentation/design/desktopLayout';
 import { coverImage } from '../presentation/design/coverImage';
 import { GameFeel, gildedPanel, siegeBackdrop } from '../presentation/design/GameFeel';
 import { CardVisual } from '../presentation/design/CardVisual';
@@ -416,8 +417,11 @@ export class CastleScene extends Phaser.Scene {
     return Math.max(this.layout.arenaTop + 22, this.castle.getBounds().top - 14);
   }
   private enemyPosition(enemy: Invader) {
+    const vp = viewport(this);
+    const narrow = !isDesktopViewport(vp.width, vp.height);
+    const leftOffset = narrow ? -vp.width * 0.12 : 0;
     return {
-      x: enemy.progress * viewport(this).width * 0.78,
+      x: leftOffset + enemy.progress * vp.width * 0.78,
       y: enemyGroundPlacement(enemy.id, this.layout.arenaTop, this.layout.arenaHeight).y,
     };
   }
