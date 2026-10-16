@@ -325,8 +325,8 @@
       "stack": { "max": 1 },
       "name": { "en": "Guild Charter", "ru": "Устав гильдии" },
       "description": { 
-        "en": "All ability buttons (HEAL, BOMB, etc.) cost 25% less coins. Workshop upgrades also discounted. Prices shown in green.", 
-        "ru": "Кнопки способностей (ЛЕЧЕНИЕ, БОМБА и др.) на 25% дешевле. Мастерская тоже. Цены показаны зелёным." 
+        "en": "All ability buttons (HEAL, BOMB, ECHO) cost 30% less coins. Prices shown in green when discounted.", 
+        "ru": "Кнопки способностей (ЛЕЧЕНИЕ, БОМБА, ЭХО) на 30% дешевле. Цены показаны зелёным." 
       },
       "effect": { "type": "guildCharter", "discount": 0.3 }
     },

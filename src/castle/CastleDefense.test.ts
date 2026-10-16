@@ -1102,20 +1102,65 @@ describe('perk integration through playCastleCard', () => {
     }
   });
 
-  it('guild_charter reduces ability costs', () => {
-    let state = start('perk-guild-test');
-    state.perks = [{ id: 'guild_charter', stacks: 1 }];
-    state.siege.coins = 100;
-    state.run = { ...state.run, player: { ...state.run.player, hp: 20 } };
+  describe('guild_charter reduces ability costs by 30%', () => {
+    function setupGuildCharter(ability: 'HEAL' | 'BOMB' | 'ECHO') {
+      let state = start('perk-guild-' + ability);
+      state.perks = [{ id: 'guild_charter', stacks: 1 }];
+      state.siege.coins = 200;
+      state.run = { ...state.run, player: { ...state.run.player, hp: 20 } };
+      state.siege.enemies = [{ id: 1, sprite: 'c_orc', boss: false, hp: 100, maxHp: 100, progress: 0.5, speed: 0.02, damage: 5, cooldown: 0 }];
+      
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+      return state;
+    }
     
-    const anyCard = getPlayableCards(state.run.battle!)[0];
-    state = anyCard
-      ? playCastleCard(state, anyCard.id, config).state
-      : drawCastleCard(state, config).state;
+    it('HEAL costs 21 instead of 30 (30% discount)', () => {
+      const state = setupGuildCharter('HEAL');
+      const result = useCastleAbility(state, 'HEAL', config);
+      expect(result.state).not.toBe(state);
+      expect(result.state.siege.coins).toBe(200 - 21);
+    });
     
-    const result = useCastleAbility(state, 'HEAL', config);
-    expect(result.state).not.toBe(state);
-    expect(result.state.siege.coins).toBe(100 - Math.floor(30 * 0.7));
+    it('BOMB costs 70 instead of 100 (30% discount)', () => {
+      const state = setupGuildCharter('BOMB');
+      const result = useCastleAbility(state, 'BOMB', config);
+      expect(result.state).not.toBe(state);
+      expect(result.state.siege.coins).toBe(200 - 70);
+    });
+    
+    it('ECHO costs 35 instead of 50 (30% discount)', () => {
+      const state = setupGuildCharter('ECHO');
+      const result = useCastleAbility(state, 'ECHO', config);
+      expect(result.state).not.toBe(state);
+      expect(result.state.siege.coins).toBe(200 - 35);
+    });
+    
+    it('without guild_charter, abilities cost full price', () => {
+      let state = start('perk-no-guild');
+      state.siege.coins = 200;
+      state.run = { ...state.run, player: { ...state.run.player, hp: 20 } };
+      state.siege.enemies = [{ id: 1, sprite: 'c_orc', boss: false, hp: 100, maxHp: 100, progress: 0.5, speed: 0.02, damage: 5, cooldown: 0 }];
+      
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+      
+      const result = useCastleAbility(state, 'HEAL', config);
+      expect(result.state.siege.coins).toBe(200 - 30);
+    });
+    
+    it('getPerkManager returns correct multiplier', () => {
+      const stateWith = start('perk-multiplier-with');
+      stateWith.perks = [{ id: 'guild_charter', stacks: 1 }];
+      expect(getPerkManager(stateWith).getAbilityCostMultiplier()).toBe(0.7);
+      
+      const stateWithout = start('perk-multiplier-without');
+      expect(getPerkManager(stateWithout).getAbilityCostMultiplier()).toBe(1);
+    });
   });
 
   it('card_counter enables early draw assist', () => {
