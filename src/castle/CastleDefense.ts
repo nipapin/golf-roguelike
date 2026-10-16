@@ -211,7 +211,7 @@ export function createCastleRun(
     undoRemaining: 3,
     runStats: emptyCastleRunStats(),
     run: { ...initial, player: { ...initial.player, hp: maxHp, maxHp }, battle: {
-      ...battle, allowRankWrap: false, activeCard, deck: ordinaryDeck,
+      ...battle, allowRankWrap: true, activeCard, deck: ordinaryDeck,
       tableau: battle.tableau.map((column) => ({ cards: column.cards.filter((card) => !card.joker) })),
       powerCards: battle.powerCards.map((power, i) => ({ ...power, type: i === 0 ? 'WILD' : 'GUARD' })),
       jokerMultiplier: 1, lifestealMultiplier: 0,
@@ -367,7 +367,7 @@ export function playCastleCard(
   const columnIndex = findCardColumn(battle.tableau, cardId);
   const card = columnIndex >= 0 ? battle.tableau[columnIndex].cards.at(-1) : undefined;
   if (!card || card.joker || !isCardExposed(battle.tableau, cardId) ||
-    !canConnectInBattle(card, { ...battle, allowRankWrap: false }))
+    !canConnectInBattle(card, { ...battle, allowRankWrap: true }))
     return { state: current, events: [] };
   const state = clone(current);
   const used = new Set(current.usedPowers ?? []);
@@ -377,7 +377,7 @@ export function playCastleCard(
   const configuredPower = getPowerType(battle.powerCards, cardId);
   const power = used.has(cardId) ? null : configuredPower === 'GUARD' || configuredPower === 'WILD' ? configuredPower : null;
   const chain = [...battle.chain, card];
-  state.run = { ...current.run, battle: { ...battle, allowRankWrap: false,
+  state.run = { ...current.run, battle: { ...battle, allowRankWrap: true,
     tableau: battle.tableau.map((column, index) => index === columnIndex ? { cards: column.cards.slice(0, -1) } : column),
     discard: battle.activeCard ? [...battle.discard, battle.activeCard] : battle.discard,
     activeCard: card, chain, castleJokerExit: undefined, wildActive: power === 'WILD',
@@ -421,7 +421,7 @@ function drawAssistRoll(current: CastleRun) {
 function castleDrawIndex(current: CastleRun, deck: readonly Card[]): number {
   const battle = current.run.battle!;
   const opensMove = (candidate: Card, card: Card) => canConnectInBattle(card, {
-    ...battle, activeCard: candidate, wildActive: false, castleJokerExit: undefined, allowRankWrap: false,
+    ...battle, activeCard: candidate, wildActive: false, castleJokerExit: undefined, allowRankWrap: true,
   });
   const columns = battle.tableau.filter(column => column.cards.length);
   if ((current.emptyDraws ?? 0) + 1 < drawAssistRoll(current).at || !deck.length ||

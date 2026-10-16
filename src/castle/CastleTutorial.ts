@@ -98,7 +98,7 @@ export const trainingSteps = [
     'From active 9 you can play 8. This special card lets the next card have any rank.',
   ],
   ['Use WILD: play King', 'Normally 8 cannot connect to King. WILD allows this one connection.'],
-  ['King → Queen', 'Continue downward with Queen. Q ↔ K works, but A ↔ K is blocked. An Ace normally connects only to 2.'],
+  ['King → Queen', 'Continue downward with Queen. Kings and Aces wrap around: K ↔ A connects both ways.'],
   ['Queen → Jack', 'Four cards bank an arc cannon as well as the earlier rewards.'],
   ['Jack → 10', 'Five cards charge a 40-damage laser. Rewards repeat every five cards: 6 banks another soldier, 7 another archer; 10 doubles all rewards.'],
   ['Fire the laser', 'Tap the closed stock. Drawing deploys your banked rewards and fires the charged laser.'],

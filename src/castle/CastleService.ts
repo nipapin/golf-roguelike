@@ -151,7 +151,7 @@ function migrateProgressionAndReserve(v: Record<string, unknown>): void {
 function migrateRules(v: Record<string, unknown>): boolean {
   if (!record(v.run) || !record(v.run.battle)) return false;
   const battle = v.run.battle;
-  battle.allowRankWrap = false;
+  battle.allowRankWrap = true;
   if (v.runStats === undefined) v.runStats = legacyRunStats(v);
   let changed = v.undoRemaining === undefined || v.abilitiesUsed === undefined;
   const isJoker = (card: unknown): boolean =>
@@ -446,7 +446,7 @@ export class CastleService {
         ...snapshot,
         run: {
           ...snapshot.run,
-          battle: snapshot.run.battle ? { ...snapshot.run.battle, allowRankWrap: false } : null,
+          battle: snapshot.run.battle ? { ...snapshot.run.battle, allowRankWrap: true } : null,
         },
       });
       const history = undoHistory

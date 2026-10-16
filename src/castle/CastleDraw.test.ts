@@ -121,12 +121,12 @@ describe('stock order after consecutive empty draws', () => {
     expect(state.run.battle!.deck).toEqual([]);
     expect(state.run.battle!.discard.map(c => c.id).slice(0, discard.length)).toEqual(discard);
   });
-  it.each([[1, 13, 2], [13, 1, 12]])('keeps linear rank rules for exposed rank %d', (top, wrong, right) => {
-    const state = fixture([[top]], [wrong, 6, right]);
+  it.each([[1, 13], [13, 1]])('uses wrap-around rank rules for exposed rank %d connecting to %d', (top, wrap) => {
+    const state = fixture([[top]], [wrap, 6, 7]);
     state.emptyDraws = 6;
     const result = draw(state);
-    expect(result.run.battle!.activeCard!.rank).toBe(right);
-    expect(result.run.battle!.deck.map(c => c.rank)).toEqual([wrong, 6]);
+    expect(result.run.battle!.activeCard!.rank).toBe(wrap);
+    expect(result.run.battle!.deck.map(c => c.rank)).toEqual([6, 7]);
   });
   it('targets only exposed cards and falls back when a larger column has no matching stock card', () => {
     const state = fixture([[12, 10], [6]], [13, 5, 2]);
