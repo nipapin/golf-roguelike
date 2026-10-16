@@ -10,6 +10,8 @@ import {
   drawCastleCard,
   nextCastleCard,
   stepSiege,
+  useCastleAbility,
+  getPerkManager,
   type CastleRun,
   type Invader,
   SIEGE_PACING,
@@ -983,5 +985,212 @@ describe('stock preview', () => {
     expect(nextCastleCard(recycled)).toEqual(card);
     expect(recycled.run.rngState).toBe(rng);
     expect(drawCastleCard(recycled, config).state.run.battle!.activeCard).toEqual(card);
+  });
+});
+
+describe('perk integration through playCastleCard', () => {
+  function findPlayableCardOfSuit(state: CastleRun, suit: string) {
+    const battle = state.run.battle!;
+    for (const column of battle.tableau) {
+      const topCard = column.cards.at(-1);
+      if (!topCard || topCard.joker) continue;
+      if (topCard.suit !== suit) continue;
+      const activeRank = battle.activeCard?.rank ?? 0;
+      if (Math.abs(topCard.rank - activeRank) === 1 ||
+          (battle.allowRankWrap && ((topCard.rank === 1 && activeRank === 13) || (topCard.rank === 13 && activeRank === 1)))) {
+        return topCard;
+      }
+    }
+    return null;
+  }
+
+  it('club_bulwark grants armor when playing clubs through the real game path', () => {
+    let state = start('perk-clubs-test');
+    state.perks = [{ id: 'club_bulwark', stacks: 1 }];
+    const initialArmor = state.run.player.armor;
+    
+    for (let i = 0; i < 50 && state.run.phase === 'battle'; i++) {
+      const clubCard = findPlayableCardOfSuit(state, 'clubs');
+      if (clubCard) {
+        const result = playCastleCard(state, clubCard.id, config);
+        if (result.state !== state) {
+          const armorEvent = result.events.find(e => e.type === 'perk_armor');
+          expect(armorEvent).toBeDefined();
+          expect(result.state.run.player.armor).toBeGreaterThan(initialArmor);
+          return;
+        }
+      }
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+    }
+    throw new Error('Could not find a playable club card in 50 moves');
+  });
+
+  it('diamond_vein grants coins when playing diamonds through the real game path', () => {
+    let state = start('perk-diamonds-test');
+    state.perks = [{ id: 'diamond_vein', stacks: 1 }];
+    const initialCoins = state.siege.coins;
+    
+    for (let i = 0; i < 50 && state.run.phase === 'battle'; i++) {
+      const diamondCard = findPlayableCardOfSuit(state, 'diamonds');
+      if (diamondCard) {
+        const result = playCastleCard(state, diamondCard.id, config);
+        if (result.state !== state) {
+          const coinEvent = result.events.find(e => e.type === 'perk_coins');
+          expect(coinEvent).toBeDefined();
+          expect(result.state.siege.coins).toBeGreaterThan(initialCoins);
+          return;
+        }
+      }
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+    }
+    throw new Error('Could not find a playable diamond card in 50 moves');
+  });
+
+  it('heart_mend heals when playing hearts through the real game path', () => {
+    let state = start('perk-hearts-test');
+    state.perks = [{ id: 'heart_mend', stacks: 1 }];
+    state.run = { ...state.run, player: { ...state.run.player, hp: 30 } };
+    const initialHp = state.run.player.hp;
+    
+    for (let i = 0; i < 50 && state.run.phase === 'battle'; i++) {
+      const heartCard = findPlayableCardOfSuit(state, 'hearts');
+      if (heartCard) {
+        const result = playCastleCard(state, heartCard.id, config);
+        if (result.state !== state) {
+          const healEvent = result.events.find(e => e.type === 'perk_heal');
+          expect(healEvent).toBeDefined();
+          expect(result.state.run.player.hp).toBeGreaterThan(initialHp);
+          return;
+        }
+      }
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+    }
+    throw new Error('Could not find a playable heart card in 50 moves');
+  });
+
+  it('perks persist through save and load', () => {
+    const storage = memoryStorage();
+    const service = new CastleService(storage);
+    const state = start('perk-persistence-test');
+    state.perks = [
+      { id: 'club_bulwark', stacks: 2 },
+      { id: 'diamond_vein', stacks: 1 },
+    ];
+    service.save(state);
+    
+    const loaded = service.load();
+    expect(loaded).not.toBeNull();
+    expect(loaded!.perks).toEqual([
+      { id: 'club_bulwark', stacks: 2 },
+      { id: 'diamond_vein', stacks: 1 },
+    ]);
+    
+    const clubCard = findPlayableCardOfSuit(loaded!, 'clubs');
+    if (clubCard) {
+      const result = playCastleCard(loaded!, clubCard.id, config);
+      expect(result.events.some(e => e.type === 'perk_armor')).toBe(true);
+      expect(result.state.run.player.armor).toBe(2);
+    }
+  });
+
+  it('guild_charter reduces ability costs', () => {
+    let state = start('perk-guild-test');
+    state.perks = [{ id: 'guild_charter', stacks: 1 }];
+    state.siege.coins = 100;
+    state.run = { ...state.run, player: { ...state.run.player, hp: 20 } };
+    
+    const anyCard = getPlayableCards(state.run.battle!)[0];
+    state = anyCard
+      ? playCastleCard(state, anyCard.id, config).state
+      : drawCastleCard(state, config).state;
+    
+    const result = useCastleAbility(state, 'HEAL', config);
+    expect(result.state).not.toBe(state);
+    expect(result.state.siege.coins).toBe(100 - Math.floor(30 * 0.7));
+  });
+
+  it('card_counter enables early draw assist', () => {
+    const state = start('perk-counter-test');
+    state.perks = [{ id: 'card_counter', stacks: 1 }];
+    
+    const manager = getPerkManager(state);
+    expect(manager.showNextCard()).toBe(true);
+    expect(manager.getDrawAssistThreshold()).toBe(2);
+  });
+
+  it('royal_court deploys units when playing face cards', () => {
+    let state = start('perk-royal-test');
+    state.perks = [{ id: 'royal_court', stacks: 1 }];
+    
+    function findPlayableFaceCard(s: CastleRun) {
+      const battle = s.run.battle!;
+      for (const column of battle.tableau) {
+        const topCard = column.cards.at(-1);
+        if (!topCard || topCard.joker) continue;
+        if (![11, 12, 13].includes(topCard.rank)) continue;
+        const activeRank = battle.activeCard?.rank ?? 0;
+        if (Math.abs(topCard.rank - activeRank) === 1 ||
+            (battle.allowRankWrap && ((topCard.rank === 1 && activeRank === 13) || (topCard.rank === 13 && activeRank === 1)))) {
+          return topCard;
+        }
+      }
+      return null;
+    }
+    
+    for (let i = 0; i < 100 && state.run.phase === 'battle'; i++) {
+      const faceCard = findPlayableFaceCard(state);
+      if (faceCard) {
+        const result = playCastleCard(state, faceCard.id, config);
+        if (result.state !== state) {
+          const deployEvent = result.events.find(e => e.type === 'deploy');
+          if (faceCard.rank === 11 || faceCard.rank === 12) {
+            expect(deployEvent).toBeDefined();
+          }
+          if (faceCard.rank === 13) {
+            const reloadEvent = result.events.find(e => e.type === 'reload' || e.type === 'deploy');
+            expect(reloadEvent).toBeDefined();
+          }
+          return;
+        }
+      }
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+    }
+    throw new Error('Could not find a playable face card in 100 moves');
+  });
+
+  it('spade_edge adds +1 link when playing spades', () => {
+    let state = start('perk-spade-test');
+    state.perks = [{ id: 'spade_edge', stacks: 1 }];
+    
+    for (let i = 0; i < 50 && state.run.phase === 'battle'; i++) {
+      const spadeCard = findPlayableCardOfSuit(state, 'spades');
+      if (spadeCard) {
+        const chainBefore = state.run.battle!.chain.length;
+        const result = playCastleCard(state, spadeCard.id, config);
+        if (result.state !== state) {
+          const cardEvent = result.events.find(e => e.type === 'card') as { type: 'card'; chain: number } | undefined;
+          expect(cardEvent).toBeDefined();
+          expect(cardEvent!.chain).toBe(chainBefore + 1 + 1);
+          return;
+        }
+      }
+      const anyCard = getPlayableCards(state.run.battle!)[0];
+      state = anyCard
+        ? playCastleCard(state, anyCard.id, config).state
+        : drawCastleCard(state, config).state;
+    }
+    throw new Error('Could not find a playable spade card in 50 moves');
   });
 });
