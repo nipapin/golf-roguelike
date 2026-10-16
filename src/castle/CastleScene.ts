@@ -8,6 +8,7 @@ import { CardVisual } from '../presentation/design/CardVisual';
 import { canConnectInBattle, getPowerType } from '../core/GameState';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { SettingsModal } from '../presentation/design/SettingsModal';
+import { tapFeedback, playFeedback, comboFeedback, impactFeedback, successFeedback, errorFeedback, deployFeedback } from '../presentation/haptics/haptics';
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { playCombatVFX } from '../presentation/design/CombatVFX';
 import { isShakeReduced } from '../presentation/juice/fxSettings';
@@ -452,6 +453,7 @@ export class CastleScene extends Phaser.Scene {
   private drawFromStock(): void {
     if (this.paused || this.locked || this.ended || !this.allowTraining('draw')) return;
     AudioSystem.unlock();
+    tapFeedback();
     const before = this.manager.state, oldActive = before!.run.battle!.activeCard?.id;
     const result = this.manager.draw();
     if (!result || result.state === before || !result.events.some(event => event.type === 'draw')) return;
@@ -619,6 +621,7 @@ export class CastleScene extends Phaser.Scene {
     const result = manager.play(id);
     if (!result || result.state === before) {
       AudioSystem.play('invalid_tap', { volume: 0.45 });
+      errorFeedback();
       const container = this.cards.get(id)?.getContainer();
       if (container) {
         const x = container.x;
@@ -633,6 +636,7 @@ export class CastleScene extends Phaser.Scene {
       }
       return;
     }
+    playFeedback();
     const visual = this.cards.get(id);
     this.cards.delete(id);
     if (visual) {
@@ -1054,6 +1058,7 @@ export class CastleScene extends Phaser.Scene {
         }
         case 'card':
           AudioSystem.playCardSound(event.chain);
+          comboFeedback(event.chain);
           for (const e of event.events) {
             if (e.type === 'power_activated') {
               AudioSystem.playPower(e.powerType);
@@ -1112,6 +1117,7 @@ export class CastleScene extends Phaser.Scene {
           if (event.enemy.boss) this.announcements?.showBoss(event.enemy.id);
           break;
         case 'deploy': {
+          deployFeedback();
           const unit = this.manager.state!.siege.units.find((u) => u.id === event.id);
           if (unit) {
             const p = this.unitPosition(unit);
@@ -1218,6 +1224,7 @@ export class CastleScene extends Phaser.Scene {
           this.actorAnimation(event.enemy, 'attack');
           if (event.damage > 0) {
             AudioSystem.play('player_hit', { volume: 0.85 });
+            impactFeedback();
             this.number(this.castle.x, this.castle.y - 70, `−${event.damage}`, '#ff6b84');
             this.tweens.add({ targets: this.castle, angle: -1.3, duration: 100, yoyo: true, ease: 'Sine.out' });
             this.feel.emotion(this.castle.x, this.castleEmotionY(), 'worried', 'castle-hit');
@@ -1514,6 +1521,8 @@ export class CastleScene extends Phaser.Scene {
     const won = state.run.phase === 'victory';
     AudioSystem.setMusicScene(won ? 'victory' : 'defeat');
     AudioSystem.play(won ? 'victory' : 'defeat');
+    if (won) successFeedback();
+    else impactFeedback();
     showCastleRoundResult(this, state, {
       next: () => {
         if (!manager.start()) return false;

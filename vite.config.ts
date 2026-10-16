@@ -107,6 +107,13 @@ export default defineConfig({
   ],
   build: {
     target: 'es2022',
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          phaser: ['phaser'],
+        },
+      },
+    },
   },
   server: { host: '127.0.0.1', port: 5173, strictPort: true },
 });

@@ -1,4 +1,6 @@
 import { isShakeReduced, setShakeReduced } from '../juice/fxSettings';
+import { isHapticsEnabled, setHapticsEnabled, tapFeedback } from '../haptics/haptics';
+import { isFullscreenSupported, isFullscreen, toggleFullscreen, onFullscreenChange } from '../fullscreen/fullscreen';
 import { viewport, getRenderDensity, safeArea } from './viewport';
 /**
  * SettingsModal - In-game settings panel
@@ -35,7 +37,7 @@ export class SettingsModal {
     const width = viewport(scene).width;
     const height = viewport(scene).height;
     this.panelWidth = Math.min(420, width - 32);
-    this.panelHeight = callbacks.variant === 'menu' ? 470 : 530;
+    this.panelHeight = callbacks.variant === 'menu' ? 520 : 580;
     
     // Dark overlay
     this.overlay = scene.add.rectangle(width / 2, height / 2, width, height, 0x000000, 0.7);
@@ -102,19 +104,33 @@ export class SettingsModal {
     this.createVolume(soundY + 138, () => AudioSystem.musicVolume, (value) => { AudioSystem.musicVolume = value; }, 'music');
     // Accessibility: reduce camera shake (persisted)
     this.createToggle(0, soundY + 200, menu ? 'Меньше тряски' : 'Less shake', isShakeReduced(), (enabled) => { setShakeReduced(enabled); }, 'settings-shake-toggle');
+    
+    // Haptics toggle (mobile vibration feedback)
+    this.createToggle(0, soundY + 250, menu ? 'Вибрация' : 'Haptics', isHapticsEnabled(), (enabled) => { 
+      setHapticsEnabled(enabled);
+      if (enabled) tapFeedback();
+    }, 'settings-haptics-toggle');
 
     if (menu) {
-      this.createButton(0, soundY + 260, 'НАЗАД', colors.gold, colors.goldLo, () => {
+      if (isFullscreenSupported()) {
+        this.createFullscreenButton(0, soundY + 310);
+      }
+      this.createButton(0, soundY + (isFullscreenSupported() ? 372 : 310), 'НАЗАД', colors.gold, colors.goldLo, () => {
         this.hide(); this.callbacks.onResume();
       }).setName('menu-settings-back');
-      this.createButton(0, soundY + 322, 'ДОПОЛНИТЕЛЬНО', colors.blue, colors.blueLo, () => {
+      this.createButton(0, soundY + (isFullscreenSupported() ? 434 : 372), 'ДОПОЛНИТЕЛЬНО', colors.blue, colors.blueLo, () => {
         this.hide(); this.callbacks.onMore?.();
       }).setName('menu-settings-more');
       return;
     }
 
+    // Fullscreen button (only on supported platforms)
+    if (isFullscreenSupported()) {
+      this.createFullscreenButton(0, soundY + 310);
+    }
+
     // Buttons
-    const buttonY = soundY + 260;
+    const buttonY = soundY + (isFullscreenSupported() ? 372 : 310);
     const buttonSpacing = 54;
     
     // Resume button (green - primary action)
@@ -199,6 +215,72 @@ export class SettingsModal {
       onChange(enabled);
     });
     this.container.add(hitZone);
+  }
+
+  private fullscreenCleanup?: () => void;
+
+  private createFullscreenButton(x: number, y: number): void {
+    const buttonWidth = Math.min(280, this.panelWidth - 64);
+    const buttonHeight = 48;
+    
+    const buttonContainer = this.scene.add.container(x, y).setName('settings-fullscreen-button');
+    
+    const bg = this.scene.add.graphics();
+    
+    const redraw = () => {
+      const full = isFullscreen();
+      const colorHi = full ? colors.violet : colors.blue;
+      const colorLo = full ? 0x5a3a7a : colors.blueLo;
+      
+      bg.clear();
+      bg.fillStyle(colors.ink, 1);
+      bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2 + 5, buttonWidth, buttonHeight, 14);
+      bg.fillStyle(colorHi, 1);
+      bg.fillGradientStyle(colorHi, colorHi, colorLo, colorLo, 1);
+      bg.fillRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight - 5, 14);
+      bg.fillStyle(0xffffff, 0.35);
+      bg.fillRoundedRect(-buttonWidth / 2 + 8, -buttonHeight / 2 + 4, buttonWidth - 16, 8, 4);
+      bg.lineStyle(3, colors.ink, 1);
+      bg.strokeRoundedRect(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight - 5, 14);
+      
+      const label = full ? 'EXIT FULLSCREEN' : 'FULLSCREEN';
+      const text = buttonContainer.getByName('fullscreen-text') as Phaser.GameObjects.Text;
+      if (text) text.setText(label);
+    };
+    
+    buttonContainer.add(bg);
+    
+    const buttonText = this.scene.add.text(0, -3, isFullscreen() ? 'EXIT FULLSCREEN' : 'FULLSCREEN', {
+      resolution: getRenderDensity(), ...gameDisplayStyle('FULLSCREEN'),
+      fontSize: '18px',
+      color: '#ffffff',
+    }).setOrigin(0.5).setStroke('#1B1030', 4).setName('fullscreen-text');
+    if (buttonText.width > buttonWidth - 22) buttonText.setFontSize(18 * (buttonWidth - 22) / buttonText.width);
+    buttonContainer.add(buttonText);
+    
+    buttonContainer.setInteractive(
+      new Phaser.Geom.Rectangle(-buttonWidth / 2, -buttonHeight / 2, buttonWidth, buttonHeight),
+      Phaser.Geom.Rectangle.Contains
+    );
+    
+    buttonContainer.on('pointerdown', () => {
+      buttonContainer.setScale(0.95);
+    });
+    
+    buttonContainer.on('pointerup', () => {
+      buttonContainer.setScale(1);
+      AudioSystem.play('button_tap');
+      tapFeedback();
+      toggleFullscreen().then(() => redraw());
+    });
+    
+    buttonContainer.on('pointerout', () => {
+      buttonContainer.setScale(1);
+    });
+    
+    this.fullscreenCleanup = onFullscreenChange(() => redraw());
+    
+    this.container.add(buttonContainer);
   }
 
   private createVolume(y: number, get: () => number, set: (value: number) => void, name: string): void {
@@ -450,6 +532,7 @@ export class SettingsModal {
   }
 
   destroy(): void {
+    this.fullscreenCleanup?.();
     this.overlay.destroy();
     this.container.destroy();
   }
