@@ -1,0 +1,317 @@
+{
+  "perks": [
+    {
+      "id": "heart_mend",
+      "rarity": "common",
+      "category": "suit",
+      "stack": { "max": 2 },
+      "name": { "en": "Mending Hearts", "ru": "Целебные черви" },
+      "description": { "en": "♥ cards heal the castle 1 HP (max 8/round).", "ru": "Черви лечат замок на 1 ОЗ (до 8 за раунд)." },
+      "effect": { "type": "suitHeal", "suit": "hearts", "value": 1, "capPerRound": 8 }
+    },
+    {
+      "id": "spade_edge",
+      "rarity": "rare",
+      "category": "suit",
+      "stack": { "max": 1 },
+      "name": { "en": "Spade Edge", "ru": "Пиковый клинок" },
+      "description": { "en": "♠ count as 2 links in a chain.", "ru": "Пики считаются за 2 звена цепочки." },
+      "effect": { "type": "suitLinks", "suit": "spades", "value": 1, "capPerChain": 3 }
+    },
+    {
+      "id": "diamond_vein",
+      "rarity": "common",
+      "category": "suit",
+      "stack": { "max": 3 },
+      "name": { "en": "Diamond Vein", "ru": "Алмазная жила" },
+      "description": { "en": "♦ cards give +2 coins.", "ru": "Бубны дают +2 монеты." },
+      "effect": { "type": "suitCoins", "suit": "diamonds", "value": 2 }
+    },
+    {
+      "id": "club_bulwark",
+      "rarity": "common",
+      "category": "suit",
+      "stack": { "max": 2 },
+      "name": { "en": "Club Bulwark", "ru": "Трефовый бастион" },
+      "description": { "en": "♣ cards give +1 armor.", "ru": "Трефы дают +1 броню." },
+      "effect": { "type": "suitArmor", "suit": "clubs", "value": 1, "armorCap": 12 }
+    },
+    {
+      "id": "flush_run",
+      "rarity": "uncommon",
+      "category": "deck",
+      "stack": { "max": 2 },
+      "name": { "en": "Flush Run", "ru": "Мастевая серия" },
+      "description": { "en": "3 same-suit cards in a row: +2 links.", "ru": "3 карты одной масти подряд: +2 звена." },
+      "effect": { "type": "flushBonus", "consecutiveCount": 3, "links": 2 }
+    },
+    {
+      "id": "royal_court",
+      "rarity": "uncommon",
+      "category": "deck",
+      "stack": { "max": 1 },
+      "name": { "en": "Royal Court", "ru": "Королевский двор" },
+      "description": { "en": "J calls a soldier, Q an archer, K loads 5 turret rounds.", "ru": "В вызывает солдата, Д — лучника, К заряжает 5 патронов." },
+      "effect": { "type": "royalCourt", "jackUnit": "soldier", "queenUnit": "archer", "kingTurretRounds": 5 }
+    },
+    {
+      "id": "ace_flare",
+      "rarity": "uncommon",
+      "category": "deck",
+      "stack": { "max": 2 },
+      "name": { "en": "Ace Flare", "ru": "Вспышка туза" },
+      "description": { "en": "Aces zap all enemies for 10.", "ru": "Тузы бьют всех врагов на 10." },
+      "effect": { "type": "aceFlare", "damage": 10 }
+    },
+    {
+      "id": "lucky_seven",
+      "rarity": "common",
+      "category": "deck",
+      "stack": { "max": 2 },
+      "name": { "en": "Lucky Seven", "ru": "Счастливая семёрка" },
+      "description": { "en": "7s: 1-in-3 chance for +6 coins and +1 armor.", "ru": "Семёрки: шанс 1 из 3 на +6 монет и +1 броню." },
+      "effect": { "type": "luckySeven", "chance": 0.333, "coins": 6, "armor": 1 }
+    },
+    {
+      "id": "momentum",
+      "rarity": "uncommon",
+      "category": "deck",
+      "stack": { "max": 1 },
+      "name": { "en": "Momentum", "ru": "Инерция" },
+      "description": { "en": "Every 4th card in a chain gives +1 link.", "ru": "Каждая 4-я карта цепочки — +1 звено." },
+      "effect": { "type": "momentum", "every": 4, "links": 1 }
+    },
+    {
+      "id": "ouroboros",
+      "rarity": "rare",
+      "category": "deck",
+      "stack": { "max": 1 },
+      "name": { "en": "Ouroboros", "ru": "Уроборос" },
+      "description": { "en": "K↔A wraps give +2 links.", "ru": "K↔A даёт +2 звена." },
+      "effect": { "type": "ouroborosLinks", "links": 2 }
+    },
+    {
+      "id": "spare_stock",
+      "rarity": "common",
+      "category": "deck",
+      "stack": { "max": 2 },
+      "name": { "en": "Spare Stock", "ru": "Запасная колода" },
+      "description": { "en": "+3 stock cards. Recycling costs 3 HP.", "ru": "+3 карты в колоде. Перетасовка стоит 3 ОЗ." },
+      "effect": { "type": "spareStock", "extraCards": 3, "recycleHpReduction": 2 }
+    },
+    {
+      "id": "card_counter",
+      "rarity": "common",
+      "category": "deck",
+      "stack": { "max": 1 },
+      "name": { "en": "Card Counter", "ru": "Счётчик карт" },
+      "description": { "en": "See the next stock card. Help comes sooner.", "ru": "Видно следующую карту колоды. Подсказка раньше." },
+      "effect": { "type": "cardCounter", "showNextCard": true, "drawAssistAt": 2 }
+    },
+    {
+      "id": "wild_reserve",
+      "rarity": "uncommon",
+      "category": "deck",
+      "stack": { "max": 2 },
+      "name": { "en": "Wild Reserve", "ru": "Дикий резерв" },
+      "description": { "en": "+1 WILD card each round.", "ru": "+1 карта WILD каждый раунд." },
+      "effect": { "type": "wildReserve", "extraWilds": 1 }
+    },
+    {
+      "id": "jester",
+      "rarity": "rare",
+      "category": "deck",
+      "stack": { "max": 2 },
+      "name": { "en": "Jester", "ru": "Шут" },
+      "description": { "en": "A Joker joins your stock: plays on anything, +2 links.", "ru": "В колоде Джокер: ложится на всё, +2 звена." },
+      "effect": { "type": "jester", "jokers": 1, "links": 2 }
+    },
+    {
+      "id": "longbow",
+      "rarity": "common",
+      "category": "units",
+      "stack": { "max": 3 },
+      "name": { "en": "Longbows", "ru": "Длинные луки" },
+      "description": { "en": "Archers +1 damage.", "ru": "Лучники +1 урон." },
+      "effect": { "type": "archerDamage", "value": 1 }
+    },
+    {
+      "id": "quick_draw",
+      "rarity": "uncommon",
+      "category": "units",
+      "stack": { "max": 2 },
+      "name": { "en": "Quick Draw", "ru": "Быстрая тетива" },
+      "description": { "en": "Archers shoot 20% faster.", "ru": "Лучники стреляют на 20% быстрее." },
+      "effect": { "type": "archerSpeed", "multiplier": 0.8 }
+    },
+    {
+      "id": "extended_mag",
+      "rarity": "common",
+      "category": "units",
+      "stack": { "max": 3 },
+      "name": { "en": "Extended Magazine", "ru": "Удлинённый магазин" },
+      "description": { "en": "Turret magazine +5. Leftover rounds are kept.", "ru": "Магазин турели +5, остаток сохраняется." },
+      "effect": { "type": "turretMag", "extraRounds": 5, "keepLeftover": true }
+    },
+    {
+      "id": "heavy_shells",
+      "rarity": "common",
+      "category": "units",
+      "stack": { "max": 3 },
+      "name": { "en": "Heavy Shells", "ru": "Тяжёлые снаряды" },
+      "description": { "en": "Arc cannon +3 damage.", "ru": "Пушка +3 урона." },
+      "effect": { "type": "mortarDamage", "value": 3 }
+    },
+    {
+      "id": "cluster_shells",
+      "rarity": "uncommon",
+      "category": "units",
+      "stack": { "max": 1 },
+      "name": { "en": "Cluster Shells", "ru": "Кассетные снаряды" },
+      "description": { "en": "Arc cannon hits 4 enemies.", "ru": "Пушка бьёт 4 врагов." },
+      "effect": { "type": "mortarTargets", "targets": 4 }
+    },
+    {
+      "id": "focusing_lens",
+      "rarity": "common",
+      "category": "units",
+      "stack": { "max": 3 },
+      "name": { "en": "Focusing Lens", "ru": "Фокусирующая линза" },
+      "description": { "en": "Laser +15 damage.", "ru": "Лазер +15 урона." },
+      "effect": { "type": "laserDamage", "value": 15 }
+    },
+    {
+      "id": "veteran_militia",
+      "rarity": "common",
+      "category": "units",
+      "stack": { "max": 2 },
+      "name": { "en": "Veteran Militia", "ru": "Ветераны" },
+      "description": { "en": "Soldiers +3 HP, last 6 s longer.", "ru": "Солдаты +3 ОЗ и живут на 6 с дольше." },
+      "effect": { "type": "soldierStats", "hpBonus": 3, "lifetimeBonus": 6 }
+    },
+    {
+      "id": "stone_walls",
+      "rarity": "common",
+      "category": "castle",
+      "stack": { "max": 3 },
+      "name": { "en": "Stone Walls", "ru": "Каменные стены" },
+      "description": { "en": "+10 max HP, heal 10.", "ru": "+10 к макс. ОЗ, лечение 10." },
+      "effect": { "type": "stoneWalls", "maxHpBonus": 10, "healNow": 10 }
+    },
+    {
+      "id": "masons",
+      "rarity": "uncommon",
+      "category": "castle",
+      "stack": { "max": 2 },
+      "name": { "en": "Masons", "ru": "Каменщики" },
+      "description": { "en": "Castle regenerates 1 HP / 15 s (max 8/round).", "ru": "Замок восстанавливает 1 ОЗ / 15 с (до 8 за раунд)." },
+      "effect": { "type": "masons", "interval": 15, "heal": 1, "capPerRound": 8 }
+    },
+    {
+      "id": "field_hospital",
+      "rarity": "uncommon",
+      "category": "castle",
+      "stack": { "max": 1 },
+      "name": { "en": "Field Hospital", "ru": "Полевой госпиталь" },
+      "description": { "en": "After a win, heal 30% of missing HP.", "ru": "После победы лечит 30% недостающих ОЗ." },
+      "effect": { "type": "fieldHospital", "healPercent": 0.3 }
+    },
+    {
+      "id": "tar_moat",
+      "rarity": "uncommon",
+      "category": "castle",
+      "stack": { "max": 2 },
+      "name": { "en": "Tar Moat", "ru": "Смоляной ров" },
+      "description": { "en": "Enemies move 12% slower.", "ru": "Враги на 12% медленнее." },
+      "effect": { "type": "tarMoat", "slowPercent": 0.12, "bossSlowPercent": 0.06 }
+    },
+    {
+      "id": "bounty_board",
+      "rarity": "common",
+      "category": "economy",
+      "stack": { "max": 2 },
+      "name": { "en": "Bounty Board", "ru": "Доска наград" },
+      "description": { "en": "Bosses drop 10 coins. Every 10th kill +2.", "ru": "Боссы дают 10 монет, каждое 10-е убийство +2." },
+      "effect": { "type": "bountyBoard", "bossCoins": 5, "killMilestone": 10, "milestoneCoins": 2 }
+    },
+    {
+      "id": "guild_charter",
+      "rarity": "uncommon",
+      "category": "economy",
+      "stack": { "max": 1 },
+      "name": { "en": "Guild Charter", "ru": "Устав гильдии" },
+      "description": { "en": "Workshop and abilities cost 30% less.", "ru": "Мастерская и способности на 30% дешевле." },
+      "effect": { "type": "guildCharter", "discount": 0.3 }
+    },
+    {
+      "id": "spade_salvo",
+      "rarity": "rare",
+      "category": "synergy",
+      "stack": { "max": 1 },
+      "name": { "en": "Spade Salvo", "ru": "Пиковый залп" },
+      "description": { "en": "♠ cards fire a free cannon shell.", "ru": "Пики дают бесплатный выстрел пушки." },
+      "effect": { "type": "spadeSalvo", "targets": 3 }
+    },
+    {
+      "id": "heartfire",
+      "rarity": "rare",
+      "category": "synergy",
+      "stack": { "max": 2 },
+      "name": { "en": "Heartfire", "ru": "Сердечный огонь" },
+      "description": { "en": "♥ cards light your next 3 arrows.", "ru": "Черви поджигают 3 следующие стрелы." },
+      "effect": { "type": "heartfire", "arrowsToIgnite": 3 }
+    },
+    {
+      "id": "trinity",
+      "rarity": "rare",
+      "category": "synergy",
+      "stack": { "max": 1 },
+      "name": { "en": "Trinity", "ru": "Троица" },
+      "description": { "en": "3rd card of a rank in a round: free BOMB (max 2).", "ru": "3-я карта одного ранга за раунд — бесплатная БОМБА (до 2)." },
+      "effect": { "type": "trinity", "bombsPerRound": 2, "bombDamage": 12 }
+    },
+    {
+      "id": "starfall",
+      "rarity": "legendary",
+      "category": "synergy",
+      "stack": { "max": 1 },
+      "prerequisites": ["ace_flare", "focusing_lens"],
+      "replaces": "ace_flare",
+      "name": { "en": "Starfall", "ru": "Звездопад" },
+      "description": { "en": "Every Ace fires a full laser.", "ru": "Каждый туз даёт полный лазерный залп." },
+      "effect": { "type": "starfall" }
+    },
+    {
+      "id": "glass_cannon",
+      "rarity": "rare",
+      "category": "risk",
+      "stack": { "max": 1 },
+      "name": { "en": "Glass Cannon", "ru": "Стеклянная пушка" },
+      "description": { "en": "−30% max HP, +40% all damage.", "ru": "−30% макс. ОЗ, +40% ко всему урону." },
+      "effect": { "type": "glassCannon", "maxHpPenalty": 0.3, "damageBonus": 0.4 }
+    },
+    {
+      "id": "blood_price",
+      "rarity": "rare",
+      "category": "risk",
+      "stack": { "max": 1 },
+      "name": { "en": "Blood Price", "ru": "Цена крови" },
+      "description": { "en": "Chains of 3+: +2 links. Short-chain draws cost 1 HP.", "ru": "Цепочки от 3: +2 звена. Добор при короткой цепочке −1 ОЗ." },
+      "effect": { "type": "bloodPrice", "minChain": 3, "links": 2, "shortDrawCost": 1 }
+    }
+  ],
+  "dropRules": {
+    "rarityWeights": {
+      "early": { "rounds": [1, 2], "common": 65, "uncommon": 28, "rare": 7, "legendary": 0 },
+      "mid": { "rounds": [3, 5], "common": 55, "uncommon": 30, "rare": 13, "legendary": 2 },
+      "late": { "rounds": [6, 999], "common": 45, "uncommon": 32, "rare": 18, "legendary": 5 }
+    },
+    "legendarySlotChance": 0.35,
+    "pityThreshold": 3,
+    "rerollBaseCost": 15,
+    "rerollCostIncrement": 10,
+    "freeRerollsPerRun": 1,
+    "skipCoins": 12,
+    "globalBonusLinkCap": 5
+  }
+}

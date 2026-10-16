@@ -356,6 +356,15 @@ describe('one-time round continuation', () => {
       maxHp: 40,
       armor: 9,
       stats: state.runStats,
+      perks: undefined,
+      perkRerollsUsed: undefined,
+      perkFreeRerollsUsed: undefined,
+      perkRareStreak: undefined,
+      progression: {
+        xp: state.progression.xp,
+        level: state.progression.level,
+        modules: [...state.progression.modules],
+      },
     });
     expect(service.readMeta().continuation).toBeUndefined();
     expect(service.beginSiege().carryover).toBeUndefined();

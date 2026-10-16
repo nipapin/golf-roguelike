@@ -1,5 +1,5 @@
 import { gameConfig } from '../data/gameConfig';
-import { generateSeed } from '../core/RNG';
+import { generateSeed, RNG } from '../core/RNG';
 import {
   createCastleRun,
   playCastleCard,
@@ -9,12 +9,14 @@ import {
   activateCastleJoker,
   buyCastleModule,
   useCastleAbility,
+  getPerkManager,
   type CastleAbility,
   type CastleRun,
   type SiegeResult,
 } from './CastleDefense';
 import { CastleService, type CastleUndoHistory } from './CastleService';
 import type { ModuleKey } from './CastleProgression';
+import type { Card, Suit } from '../core/types';
 /** HP cost for each undo. Set to 0 to disable damage. */
 export const CASTLE_UNDO_HP_COST = 1;
 export class CastleManager {
@@ -67,6 +69,18 @@ export class CastleManager {
           armor: meta.carryover.armor,
         },
       };
+      this.state.perks = meta.carryover.perks;
+      this.state.perkRerollsUsed = meta.carryover.perkRerollsUsed;
+      this.state.perkFreeRerollsUsed = meta.carryover.perkFreeRerollsUsed;
+      this.state.perkRareStreak = meta.carryover.perkRareStreak;
+      if (meta.carryover.progression) {
+        this.state.progression = {
+          xp: meta.carryover.progression.xp,
+          level: meta.carryover.progression.level,
+          modules: [...meta.carryover.progression.modules] as import('./CastleProgression').ModuleKey[],
+        };
+      }
+      this.applyPerkBattleSetup();
     }
     this.save();
     return true;
@@ -169,9 +183,62 @@ export class CastleManager {
   private remember(state: CastleRun): void {
     this.history.entries.push({ state: structuredClone(state), cost: this.history.cost });
   }
+  private applyPerkBattleSetup(): void {
+    if (!this.state || !this.state.perks?.length) return;
+    const perkManager = getPerkManager(this.state);
+    const battle = this.state.run.battle!;
+    const rng = new RNG(this.state.run.seed + ':perk-setup');
+    const allIds = [
+      ...battle.deck.map(c => parseInt(c.id, 10) || 0),
+      ...battle.tableau.flatMap(col => col.cards.map(c => parseInt(c.id, 10) || 0)),
+      parseInt(battle.activeCard?.id ?? '0', 10) || 0
+    ];
+    let nextId = Math.max(...allIds) + 1;
+    const newDeck: Card[] = [...battle.deck];
+    const newPowerCards = [...battle.powerCards];
+    const extraStockCards = perkManager.getExtraStockCards();
+    if (extraStockCards > 0) {
+      const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+      for (let i = 0; i < extraStockCards; i++) {
+        const card: Card = {
+          id: String(nextId++),
+          suit: suits[rng.nextInt(0, suits.length - 1)],
+          rank: rng.nextInt(1, 13),
+        };
+        newDeck.push(card);
+      }
+    }
+    const extraWilds = perkManager.getExtraWilds();
+    for (let i = 0; i < extraWilds; i++) {
+      const suits: Suit[] = ['hearts', 'diamonds', 'clubs', 'spades'];
+      const card: Card = {
+        id: String(nextId++),
+        suit: suits[rng.nextInt(0, suits.length - 1)],
+        rank: rng.nextInt(1, 13),
+      };
+      newDeck.push(card);
+      newPowerCards.push({ cardId: card.id, type: 'WILD' });
+    }
+    const extraJokers = perkManager.getExtraJokers();
+    for (let i = 0; i < extraJokers; i++) {
+      const jokerCard = createJokerCard(String(nextId++), rng);
+      newDeck.push(jokerCard);
+    }
+    const shuffledDeck = rng.shuffle(newDeck);
+    this.state.run = {
+      ...this.state.run,
+      battle: { ...battle, deck: shuffledDeck, powerCards: newPowerCards },
+      rngState: rng.getState(),
+    };
+  }
 }
 let singleton: CastleManager | null = null;
 export function castleManager(): CastleManager {
   if (!singleton) singleton = new CastleManager(localStorage);
   return singleton;
+}
+
+function createJokerCard(id: string, rng: RNG): Card {
+  const suit: Suit = rng.next() < 0.5 ? 'hearts' : 'diamonds';
+  return { id, suit, rank: 0, joker: rng.next() < 0.5 ? 'red' : 'black' };
 }
