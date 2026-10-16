@@ -9,6 +9,7 @@ import { canConnectInBattle, getPowerType } from '../core/GameState';
 import { AudioSystem } from '../presentation/audio/AudioSystem';
 import { SettingsModal } from '../presentation/design/SettingsModal';
 import { tapFeedback, playFeedback, comboFeedback, impactFeedback, successFeedback, errorFeedback, deployFeedback } from '../presentation/haptics/haptics';
+import { fadeIn, confettiBurst, celebrationBurst } from '../presentation/juice/transitions';
 import { gamePopup, popupButton } from '../presentation/design/GamePopup';
 import { playCombatVFX } from '../presentation/design/CombatVFX';
 import { isShakeReduced } from '../presentation/juice/fxSettings';
@@ -286,6 +287,7 @@ export class CastleScene extends Phaser.Scene {
     this.syncActors();
     this.refreshHUD();
     AudioSystem.setMusicScene('battle');
+    fadeIn(this, { duration: 400 });
     if (manager.state!.run.phase !== 'battle') this.endPopup();
     const skipTraining = () => this.finishTraining();
     if (this.training) {
@@ -550,7 +552,11 @@ export class CastleScene extends Phaser.Scene {
   private renderCards(): void {
     const battle = this.manager.state!.run.battle!;
     const next = new Set<string>(),
-      { side, cw, gap, tableauTop, strip } = this.layout;
+      { side, cw, ch, gap, tableauTop, strip } = this.layout;
+    const isInitialDeal = this.cards.size === 0;
+    const reduced = isShakeReduced();
+    let newCardIndex = 0;
+    
     battle.tableau.forEach((column, col) =>
       column.cards.forEach((card, row) => {
         next.add(card.id);
@@ -576,6 +582,24 @@ export class CastleScene extends Phaser.Scene {
           );
           this.cards.set(card.id, visual);
           visual.setInteractive(() => this.play(card.id));
+          
+          // Animate card deal for initial layout
+          if (isInitialDeal && !this.training) {
+            const container = visual.getContainer();
+            const delay = reduced ? newCardIndex * 15 : newCardIndex * 35;
+            const startY = -ch - 20;
+            container.setY(startY).setAlpha(0).setAngle(reduced ? 0 : -5 + Math.random() * 10);
+            this.tweens.add({
+              targets: container,
+              y,
+              alpha: 1,
+              angle: 0,
+              delay,
+              duration: reduced ? 120 : 280,
+              ease: 'Back.out',
+            });
+            newCardIndex++;
+          }
         }
         visual.setPosition(x, y);
         visual.setDepth(60 + row);
@@ -1521,8 +1545,17 @@ export class CastleScene extends Phaser.Scene {
     const won = state.run.phase === 'victory';
     AudioSystem.setMusicScene(won ? 'victory' : 'defeat');
     AudioSystem.play(won ? 'victory' : 'defeat');
-    if (won) successFeedback();
-    else impactFeedback();
+    if (won) {
+      successFeedback();
+      // Victory celebration effects
+      const { width, height } = viewport(this);
+      celebrationBurst(this, width / 2, height * 0.4, 32);
+      this.time.delayedCall(200, () => confettiBurst(this));
+      this.time.delayedCall(400, () => celebrationBurst(this, width * 0.3, height * 0.5, 16));
+      this.time.delayedCall(500, () => celebrationBurst(this, width * 0.7, height * 0.5, 16));
+    } else {
+      impactFeedback();
+    }
     showCastleRoundResult(this, state, {
       next: () => {
         if (!manager.start()) return false;
