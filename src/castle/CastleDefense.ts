@@ -169,6 +169,12 @@ export interface CastleRun {
   perkFreeRerollsUsed?: number;
   /** Consecutive offers without rare+ (for pity) */
   perkRareStreak?: number;
+  /** Pending perk offer (saved when player hasn't chosen yet) */
+  pendingPerkOffer?: {
+    perks: string[];
+    rerollsUsed: number;
+    freeRerollsUsed: number;
+  };
 }
 export type SiegeEvent =
   | { type: 'ability'; ability: CastleAbility }

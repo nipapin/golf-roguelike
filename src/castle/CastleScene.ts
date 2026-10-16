@@ -25,6 +25,7 @@ import { enemyGroundPlacement } from './battlefieldGeometry';
 import { castleAbilityButton } from './CastleAbilityButton';
 import { showCastleRoundResult } from './CastleRoundResult';
 import { showRunWorkshop } from './CastleWorkshop';
+import { showPerkChoice, showCurrentPerks } from './CastlePerkChoice';
 import { siegeButton } from '../presentation/design/SiegeButton';
 import { CastleRewardCard } from './CastleRewardCard';
 import { CastleCardAnnouncements } from './CastleCardAnnouncements';
@@ -92,6 +93,7 @@ export class CastleScene extends Phaser.Scene {
   private hpBar = { x: 0, y: 0, width: 0, height: 18 };
   private hpText!: Phaser.GameObjects.Text;
   private coins!: Phaser.GameObjects.Text;
+  private perkBar?: Phaser.GameObjects.Container;
   private chainText!: Phaser.GameObjects.Text;
   private status!: Phaser.GameObjects.Text;
   private steps: CastleRewardCard[] = [];
@@ -184,6 +186,11 @@ export class CastleScene extends Phaser.Scene {
     const coinX = desktop ? hudX + 603 : w - 95;
     this.add.image(coinX, hudTop + 15, 'coin').setDisplaySize(18, 18);
     this.coins = this.text(coinX + 27, hudTop + 15, '0', 16, '#ffe39c');
+    const perkBarX = desktop ? hudX + 260 : hudX + 180;
+    const perkBarWidth = desktop ? 300 : coinX - perkBarX - 30;
+    if (manager.state!.perks?.length) {
+      this.perkBar = showCurrentPerks(this, manager.state!.perks, perkBarX + perkBarWidth / 2, hudTop + 15, perkBarWidth);
+    }
     const pause = siegeButton(this, null, desktop ? hudX + 751 : w - 30,
       hudTop + 15, 30, 28, '', () => {
         if (this.ended || this.locked || this.training) return;
@@ -1562,16 +1569,23 @@ export class CastleScene extends Phaser.Scene {
     AudioSystem.play(won ? 'victory' : 'defeat');
     if (won) {
       successFeedback();
-      // Victory celebration effects
       const { width, height } = viewport(this);
       celebrationBurst(this, width / 2, height * 0.4, 32);
       this.time.delayedCall(200, () => confettiBurst(this));
       this.time.delayedCall(400, () => celebrationBurst(this, width * 0.3, height * 0.5, 16));
       this.time.delayedCall(500, () => celebrationBurst(this, width * 0.7, height * 0.5, 16));
+      this.time.delayedCall(800, () => {
+        showPerkChoice(this, manager, () => {
+          this.showResultScreen(manager, state);
+        });
+      });
     } else {
       impactFeedback();
+      this.showResultScreen(manager, state);
     }
-    showCastleRoundResult(this, state, {
+  }
+  private showResultScreen(manager: CastleManager, state: typeof manager.state): void {
+    showCastleRoundResult(this, state!, {
       next: () => {
         if (!manager.start()) return false;
         this.scene.restart({ tutorial: false });
