@@ -356,7 +356,8 @@ export class PerkManager {
   }
 
   getAbilityCostMultiplier(): number {
-    return this.owns('guild_charter') ? 0.7 : 1;
+    const discount = this.effectValue('guild_charter', 'discount', 0);
+    return discount > 0 ? 1 - discount : 1;
   }
 
   // ============ ROUND START/END ============
