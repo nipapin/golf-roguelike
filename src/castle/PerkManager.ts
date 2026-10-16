@@ -20,6 +20,7 @@ export interface PerkDef {
   replaces?: string;
   name: { en: string; ru: string };
   description: { en: string; ru: string };
+  stackDesc?: { en: string; ru: string };
   effect: PerkEffect;
 }
 

@@ -9,6 +9,28 @@ import { successFeedback, tapFeedback } from '../presentation/haptics/haptics';
 import { getLanguage } from '../localization/i18n';
 import type { CastleManager } from './CastleManager';
 import { generatePerkOffer, getPerk, DROP_RULES, type PerkDef, type PerkOffer } from './PerkManager';
+
+const GLOSSARY_EN: { title: string; text: string }[] = [
+  { title: 'Draw Pile', text: 'The card stack (bottom-left) you draw from. When empty with no moves, you pay HP for a new deal.' },
+  { title: 'Chain', text: 'A sequence of cards you play. Chain length determines your reward when you DRAW.' },
+  { title: 'Link', text: 'Each card in a chain = 1 link. More links = better rewards. 5+ links = laser!' },
+  { title: 'Draw', text: 'The button that deploys defenders based on your chain and takes a new card from the pile.' },
+  { title: 'Reshuffle', text: 'When the pile is empty with no moves, cards are re-dealt. Costs 5 HP (or less with perks).' },
+  { title: 'Armor', text: 'Absorbs enemy damage before castle HP is lost. Shown as a blue bar.' },
+  { title: 'Stacks', text: 'Some perks can be taken multiple times. Each stack increases the effect.' },
+  { title: 'Rarity', text: 'Common (gray), Uncommon (green), Rare (blue), Legendary (gold). Rarer perks are stronger.' },
+];
+
+const GLOSSARY_RU: { title: string; text: string }[] = [
+  { title: 'Колода', text: 'Колода (слева внизу) — откуда берёшь карты. Когда она пуста и нет ходов, платишь HP за новый расклад.' },
+  { title: 'Цепочка', text: 'Последовательность сыгранных карт. Длина цепочки определяет награду при ДОБОРЕ.' },
+  { title: 'Звено', text: 'Каждая карта в цепочке = 1 звено. Больше звеньев = лучшие награды. 5+ звеньев = лазер!' },
+  { title: 'Добор', text: 'Кнопка, которая призывает защитников по твоей цепочке и берёт новую карту из колоды.' },
+  { title: 'Пересдача', text: 'Когда колода пуста и нет ходов, карты раздаются заново. Стоит 5 HP (или меньше с перками).' },
+  { title: 'Броня', text: 'Поглощает урон врагов до того, как теряется HP замка. Показана синей полоской.' },
+  { title: 'Стаки', text: 'Некоторые перки можно взять несколько раз. Каждый стак усиливает эффект.' },
+  { title: 'Редкость', text: 'Common (серый), Uncommon (зелёный), Rare (синий), Legendary (золотой). Редкие перки сильнее.' },
+];
 import { RNG } from '../core/RNG';
 
 const RARITY_COLORS: Record<string, { bg: number; border: number; glow: number; text: string }> = {
@@ -107,6 +129,23 @@ export function showPerkChoice(
   text(root, 0, top + 32, lang === 'ru' ? 'ВЫБЕРИ ПЕРК' : 'CHOOSE A PERK', 26, '#ffe35a');
   text(root, 0, top + 60, lang === 'ru' ? 'Усиль свой забег' : 'Power up your run', 12, '#b7ced8');
 
+  const helpBtn = own(scene.add.container(width / 2 - 24, top + 32));
+  root.add(helpBtn);
+  const helpBg = own(scene.add.graphics());
+  helpBg.fillStyle(0x2d5a8a).fillCircle(0, 0, 14);
+  helpBg.lineStyle(2, 0x4299e1).strokeCircle(0, 0, 14);
+  helpBtn.add(helpBg);
+  const helpText = own(scene.add.text(0, 0, '?', {
+    resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '16px', color: '#ffffff',
+  }).setOrigin(0.5));
+  helpBtn.add(helpText);
+  helpBtn.setInteractive(new Phaser.Geom.Circle(0, 0, 14), Phaser.Geom.Circle.Contains);
+  helpBtn.on('pointerup', () => {
+    AudioSystem.play('button_tap');
+    tapFeedback();
+    showGlossary(scene, own, root, width, height, top, lang);
+  });
+
   let currentOffer!: PerkOffer;
   let cardsContainer: Phaser.GameObjects.Container;
   let rerollButton: Phaser.GameObjects.Container | null = null;
@@ -155,7 +194,9 @@ export function showPerkChoice(
     currentOffer.perks.forEach((perk, index) => {
       const x = startX + index * (cardWidth + gap);
       const y = top + 180;
-      const card = createPerkCard(scene, own, perk, cardWidth, cardHeight, lang, index, reduced, () => {
+      const ownedPerk = (state.perks ?? []).find(p => p.id === perk.id);
+      const currentStacks = ownedPerk?.stacks ?? 0;
+      const card = createPerkCard(scene, own, perk, cardWidth, cardHeight, lang, index, reduced, currentStacks, () => {
         if (acted) return;
         acted = true;
         selectPerk(perk);
@@ -321,11 +362,12 @@ function createPerkCard(
   lang: 'en' | 'ru',
   index: number,
   reduced: boolean,
+  currentStacks: number,
   onSelect: () => void
 ): Phaser.GameObjects.Container {
   const card = own(scene.add.container(0, 0));
   const colors = RARITY_COLORS[perk.rarity];
-  const stacks = perk.stack?.max ?? 1;
+  const maxStacks = perk.stack?.max ?? 1;
 
   const glow = own(scene.add.graphics());
   glow.fillStyle(colors.glow, 0.3);
@@ -380,11 +422,38 @@ function createPerkCard(
   }).setOrigin(0.5, 0));
   card.add(descLabel);
 
-  if (stacks > 1) {
-    const stackLabel = own(scene.add.text(width / 2 - 10, height / 2 - 14, `×${stacks}`, {
-      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '11px', color: colors.text,
+  if (maxStacks > 1) {
+    const nextStacks = Math.min(currentStacks + 1, maxStacks);
+    const stackText = currentStacks > 0 
+      ? `${currentStacks} → ${nextStacks}` 
+      : `0 → 1`;
+    const stackBg = own(scene.add.graphics());
+    stackBg.fillStyle(0x1a2634, 0.9).fillRoundedRect(-width / 2 + 4, height / 2 - 24, width - 8, 18, 4);
+    card.add(stackBg);
+    
+    const stackIcon = own(scene.add.text(-width / 2 + 10, height / 2 - 15, '⬆', {
+      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '10px', color: currentStacks > 0 ? '#48bb78' : '#718096',
+    }).setOrigin(0, 0.5));
+    card.add(stackIcon);
+    
+    const stackLabel = own(scene.add.text(0, height / 2 - 15, stackText, {
+      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '10px', 
+      color: currentStacks > 0 ? '#48bb78' : '#a0aec0',
     }).setOrigin(0.5));
     card.add(stackLabel);
+    
+    const maxLabel = own(scene.add.text(width / 2 - 10, height / 2 - 15, `/${maxStacks}`, {
+      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '9px', color: '#718096',
+    }).setOrigin(1, 0.5));
+    card.add(maxLabel);
+  } else {
+    const singleBg = own(scene.add.graphics());
+    singleBg.fillStyle(0x1a2634, 0.9).fillRoundedRect(-width / 2 + 4, height / 2 - 24, width - 8, 18, 4);
+    card.add(singleBg);
+    const singleLabel = own(scene.add.text(0, height / 2 - 15, lang === 'ru' ? 'Один раз' : 'Once only', {
+      resolution: getRenderDensity(), fontFamily: lang === 'ru' ? 'Rubik' : 'Fredoka', fontSize: '9px', color: '#718096',
+    }).setOrigin(0.5));
+    card.add(singleLabel);
   }
 
   card.setInteractive(new Phaser.Geom.Rectangle(-width / 2, -height / 2, width, height),
@@ -400,6 +469,9 @@ function createPerkCard(
     ease: 'Back.out',
   });
 
+  let longPressTimer: ReturnType<typeof setTimeout> | null = null;
+  let isLongPress = false;
+
   card.on('pointerover', () => {
     scene.tweens.add({ targets: card, scale: 1.05, duration: 100 });
     scene.tweens.add({ targets: glow, alpha: 1, duration: 150 });
@@ -407,14 +479,170 @@ function createPerkCard(
   card.on('pointerout', () => {
     scene.tweens.add({ targets: card, scale: 1, duration: 100 });
     scene.tweens.add({ targets: glow, alpha: 0, duration: 150 });
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
   });
-  card.on('pointerdown', () => card.setScale(0.98));
+  card.on('pointerdown', () => {
+    card.setScale(0.98);
+    isLongPress = false;
+    longPressTimer = setTimeout(() => {
+      isLongPress = true;
+      AudioSystem.play('button_tap');
+      tapFeedback();
+      showPerkDetail(scene, own, card, perk, lang, currentStacks);
+    }, 400);
+  });
   card.on('pointerup', () => {
-    card.setScale(1.05);
-    onSelect();
+    if (longPressTimer) {
+      clearTimeout(longPressTimer);
+      longPressTimer = null;
+    }
+    if (!isLongPress) {
+      card.setScale(1.05);
+      onSelect();
+    }
   });
 
   return card;
+}
+
+function showPerkDetail(
+  scene: Phaser.Scene,
+  own: <T extends Phaser.GameObjects.GameObject>(obj: T) => T,
+  card: Phaser.GameObjects.Container,
+  perk: PerkDef,
+  lang: 'en' | 'ru',
+  currentStacks: number
+): void {
+  const colors = RARITY_COLORS[perk.rarity];
+  const maxStacks = perk.stack?.max ?? 1;
+  
+  const tooltip = own(scene.add.container(0, -100));
+  card.add(tooltip);
+  
+  const tooltipWidth = 180;
+  const desc = perk.description[lang];
+  const textHeight = Math.ceil(desc.length / 25) * 12 + 40;
+  const tooltipHeight = Math.max(80, textHeight);
+  
+  const bg = own(scene.add.graphics());
+  bg.fillStyle(0x0a1520, 0.95);
+  bg.fillRoundedRect(-tooltipWidth / 2, -tooltipHeight / 2, tooltipWidth, tooltipHeight, 8);
+  bg.lineStyle(2, colors.border);
+  bg.strokeRoundedRect(-tooltipWidth / 2, -tooltipHeight / 2, tooltipWidth, tooltipHeight, 8);
+  tooltip.add(bg);
+  
+  const titleText = own(scene.add.text(0, -tooltipHeight / 2 + 14, perk.name[lang], {
+    resolution: getRenderDensity(), 
+    fontFamily: lang === 'ru' ? 'Rubik' : 'Lilita One',
+    fontStyle: lang === 'ru' ? 'bold' : 'normal',
+    fontSize: '11px', color: colors.text,
+  }).setOrigin(0.5));
+  tooltip.add(titleText);
+  
+  const descText = own(scene.add.text(0, 4, desc, {
+    resolution: getRenderDensity(), 
+    fontFamily: lang === 'ru' ? 'Rubik' : 'Fredoka',
+    fontSize: '9px', color: '#e2e8f0',
+    align: 'center',
+    wordWrap: { width: tooltipWidth - 16 },
+  }).setOrigin(0.5));
+  tooltip.add(descText);
+  
+  if (maxStacks > 1) {
+    const stackInfo = lang === 'ru' 
+      ? `Стаки: ${currentStacks}/${maxStacks}`
+      : `Stacks: ${currentStacks}/${maxStacks}`;
+    const stackText = own(scene.add.text(0, tooltipHeight / 2 - 14, stackInfo, {
+      resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '9px', 
+      color: currentStacks > 0 ? '#48bb78' : '#718096',
+    }).setOrigin(0.5));
+    tooltip.add(stackText);
+  }
+  
+  tooltip.setAlpha(0).setScale(0.8);
+  scene.tweens.add({ targets: tooltip, alpha: 1, scale: 1, duration: 150, ease: 'Back.out' });
+  
+  const dismissTimer = scene.time.delayedCall(2500, () => {
+    scene.tweens.add({
+      targets: tooltip,
+      alpha: 0,
+      scale: 0.8,
+      duration: 150,
+      onComplete: () => tooltip.destroy(),
+    });
+  });
+  
+  tooltip.once('destroy', () => dismissTimer.remove());
+}
+
+function showGlossary(
+  scene: Phaser.Scene,
+  own: <T extends Phaser.GameObjects.GameObject>(obj: T) => T,
+  parent: Phaser.GameObjects.Container,
+  panelWidth: number,
+  panelHeight: number,
+  top: number,
+  lang: 'en' | 'ru'
+): void {
+  const glossary = lang === 'ru' ? GLOSSARY_RU : GLOSSARY_EN;
+  const overlay = own(scene.add.container(0, 0));
+  parent.add(overlay);
+
+  const bg = own(scene.add.graphics());
+  bg.fillStyle(0x0a1520, 0.95);
+  bg.fillRoundedRect(-panelWidth / 2 + 4, top + 4, panelWidth - 8, panelHeight - 8, 10);
+  overlay.add(bg);
+
+  const title = own(scene.add.text(0, top + 28, lang === 'ru' ? 'СПРАВКА' : 'GLOSSARY', {
+    resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '20px', color: '#ffe35a',
+  }).setOrigin(0.5));
+  overlay.add(title);
+
+  let yPos = top + 60;
+  const lineHeight = 52;
+  const textWidth = panelWidth - 40;
+
+  for (const entry of glossary) {
+    const termTitle = own(scene.add.text(-panelWidth / 2 + 20, yPos, entry.title, {
+      resolution: getRenderDensity(), fontFamily: lang === 'ru' ? 'Rubik' : 'Lilita One',
+      fontStyle: lang === 'ru' ? 'bold' : 'normal',
+      fontSize: '12px', color: '#4299e1',
+    }).setOrigin(0, 0));
+    overlay.add(termTitle);
+
+    const termText = own(scene.add.text(-panelWidth / 2 + 20, yPos + 14, entry.text, {
+      resolution: getRenderDensity(), fontFamily: lang === 'ru' ? 'Rubik' : 'Fredoka',
+      fontSize: '9px', color: '#c5d1d8', wordWrap: { width: textWidth },
+    }).setOrigin(0, 0));
+    overlay.add(termText);
+
+    yPos += lineHeight;
+  }
+
+  const closeBtn = own(scene.add.container(0, top + panelHeight - 40));
+  overlay.add(closeBtn);
+  const closeBg = own(scene.add.graphics());
+  closeBg.fillStyle(0x19313c).fillRoundedRect(-60, -14 + 3, 120, 28, 8);
+  closeBg.fillStyle(0x2d5a8a).fillRoundedRect(-60, -14, 120, 28, 8);
+  closeBg.fillStyle(0x4299e1).fillRoundedRect(-60, -14, 120, 24, 8);
+  closeBg.lineStyle(2, 0x19313c).strokeRoundedRect(-60, -14, 120, 28, 8);
+  closeBtn.add(closeBg);
+  const closeText = own(scene.add.text(0, -3, lang === 'ru' ? 'ЗАКРЫТЬ' : 'CLOSE', {
+    resolution: getRenderDensity(), fontFamily: 'Lilita One', fontSize: '13px', color: '#ffffff',
+  }).setOrigin(0.5).setStroke('#19313c', 2));
+  closeBtn.add(closeText);
+  closeBtn.setInteractive(new Phaser.Geom.Rectangle(-60, -14, 120, 28), Phaser.Geom.Rectangle.Contains);
+  closeBtn.on('pointerup', () => {
+    AudioSystem.play('button_tap');
+    tapFeedback();
+    overlay.destroy();
+  });
+
+  overlay.setAlpha(0);
+  scene.tweens.add({ targets: overlay, alpha: 1, duration: 150 });
 }
 
 export function showCurrentPerks(

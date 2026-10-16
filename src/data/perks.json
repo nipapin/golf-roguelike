@@ -6,7 +6,11 @@
       "category": "suit",
       "stack": { "max": 2 },
       "name": { "en": "Mending Hearts", "ru": "Целебные черви" },
-      "description": { "en": "♥ cards heal the castle 1 HP (max 8/round).", "ru": "Черви лечат замок на 1 ОЗ (до 8 за раунд)." },
+      "description": { 
+        "en": "When you play a ♥ Heart, the castle heals 1 HP. Shows a green +1 HP popup. Heals up to 8 HP per round.", 
+        "ru": "Когда играешь ♥ черву, замок лечится на 1 HP. Видно зелёный +1 HP. До 8 HP за раунд." 
+      },
+      "stackDesc": { "en": "+1 HP per ♥", "ru": "+1 HP за ♥" },
       "effect": { "type": "suitHeal", "suit": "hearts", "value": 1, "capPerRound": 8 }
     },
     {
@@ -15,7 +19,10 @@
       "category": "suit",
       "stack": { "max": 1 },
       "name": { "en": "Spade Edge", "ru": "Пиковый клинок" },
-      "description": { "en": "♠ count as 2 links in a chain.", "ru": "Пики считаются за 2 звена цепочки." },
+      "description": { 
+        "en": "Each ♠ Spade you play adds 2 links to your chain instead of 1. Reach higher rewards faster! Max +3 bonus links per chain.", 
+        "ru": "Каждая ♠ пика добавляет 2 звена вместо 1. Быстрее достигай наград! Макс. +3 бонуса за цепочку." 
+      },
       "effect": { "type": "suitLinks", "suit": "spades", "value": 1, "capPerChain": 3 }
     },
     {
@@ -24,7 +31,11 @@
       "category": "suit",
       "stack": { "max": 3 },
       "name": { "en": "Diamond Vein", "ru": "Алмазная жила" },
-      "description": { "en": "♦ cards give +2 coins.", "ru": "Бубны дают +2 монеты." },
+      "description": { 
+        "en": "When you play a ♦ Diamond, earn +2 bonus coins. Shows a gold +2 popup. Coins are saved for the workshop.", 
+        "ru": "Когда играешь ♦ бубну, получаешь +2 монеты. Видно золотой +2. Монеты копятся для мастерской." 
+      },
+      "stackDesc": { "en": "+2 coins per ♦", "ru": "+2 монеты за ♦" },
       "effect": { "type": "suitCoins", "suit": "diamonds", "value": 2 }
     },
     {
@@ -33,7 +44,11 @@
       "category": "suit",
       "stack": { "max": 2 },
       "name": { "en": "Club Bulwark", "ru": "Трефовый бастион" },
-      "description": { "en": "♣ cards give +1 armor.", "ru": "Трефы дают +1 броню." },
+      "description": { 
+        "en": "When you play a ♣ Club, gain +1 armor. Shows a blue +1 ARMOR popup. Armor absorbs enemy damage before HP. Max 12 armor.", 
+        "ru": "Когда играешь ♣ трефу, получаешь +1 броню. Видно синий +1 БРОНЯ. Броня защищает HP. Макс. 12 брони." 
+      },
+      "stackDesc": { "en": "+1 armor per ♣", "ru": "+1 броня за ♣" },
       "effect": { "type": "suitArmor", "suit": "clubs", "value": 1, "armorCap": 12 }
     },
     {
@@ -42,7 +57,11 @@
       "category": "deck",
       "stack": { "max": 2 },
       "name": { "en": "Flush Run", "ru": "Мастевая серия" },
-      "description": { "en": "3 same-suit cards in a row: +2 links.", "ru": "3 карты одной масти подряд: +2 звена." },
+      "description": { 
+        "en": "Play 3 cards of the same suit in a row (e.g. 3♠-4♠-5♠) and gain +2 bonus links. Helps reach turret (3) or cannon (4) faster.", 
+        "ru": "Сыграй 3 карты одной масти подряд (3♠-4♠-5♠) и получи +2 звена. Быстрее турель (3) или пушка (4)." 
+      },
+      "stackDesc": { "en": "+2 links", "ru": "+2 звена" },
       "effect": { "type": "flushBonus", "consecutiveCount": 3, "links": 2 }
     },
     {
@@ -51,7 +70,10 @@
       "category": "deck",
       "stack": { "max": 1 },
       "name": { "en": "Royal Court", "ru": "Королевский двор" },
-      "description": { "en": "J calls a soldier, Q an archer, K loads 5 turret rounds.", "ru": "В вызывает солдата, Д — лучника, К заряжает 5 патронов." },
+      "description": { 
+        "en": "Face cards summon units immediately! Jack → 1 soldier. Queen → 1 archer. King → loads 5 turret rounds. No need to DRAW.", 
+        "ru": "Фигуры сразу призывают! Валет → 1 боец. Дама → 1 лучник. Король → 5 патронов турели. ДОБОР не нужен." 
+      },
       "effect": { "type": "royalCourt", "jackUnit": "soldier", "queenUnit": "archer", "kingTurretRounds": 5 }
     },
     {
@@ -60,7 +82,11 @@
       "category": "deck",
       "stack": { "max": 2 },
       "name": { "en": "Ace Flare", "ru": "Вспышка туза" },
-      "description": { "en": "Aces zap all enemies for 10.", "ru": "Тузы бьют всех врагов на 10." },
+      "description": { 
+        "en": "When you play any Ace, a laser zaps ALL enemies on screen for 10 damage each. Instant effect, no DRAW needed.", 
+        "ru": "Когда играешь туз, лазер бьёт ВСЕХ врагов на 10 урона. Мгновенно, ДОБОР не нужен." 
+      },
+      "stackDesc": { "en": "+10 dmg", "ru": "+10 урона" },
       "effect": { "type": "aceFlare", "damage": 10 }
     },
     {
@@ -69,7 +95,11 @@
       "category": "deck",
       "stack": { "max": 2 },
       "name": { "en": "Lucky Seven", "ru": "Счастливая семёрка" },
-      "description": { "en": "7s: 1-in-3 chance for +6 coins and +1 armor.", "ru": "Семёрки: шанс 1 из 3 на +6 монет и +1 броню." },
+      "description": { 
+        "en": "When you play a 7, there's a 33% chance to win +6 coins and +1 armor instantly. Watch for the jackpot animation!", 
+        "ru": "Когда играешь 7, шанс 33% получить +6 монет и +1 броню. Смотри на анимацию выигрыша!" 
+      },
+      "stackDesc": { "en": "+6 coins, +1 armor", "ru": "+6 монет, +1 броня" },
       "effect": { "type": "luckySeven", "chance": 0.333, "coins": 6, "armor": 1 }
     },
     {
@@ -78,7 +108,10 @@
       "category": "deck",
       "stack": { "max": 1 },
       "name": { "en": "Momentum", "ru": "Инерция" },
-      "description": { "en": "Every 4th card in a chain gives +1 link.", "ru": "Каждая 4-я карта цепочки — +1 звено." },
+      "description": { 
+        "en": "Build long chains! Every 4th card (4th, 8th, 12th...) in your chain gives +1 bonus link. Great for reaching laser (5+).", 
+        "ru": "Строй длинные цепочки! Каждая 4-я карта (4, 8, 12...) даёт +1 звено. Отлично для лазера (5+)." 
+      },
       "effect": { "type": "momentum", "every": 4, "links": 1 }
     },
     {
@@ -87,7 +120,10 @@
       "category": "deck",
       "stack": { "max": 1 },
       "name": { "en": "Ouroboros", "ru": "Уроборос" },
-      "description": { "en": "K↔A wraps give +2 links.", "ru": "K↔A даёт +2 звена." },
+      "description": { 
+        "en": "When your chain wraps from King to Ace (K→A) or Ace to King (A→K), gain +2 bonus links. Easier lasers!", 
+        "ru": "Когда цепочка идёт K→A или A→K, получи +2 звена. Легче добраться до лазера!" 
+      },
       "effect": { "type": "ouroborosLinks", "links": 2 }
     },
     {
@@ -96,7 +132,11 @@
       "category": "deck",
       "stack": { "max": 2 },
       "name": { "en": "Spare Stock", "ru": "Запасная колода" },
-      "description": { "en": "+3 stock cards. Recycling costs 3 HP.", "ru": "+3 карты в колоде. Перетасовка стоит 3 ОЗ." },
+      "description": { 
+        "en": "Adds 3 extra cards to your draw pile (bottom-left). When the pile runs out with no moves, refilling it costs 3 HP instead of 5 HP.", 
+        "ru": "Добавляет 3 карты в колоду (слева внизу). Когда карты кончились и нет ходов, новый расклад стоит 3 HP вместо 5." 
+      },
+      "stackDesc": { "en": "+3 cards, 3→1 HP cost", "ru": "+3 карты, 3→1 HP" },
       "effect": { "type": "spareStock", "extraCards": 3, "recycleHpReduction": 2 }
     },
     {
@@ -105,7 +145,10 @@
       "category": "deck",
       "stack": { "max": 1 },
       "name": { "en": "Card Counter", "ru": "Счётчик карт" },
-      "description": { "en": "See the next stock card. Help comes sooner.", "ru": "Видно следующую карту колоды. Подсказка раньше." },
+      "description": { 
+        "en": "The next card in your draw pile is shown face-up. Plan ahead! Also, the hint button (?) appears 1 turn sooner when stuck.", 
+        "ru": "Следующая карта в колоде видна лицом вверх. Планируй! Подсказка (?) появляется на 1 ход раньше." 
+      },
       "effect": { "type": "cardCounter", "showNextCard": true, "drawAssistAt": 2 }
     },
     {
@@ -114,7 +157,11 @@
       "category": "deck",
       "stack": { "max": 2 },
       "name": { "en": "Jester", "ru": "Шут" },
-      "description": { "en": "A Joker joins your stock: plays on anything, +2 links.", "ru": "В колоде Джокер: ложится на всё, +2 звена." },
+      "description": { 
+        "en": "A Joker card is shuffled into your draw pile. Jokers can be played on ANY card and add +2 bonus links to your chain.", 
+        "ru": "Джокер добавлен в колоду. Джокеры играются на ЛЮБУЮ карту и дают +2 звена к цепочке." 
+      },
+      "stackDesc": { "en": "+1 Joker", "ru": "+1 Джокер" },
       "effect": { "type": "jester", "jokers": 1, "links": 2 }
     },
     {
@@ -123,7 +170,11 @@
       "category": "units",
       "stack": { "max": 3 },
       "name": { "en": "Longbows", "ru": "Длинные луки" },
-      "description": { "en": "Archers +1 damage.", "ru": "Лучники +1 урон." },
+      "description": { 
+        "en": "Your archers (summoned at chain 2) deal +1 damage per arrow. Base: 2 dmg → Now: 3 dmg.", 
+        "ru": "Лучники (призыв на цепочке 2) наносят +1 урона стрелой. Было: 2 → Теперь: 3." 
+      },
+      "stackDesc": { "en": "+1 arrow dmg", "ru": "+1 урон стрелы" },
       "effect": { "type": "archerDamage", "value": 1 }
     },
     {
@@ -132,7 +183,11 @@
       "category": "units",
       "stack": { "max": 2 },
       "name": { "en": "Quick Draw", "ru": "Быстрая тетива" },
-      "description": { "en": "Archers shoot 20% faster.", "ru": "Лучники стреляют на 20% быстрее." },
+      "description": { 
+        "en": "Your archers shoot 20% faster. More arrows = more damage over time. Stacks make archers even deadlier.", 
+        "ru": "Лучники стреляют на 20% быстрее. Больше стрел = больше урона. Стаки ускоряют ещё сильнее." 
+      },
+      "stackDesc": { "en": "+20% fire rate", "ru": "+20% скорость" },
       "effect": { "type": "archerSpeed", "multiplier": 0.8 }
     },
     {
@@ -141,7 +196,11 @@
       "category": "units",
       "stack": { "max": 3 },
       "name": { "en": "Extended Magazine", "ru": "Удлинённый магазин" },
-      "description": { "en": "Turret magazine +5. Leftover rounds are kept.", "ru": "Магазин турели +5, остаток сохраняется." },
+      "description": { 
+        "en": "Your turret (chain 3) holds +5 extra rounds. Base: 10 → Now: 15. Leftover rounds carry over to next reload!", 
+        "ru": "Турель (цепочка 3) вмещает +5 патронов. Было: 10 → Теперь: 15. Остаток сохраняется!" 
+      },
+      "stackDesc": { "en": "+5 rounds", "ru": "+5 патронов" },
       "effect": { "type": "turretMag", "extraRounds": 5, "keepLeftover": true }
     },
     {
@@ -150,7 +209,11 @@
       "category": "units",
       "stack": { "max": 3 },
       "name": { "en": "Heavy Shells", "ru": "Тяжёлые снаряды" },
-      "description": { "en": "Arc cannon +3 damage.", "ru": "Пушка +3 урона." },
+      "description": { 
+        "en": "Your arc cannon (chain 4) deals +3 damage per shell. Base: 9 dmg → Now: 12 dmg per enemy hit.", 
+        "ru": "Пушка (цепочка 4) наносит +3 урона за снаряд. Было: 9 → Теперь: 12 урона по врагу." 
+      },
+      "stackDesc": { "en": "+3 shell dmg", "ru": "+3 урон снаряда" },
       "effect": { "type": "mortarDamage", "value": 3 }
     },
     {
@@ -159,7 +222,10 @@
       "category": "units",
       "stack": { "max": 1 },
       "name": { "en": "Cluster Shells", "ru": "Кассетные снаряды" },
-      "description": { "en": "Arc cannon hits 4 enemies.", "ru": "Пушка бьёт 4 врагов." },
+      "description": { 
+        "en": "Your arc cannon (chain 4) shells explode hitting 4 enemies instead of 3. Better crowd control!", 
+        "ru": "Снаряды пушки (цепочка 4) поражают 4 врагов вместо 3. Лучше против толпы!" 
+      },
       "effect": { "type": "mortarTargets", "targets": 4 }
     },
     {
@@ -168,7 +234,11 @@
       "category": "units",
       "stack": { "max": 3 },
       "name": { "en": "Focusing Lens", "ru": "Фокусирующая линза" },
-      "description": { "en": "Laser +15 damage.", "ru": "Лазер +15 урона." },
+      "description": { 
+        "en": "Your laser (chain 5+) deals +15 damage to every enemy. Base: 40 dmg → Now: 55 dmg to ALL enemies on screen.", 
+        "ru": "Лазер (цепочка 5+) наносит +15 урона каждому врагу. Было: 40 → Теперь: 55 по ВСЕМ врагам." 
+      },
+      "stackDesc": { "en": "+15 laser dmg", "ru": "+15 урон лазера" },
       "effect": { "type": "laserDamage", "value": 15 }
     },
     {
@@ -177,7 +247,11 @@
       "category": "units",
       "stack": { "max": 2 },
       "name": { "en": "Veteran Militia", "ru": "Ветераны" },
-      "description": { "en": "Soldiers +3 HP, last 6 s longer.", "ru": "Солдаты +3 ОЗ и живут на 6 с дольше." },
+      "description": { 
+        "en": "Your soldiers (chain 1) have +3 HP and live 6 seconds longer. They survive more hits and march further.", 
+        "ru": "Бойцы (цепочка 1) получают +3 HP и живут на 6 сек дольше. Выживают дольше и идут дальше." 
+      },
+      "stackDesc": { "en": "+3 HP, +6s life", "ru": "+3 HP, +6с жизни" },
       "effect": { "type": "soldierStats", "hpBonus": 3, "lifetimeBonus": 6 }
     },
     {
@@ -186,7 +260,11 @@
       "category": "castle",
       "stack": { "max": 3 },
       "name": { "en": "Stone Walls", "ru": "Каменные стены" },
-      "description": { "en": "+10 max HP, heal 10.", "ru": "+10 к макс. ОЗ, лечение 10." },
+      "description": { 
+        "en": "Immediately +10 max castle HP and heals 10 HP now. Your HP bar grows and fills! Stacks for even more HP.", 
+        "ru": "Сразу +10 макс. HP замка и лечит 10 HP. Полоска HP растёт и заполняется! Стаки дают ещё HP." 
+      },
+      "stackDesc": { "en": "+10 max HP, heal 10", "ru": "+10 макс. HP, лечит 10" },
       "effect": { "type": "stoneWalls", "maxHpBonus": 10, "healNow": 10 }
     },
     {
@@ -195,7 +273,11 @@
       "category": "castle",
       "stack": { "max": 2 },
       "name": { "en": "Masons", "ru": "Каменщики" },
-      "description": { "en": "Castle regenerates 1 HP / 15 s (max 8/round).", "ru": "Замок восстанавливает 1 ОЗ / 15 с (до 8 за раунд)." },
+      "description": { 
+        "en": "Castle automatically heals 1 HP every 15 seconds during battle. Up to 8 HP healed per round. Passive regen!", 
+        "ru": "Замок сам лечится на 1 HP каждые 15 секунд в бою. До 8 HP за раунд. Пассивная регенерация!" 
+      },
+      "stackDesc": { "en": "+1 HP / 15s", "ru": "+1 HP / 15с" },
       "effect": { "type": "masons", "interval": 15, "heal": 1, "capPerRound": 8 }
     },
     {
@@ -204,7 +286,10 @@
       "category": "castle",
       "stack": { "max": 1 },
       "name": { "en": "Field Hospital", "ru": "Полевой госпиталь" },
-      "description": { "en": "After a win, heal 30% of missing HP.", "ru": "После победы лечит 30% недостающих ОЗ." },
+      "description": { 
+        "en": "After winning a siege, heal 30% of your missing HP. Example: 50/100 HP → heals 15 HP → 65/100 HP.", 
+        "ru": "После победы в осаде восстанавливает 30% потерянного HP. Было 50/100 HP → +15 HP → 65/100 HP." 
+      },
       "effect": { "type": "fieldHospital", "healPercent": 0.3 }
     },
     {
@@ -213,7 +298,11 @@
       "category": "castle",
       "stack": { "max": 2 },
       "name": { "en": "Tar Moat", "ru": "Смоляной ров" },
-      "description": { "en": "Enemies move 12% slower.", "ru": "Враги на 12% медленнее." },
+      "description": { 
+        "en": "All enemies move 12% slower on the road. More time to kill them! Bosses are slowed 6%. Stacks slow even more.", 
+        "ru": "Все враги идут на 12% медленнее. Больше времени убить их! Боссы замедлены на 6%. Стаки усиливают." 
+      },
+      "stackDesc": { "en": "+12% slow", "ru": "+12% замедление" },
       "effect": { "type": "tarMoat", "slowPercent": 0.12, "bossSlowPercent": 0.06 }
     },
     {
@@ -222,7 +311,11 @@
       "category": "economy",
       "stack": { "max": 2 },
       "name": { "en": "Bounty Board", "ru": "Доска наград" },
-      "description": { "en": "Bosses drop 10 coins. Every 10th kill +2.", "ru": "Боссы дают 10 монет, каждое 10-е убийство +2." },
+      "description": { 
+        "en": "Boss enemies drop +10 bonus coins when killed. Also, every 10th enemy you kill gives +2 coins. Watch the kill counter!", 
+        "ru": "Боссы дают +10 монет при убийстве. Каждое 10-е убийство даёт +2 монеты. Следи за счётчиком убийств!" 
+      },
+      "stackDesc": { "en": "+5 boss coins, +2/10 kills", "ru": "+5 за босса, +2/10 убийств" },
       "effect": { "type": "bountyBoard", "bossCoins": 5, "killMilestone": 10, "milestoneCoins": 2 }
     },
     {
@@ -231,7 +324,10 @@
       "category": "economy",
       "stack": { "max": 1 },
       "name": { "en": "Guild Charter", "ru": "Устав гильдии" },
-      "description": { "en": "Workshop and abilities cost 30% less.", "ru": "Мастерская и способности на 30% дешевле." },
+      "description": { 
+        "en": "All ability buttons (HEAL, BOMB, etc.) cost 25% less coins. Workshop upgrades also discounted. Prices shown in green.", 
+        "ru": "Кнопки способностей (ЛЕЧЕНИЕ, БОМБА и др.) на 25% дешевле. Мастерская тоже. Цены показаны зелёным." 
+      },
       "effect": { "type": "guildCharter", "discount": 0.3 }
     },
     {
@@ -240,7 +336,10 @@
       "category": "synergy",
       "stack": { "max": 1 },
       "name": { "en": "Spade Salvo", "ru": "Пиковый залп" },
-      "description": { "en": "♠ cards fire a free cannon shell.", "ru": "Пики дают бесплатный выстрел пушки." },
+      "description": { 
+        "en": "Every ♠ Spade you play fires a free cannon shell at 3 enemies. Instant damage, no chain needed! Great with Spade Edge.", 
+        "ru": "Каждая ♠ пика выпускает бесплатный снаряд по 3 врагам. Мгновенный урон! Отлично с Пиковым клинком." 
+      },
       "effect": { "type": "spadeSalvo", "targets": 3 }
     },
     {
@@ -249,7 +348,11 @@
       "category": "synergy",
       "stack": { "max": 2 },
       "name": { "en": "Heartfire", "ru": "Сердечный огонь" },
-      "description": { "en": "♥ cards light your next 3 arrows.", "ru": "Черви поджигают 3 следующие стрелы." },
+      "description": { 
+        "en": "Every ♥ Heart you play sets your next 3 archer arrows on fire for bonus damage. Synergizes with Mending Hearts!", 
+        "ru": "Каждая ♥ черва поджигает следующие 3 стрелы лучника. Дополнительный урон! Хорошо с Целебными червями!" 
+      },
+      "stackDesc": { "en": "+3 fire arrows", "ru": "+3 огненных стрелы" },
       "effect": { "type": "heartfire", "arrowsToIgnite": 3 }
     },
     {
@@ -258,7 +361,10 @@
       "category": "synergy",
       "stack": { "max": 1 },
       "name": { "en": "Trinity", "ru": "Троица" },
-      "description": { "en": "3rd card of a rank in a round: free BOMB (max 2).", "ru": "3-я карта одного ранга за раунд — бесплатная БОМБА (до 2)." },
+      "description": { 
+        "en": "Play 3 cards of the same rank (e.g. three 7s) in one round and get a FREE BOMB hitting all enemies for 12 damage. Max 2 per round.", 
+        "ru": "Сыграй 3 карты одного ранга (три 7) за раунд и получи БЕСПЛАТНУЮ БОМБУ на 12 урона. Макс. 2 за раунд." 
+      },
       "effect": { "type": "trinity", "bombsPerRound": 2, "bombDamage": 12 }
     },
     {
@@ -269,7 +375,10 @@
       "prerequisites": ["ace_flare", "focusing_lens"],
       "replaces": "ace_flare",
       "name": { "en": "Starfall", "ru": "Звездопад" },
-      "description": { "en": "Every Ace fires a full laser.", "ru": "Каждый туз даёт полный лазерный залп." },
+      "description": { 
+        "en": "LEGENDARY! Replaces Ace Flare. Every Ace now fires a FULL LASER dealing massive damage to all enemies. Devastating!", 
+        "ru": "ЛЕГЕНДАРНЫЙ! Заменяет Вспышку туза. Каждый туз даёт ПОЛНЫЙ ЛАЗЕР по всем врагам. Разрушительно!" 
+      },
       "effect": { "type": "starfall" }
     },
     {
@@ -278,7 +387,10 @@
       "category": "risk",
       "stack": { "max": 1 },
       "name": { "en": "Glass Cannon", "ru": "Стеклянная пушка" },
-      "description": { "en": "−30% max HP, +40% all damage.", "ru": "−30% макс. ОЗ, +40% ко всему урону." },
+      "description": { 
+        "en": "RISK/REWARD: Your max HP is reduced by 30%, but ALL your damage is increased by 40%. High risk, high damage!", 
+        "ru": "РИСК/НАГРАДА: Макс. HP снижен на 30%, но ВЕСЬ урон увеличен на 40%. Большой риск, большой урон!" 
+      },
       "effect": { "type": "glassCannon", "maxHpPenalty": 0.3, "damageBonus": 0.4 }
     },
     {
@@ -287,7 +399,10 @@
       "category": "risk",
       "stack": { "max": 1 },
       "name": { "en": "Blood Price", "ru": "Цена крови" },
-      "description": { "en": "Chains of 3+: +2 links. Short-chain draws cost 1 HP.", "ru": "Цепочки от 3: +2 звена. Добор при короткой цепочке −1 ОЗ." },
+      "description": { 
+        "en": "RISK/REWARD: Chains of 3+ cards give +2 bonus links. But if you DRAW with fewer than 3 cards, it costs 1 HP.", 
+        "ru": "РИСК/НАГРАДА: Цепочки от 3 карт дают +2 звена. Но ДОБОР при цепочке меньше 3 стоит 1 HP." 
+      },
       "effect": { "type": "bloodPrice", "minChain": 3, "links": 2, "shortDrawCost": 1 }
     }
   ],
