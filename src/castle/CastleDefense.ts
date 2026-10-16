@@ -3,6 +3,7 @@ import { RNG } from '../core/RNG';
 import type { RunState, GameConfig, GameEvent, Card } from '../core/types';
 import { startRun } from '../core/GameActions';
 import { CASTLE_XP, castleLevel, MODULES, type CastleProgression, type ModuleKey } from './CastleProgression';
+import { PerkManager } from './PerkManager';
 
 export type UnitKind = 'soldier' | 'archer' | 'turret' | 'mortar';
 // Keep the legacy 'knight' upgrade key so paid levels survive the archer replacement.
@@ -151,6 +152,23 @@ export interface CastleRun {
   undoRemaining?: number;
   inheritedCoins?: number;
   runStats?: CastleRunStats;
+  /** Owned perks with stack counts, persists for the run */
+  perks?: { id: string; stacks: number }[];
+  /** Perk round state (resets each round) */
+  perkRoundState?: {
+    heartHealUsed: number;
+    trinityBombs: number;
+    ranksPlayed: [number, number][];
+    fireArrows: number;
+    masonsElapsed: number;
+    masonsHealUsed: number;
+  };
+  /** Rerolls used this run for perk offers */
+  perkRerollsUsed?: number;
+  /** Free rerolls used this run */
+  perkFreeRerollsUsed?: number;
+  /** Consecutive offers without rare+ (for pity) */
+  perkRareStreak?: number;
 }
 export type SiegeEvent =
   | { type: 'ability'; ability: CastleAbility }
@@ -170,7 +188,13 @@ export type SiegeEvent =
   | { type: 'laser'; final: boolean; damage: number }
   | { type: 'card'; chain: number; events: GameEvent[] }
   | { type: 'draw'; recycled: boolean }
-  | { type: 'ended'; victory: boolean };
+  | { type: 'ended'; victory: boolean }
+  | { type: 'perk_heal'; amount: number }
+  | { type: 'perk_coins'; amount: number }
+  | { type: 'perk_armor'; amount: number }
+  | { type: 'perk_bomb'; damage: number }
+  | { type: 'perk_laser'; damage: number }
+  | { type: 'perk_salvo'; damage: number; targets: number };
 export interface SiegeResult {
   state: CastleRun;
   events: SiegeEvent[];
@@ -211,7 +235,7 @@ export function createCastleRun(
     undoRemaining: 3,
     runStats: emptyCastleRunStats(),
     run: { ...initial, player: { ...initial.player, hp: maxHp, maxHp }, battle: {
-      ...battle, allowRankWrap: false, activeCard, deck: ordinaryDeck,
+      ...battle, allowRankWrap: true, activeCard, deck: ordinaryDeck,
       tableau: battle.tableau.map((column) => ({ cards: column.cards.filter((card) => !card.joker) })),
       powerCards: battle.powerCards.map((power, i) => ({ ...power, type: i === 0 ? 'WILD' : 'GUARD' })),
       jokerMultiplier: 1, lifestealMultiplier: 0,
@@ -239,6 +263,36 @@ export const siegeDifficulty = (siegeNumber: number) => {
     speed: 1 + Math.min(0.3, tier * 0.015),
   };
 };
+
+/** Get PerkManager from state with proper round state hydration */
+export function getPerkManager(state: CastleRun): PerkManager {
+  const manager = PerkManager.fromOwned(state.perks ?? []);
+  if (state.perkRoundState) {
+    const rs = manager.getRoundState();
+    rs.heartHealUsed = state.perkRoundState.heartHealUsed;
+    rs.trinityBombs = state.perkRoundState.trinityBombs;
+    rs.fireArrows = state.perkRoundState.fireArrows;
+    rs.masonsElapsed = state.perkRoundState.masonsElapsed;
+    rs.masonsHealUsed = state.perkRoundState.masonsHealUsed;
+    for (const [k, v] of state.perkRoundState.ranksPlayed) {
+      rs.ranksPlayed.set(k, v);
+    }
+  }
+  return manager;
+}
+
+/** Serialize perk round state for saving */
+function serializePerkRoundState(manager: PerkManager): CastleRun['perkRoundState'] {
+  const rs = manager.getRoundState();
+  return {
+    heartHealUsed: rs.heartHealUsed,
+    trinityBombs: rs.trinityBombs,
+    ranksPlayed: Array.from(rs.ranksPlayed.entries()),
+    fireArrows: rs.fireArrows,
+    masonsElapsed: rs.masonsElapsed,
+    masonsHealUsed: rs.masonsHealUsed,
+  };
+}
 const clone = (state: CastleRun): CastleRun => ({
   ...state,
   runStats: state.runStats ? { ...state.runStats } : emptyCastleRunStats(),
@@ -250,6 +304,8 @@ const clone = (state: CastleRun): CastleRun => ({
     enemies: state.siege.enemies.map((e) => ({ ...e })),
     units: state.siege.units.map((u) => ({ ...u })),
   },
+  perks: state.perks ? state.perks.map(p => ({ ...p })) : undefined,
+  perkRoundState: state.perkRoundState ? { ...state.perkRoundState, ranksPlayed: [...state.perkRoundState.ranksPlayed] } : undefined,
 });
 
 function gainXp(state: CastleRun, amount: number, events: SiegeEvent[]) {
@@ -289,7 +345,9 @@ function killDead(state: CastleRun, events: SiegeEvent[]) {
   state.siege.enemies = state.siege.enemies.filter((e) => e.hp > 0);
 }
 function laser(state: CastleRun, events: SiegeEvent[], final = false, charge = 1) {
-  const damage = upgradeValue('laser', state.upgrades.laser) * charge;
+  const perkManager = getPerkManager(state);
+  const baseDamage = upgradeValue('laser', state.upgrades.laser) + perkManager.getLaserDamageBonus();
+  const damage = Math.round(baseDamage * charge * perkManager.getDamageMultiplier());
   const burning = !final && state.progression.modules.includes('volatileLaser')
     ? state.siege.enemies.filter((enemy) => (enemy.burning ?? 0) > 0) : [];
   for (const enemy of state.siege.enemies) enemy.hp = final ? 0 : Math.max(0, enemy.hp - damage);
@@ -303,34 +361,46 @@ function laser(state: CastleRun, events: SiegeEvent[], final = false, charge = 1
   state.siege.laserCharge = 0;
 }
 function deploy(state: CastleRun, kind: UnitKind, events: SiegeEvent[], charge = 1) {
-  const multiplier = 1;
+  const perkManager = getPerkManager(state);
   const stats = DEFENDER_STATS[kind];
-  const base =
-    kind === 'turret' || kind === 'soldier'
-      ? stats.damage
-      : kind === 'archer'
-        ? upgradeValue('knight', state.upgrades.knight)
-        : upgradeValue('mortar', state.upgrades.mortar);
+  const baseDamage = kind === 'turret' || kind === 'soldier'
+    ? stats.damage
+    : kind === 'archer'
+      ? upgradeValue('knight', state.upgrades.knight) + perkManager.getArcherDamageBonus()
+      : upgradeValue('mortar', state.upgrades.mortar) + perkManager.getMortarDamageBonus();
+  const damageMultiplier = perkManager.getDamageMultiplier();
+  
+  let soldierHp = state.progression.modules.includes('shieldSoldiers') ? 6 : 3;
+  let soldierTtl = stats.ttl;
+  if (kind === 'soldier') {
+    soldierHp += perkManager.getSoldierHpBonus();
+    soldierTtl += perkManager.getSoldierLifetimeBonus();
+  }
+  
+  const turretAmmo = kind === 'turret' ? upgradeValue('magazine', state.upgrades.magazine) + perkManager.getTurretMagBonus() : stats.ammo;
+  
   const unit: Defender = {
     id:
       kind === 'turret' || kind === 'mortar'
         ? (state.siege.units.find((u) => u.kind === kind)?.id ?? state.siege.nextId++)
         : state.siege.nextId++,
     kind,
-    damage: base * multiplier * (kind === 'mortar' ? charge : 1),
+    damage: Math.round(baseDamage * damageMultiplier * (kind === 'mortar' ? charge : 1)),
     heal: 0,
     cooldown: 0,
     engaged: false,
-    hp: kind === 'soldier' ? (state.progression.modules.includes('shieldSoldiers') ? 6 : 3) : kind === 'archer' ? 2 : 6,
-    maxHp: kind === 'soldier' ? (state.progression.modules.includes('shieldSoldiers') ? 6 : 3) : kind === 'archer' ? 2 : 6,
+    hp: kind === 'soldier' ? soldierHp : kind === 'archer' ? 2 : 6,
+    maxHp: kind === 'soldier' ? soldierHp : kind === 'archer' ? 2 : 6,
     progress: 0.94,
-    ttl: stats.ttl,
-    ammo: kind === 'turret' ? upgradeValue('magazine', state.upgrades.magazine) * charge : stats.ammo,
+    ttl: kind === 'soldier' ? soldierTtl : stats.ttl,
+    ammo: kind === 'turret' ? Math.round(turretAmmo * charge) : stats.ammo,
   };
   if (kind === 'turret') {
     const turret = state.siege.units.find((u) => u.kind === 'turret');
     if (turret) {
-      Object.assign(turret, unit, { cooldown: Math.max(0, turret.cooldown) });
+      const keepLeftover = perkManager.shouldKeepTurretLeftover();
+      const newAmmo = keepLeftover ? turret.ammo + unit.ammo : unit.ammo;
+      Object.assign(turret, unit, { cooldown: Math.max(0, turret.cooldown), ammo: newAmmo });
       events.push({ type: 'reload', id: turret.id, ammo: turret.ammo });
       return;
     }
@@ -367,17 +437,22 @@ export function playCastleCard(
   const columnIndex = findCardColumn(battle.tableau, cardId);
   const card = columnIndex >= 0 ? battle.tableau[columnIndex].cards.at(-1) : undefined;
   if (!card || card.joker || !isCardExposed(battle.tableau, cardId) ||
-    !canConnectInBattle(card, { ...battle, allowRankWrap: false }))
+    !canConnectInBattle(card, { ...battle, allowRankWrap: true }))
     return { state: current, events: [] };
   const state = clone(current);
+  const perkManager = getPerkManager(state);
+  const perkRng = new RNG(current.run.seed + ':perks:' + Date.now());
   const used = new Set(current.usedPowers ?? []);
   state.emptyDraws = 0;
   state.drawAssistAt = undefined;
   (state.runStats ??= emptyCastleRunStats()).cardsPlayed++;
   const configuredPower = getPowerType(battle.powerCards, cardId);
   const power = used.has(cardId) ? null : configuredPower === 'GUARD' || configuredPower === 'WILD' ? configuredPower : null;
+  
+  const linkBonus = perkManager.getLinkBonus(card, battle.activeCard, battle.chain.length);
   const chain = [...battle.chain, card];
-  state.run = { ...current.run, battle: { ...battle, allowRankWrap: false,
+  
+  state.run = { ...current.run, battle: { ...battle, allowRankWrap: true,
     tableau: battle.tableau.map((column, index) => index === columnIndex ? { cards: column.cards.slice(0, -1) } : column),
     discard: battle.activeCard ? [...battle.discard, battle.activeCard] : battle.discard,
     activeCard: card, chain, castleJokerExit: undefined, wildActive: power === 'WILD',
@@ -388,20 +463,103 @@ export function playCastleCard(
   if (power) {
     cardEvents.push({ type: 'power_activated', powerType: power, card });
     if (power === 'WILD') cardEvents.push({ type: 'wild_activated' });
-    // All good cards are single-use, including persistent modifiers.
     used.add(cardId);
   }
   state.usedPowers = [...used];
   state.siege.started = true;
-  const events: SiegeEvent[] = [{ type: 'card', chain: chain.length, events: cardEvents }];
+  const events: SiegeEvent[] = [{ type: 'card', chain: chain.length + linkBonus, events: cardEvents }];
   gainXp(state, CASTLE_XP.card, events);
+  
   if (power === 'GUARD') {
     const rng = RNG.fromState(state.run.rngState);
     const amount = rng.next() < CASTLE_GUARD_REWARD.bonusChance ? CASTLE_GUARD_REWARD.bonus : CASTLE_GUARD_REWARD.normal;
     state.run = { ...state.run, rngState: rng.getState(), player: { ...state.run.player, armor: state.run.player.armor + amount } };
     events.push({ type: 'boost', effect: 'armor', amount });
   }
-  state.siege.laserCharge = chainRewardCounts(chain.length).laser;
+
+  // Perk: Suit effects
+  if (!card.joker) {
+    const suitEffects = perkManager.onSuitPlayed(card.suit);
+    if (suitEffects.heal > 0) {
+      const newHp = Math.min(state.run.player.maxHp, state.run.player.hp + suitEffects.heal);
+      if (newHp > state.run.player.hp) {
+        const healed = newHp - state.run.player.hp;
+        state.run = { ...state.run, player: { ...state.run.player, hp: newHp } };
+        events.push({ type: 'perk_heal', amount: healed });
+      }
+    }
+    if (suitEffects.coins > 0) {
+      state.siege.coins += suitEffects.coins;
+      events.push({ type: 'perk_coins', amount: suitEffects.coins });
+    }
+    if (suitEffects.armor > 0) {
+      const armorCap = perkManager.getArmorCap();
+      const newArmor = Math.min(armorCap, state.run.player.armor + suitEffects.armor);
+      if (newArmor > state.run.player.armor) {
+        const added = newArmor - state.run.player.armor;
+        state.run = { ...state.run, player: { ...state.run.player, armor: newArmor } };
+        events.push({ type: 'perk_armor', amount: added });
+      }
+    }
+    
+    // Perk: Spade Salvo
+    if (perkManager.shouldFireSalvo(card.suit) && state.siege.units.some(u => u.kind === 'mortar')) {
+      const targets = perkManager.getSalvoTargets();
+      const mortarDmg = DEFENDER_STATS.mortar.damage + perkManager.getMortarDamageBonus();
+      const damage = Math.round(mortarDmg * perkManager.getDamageMultiplier());
+      const hit = state.siege.enemies.filter(e => e.hp > 0).sort((a, b) => b.progress - a.progress).slice(0, targets);
+      for (const enemy of hit) enemy.hp -= damage;
+      if (hit.length > 0) events.push({ type: 'perk_salvo', damage, targets: hit.length });
+      killDead(state, events);
+    }
+    
+    // Perk: Rank effects (royal_court, ace_flare, lucky_seven, trinity)
+    const rankEffects = perkManager.onRankPlayed(card.rank, perkRng);
+    if (rankEffects.deployUnit) {
+      deploy(state, rankEffects.deployUnit, events);
+    }
+    if (rankEffects.turretRounds > 0) {
+      const turret = state.siege.units.find(u => u.kind === 'turret');
+      if (turret) {
+        turret.ammo += rankEffects.turretRounds;
+        events.push({ type: 'reload', id: turret.id, ammo: turret.ammo });
+      } else {
+        deploy(state, 'turret', events, rankEffects.turretRounds / 10);
+      }
+    }
+    if (rankEffects.laserDamage !== 0) {
+      if (rankEffects.laserDamage === -1) {
+        const baseLaser = upgradeValue('laser', state.upgrades.laser) + perkManager.getLaserDamageBonus();
+        const damage = Math.round(baseLaser * perkManager.getDamageMultiplier());
+        for (const enemy of state.siege.enemies) enemy.hp -= damage;
+        events.push({ type: 'perk_laser', damage });
+        killDead(state, events);
+      } else {
+        const damage = Math.round(rankEffects.laserDamage * perkManager.getDamageMultiplier());
+        for (const enemy of state.siege.enemies) enemy.hp -= damage;
+        events.push({ type: 'perk_laser', damage });
+        killDead(state, events);
+      }
+    }
+    if (rankEffects.coins > 0) {
+      state.siege.coins += rankEffects.coins;
+      events.push({ type: 'perk_coins', amount: rankEffects.coins });
+    }
+    if (rankEffects.armor > 0) {
+      state.run = { ...state.run, player: { ...state.run.player, armor: state.run.player.armor + rankEffects.armor } };
+      events.push({ type: 'perk_armor', amount: rankEffects.armor });
+    }
+    if (rankEffects.freeBomb) {
+      const damage = 12;
+      for (const enemy of state.siege.enemies) enemy.hp -= damage;
+      events.push({ type: 'perk_bomb', damage });
+      killDead(state, events);
+    }
+  }
+
+  state.perkRoundState = serializePerkRoundState(perkManager);
+  state.siege.laserCharge = chainRewardCounts(chain.length + linkBonus).laser;
+  
   if (isTableauEmpty(state.run.battle!.tableau)) {
     laser(state, events, true);
     (state.runStats ??= emptyCastleRunStats()).roundsWon++;
@@ -421,7 +579,7 @@ function drawAssistRoll(current: CastleRun) {
 function castleDrawIndex(current: CastleRun, deck: readonly Card[]): number {
   const battle = current.run.battle!;
   const opensMove = (candidate: Card, card: Card) => canConnectInBattle(card, {
-    ...battle, activeCard: candidate, wildActive: false, castleJokerExit: undefined, allowRankWrap: false,
+    ...battle, activeCard: candidate, wildActive: false, castleJokerExit: undefined, allowRankWrap: true,
   });
   const columns = battle.tableau.filter(column => column.cards.length);
   if ((current.emptyDraws ?? 0) + 1 < drawAssistRoll(current).at || !deck.length ||
@@ -469,8 +627,15 @@ export function drawCastleCard(current: CastleRun, _config: GameConfig): SiegeRe
   if (current.run.phase !== 'battle') return { state: current, events: [] };
   const state = clone(current);
   const events: SiegeEvent[] = [];
+  const perkManager = getPerkManager(state);
   const chain = state.run.battle?.chain.length ?? 0;
-  const rewards = chainRewardCounts(chain);
+  const chainEndBonus = perkManager.getChainEndBonus(chain);
+  const bloodPriceCost = perkManager.getShortChainDrawCost(chain);
+  if (bloodPriceCost > 0) {
+    state.run = { ...state.run, player: { ...state.run.player, hp: state.run.player.hp - bloodPriceCost } };
+  }
+  const effectiveChain = chain + chainEndBonus;
+  const rewards = chainRewardCounts(effectiveChain);
   // Release all reached rewards once, before drawing resets joker/chain effects.
   for (let i = 0; i < rewards.soldier * upgradeValue('soldier', state.upgrades.soldier); i++)
     deploy(state, 'soldier', events);
@@ -529,8 +694,17 @@ export function stepSiege(current: CastleRun): SiegeResult {
   const state = clone(current),
     siege = state.siege,
     events: SiegeEvent[] = [];
+  const perkManager = getPerkManager(state);
   const difficulty = siegeDifficulty(state.siegeNumber);
   siege.elapsed += STEP;
+  
+  // Perk: Masons castle regen
+  const masonsHeal = perkManager.tickMasons(STEP, state.run.player.hp, state.run.player.maxHp);
+  if (masonsHeal > 0) {
+    state.run = { ...state.run, player: { ...state.run.player, hp: state.run.player.hp + masonsHeal } };
+    events.push({ type: 'perk_heal', amount: masonsHeal });
+    state.perkRoundState = serializePerkRoundState(perkManager);
+  }
   (state.runStats ??= emptyCastleRunStats()).seconds += STEP;
   siege.spawnIn -= STEP;
   if (siege.spawnIn <= 0) {
@@ -545,6 +719,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
           difficulty.hp
       );
       const sprites = boss ? ['c_ogre', 'c_reaper1'] : ['c_orc', 'c_goblin', 'c_reaper2'];
+      const baseSpeed = ((boss ? 0.025 : 0.032) + rng.next() * 0.006) * difficulty.speed;
       const enemy: Invader = {
         id: siege.nextId++,
         sprite: rng.pickOne(sprites),
@@ -553,7 +728,7 @@ export function stepSiege(current: CastleRun): SiegeResult {
         maxHp: hp,
         // World coordinates occupy 78% of the screen; ports span screen x=10–50%.
         progress: (0.1 + rng.next() * 0.4) / 0.78,
-        speed: ((boss ? 0.025 : 0.032) + rng.next() * 0.006) * difficulty.speed,
+        speed: baseSpeed * perkManager.getEnemySpeedMultiplier(boss),
         damage: boss ? 4 : 1 + Math.floor(level / 2),
         cooldown: 0,
       };
@@ -589,10 +764,14 @@ export function stepSiege(current: CastleRun): SiegeResult {
       )
       .sort((a, b) => b.progress - a.progress);
     if (!targets.length) continue;
-    unit.cooldown = stats.interval;
+    const interval = unit.kind === 'archer' 
+      ? stats.interval * perkManager.getArcherSpeedMultiplier()
+      : stats.interval;
+    unit.cooldown = interval;
     unit.ammo--;
     unit.engaged = true;
-    const hit = unit.kind === 'mortar' ? targets.slice(0, 3) : targets.slice(0, 1);
+    const mortarTargets = perkManager.getMortarTargets();
+    const hit = unit.kind === 'mortar' ? targets.slice(0, mortarTargets) : targets.slice(0, 1);
     for (const target of hit) {
       const damage = Math.min(target.hp, unit.damage);
       target.hp -= unit.damage;
@@ -604,9 +783,15 @@ export function stepSiege(current: CastleRun): SiegeResult {
             hp: Math.min(state.run.player.maxHp, state.run.player.hp + damage * unit.heal),
           },
         };
-      const fire = unit.kind === 'archer' && state.progression.modules.includes('fireArrows');
+      // Fire from module or heartfire perk
+      const moduleFireArrows = state.progression.modules.includes('fireArrows');
+      const perkFireArrows = unit.kind === 'archer' && perkManager.consumeFireArrow();
+      const fire = (unit.kind === 'archer' && moduleFireArrows) || perkFireArrows;
       if (fire) { target.burning = 4; target.burnDamage = 2; }
       events.push({ type: 'shot', kind: unit.kind, unit: unit.id, target: target.id, damage, ...(fire ? { fire: true } : {}) });
+    }
+    if (unit.kind === 'archer' && perkManager.consumeFireArrow()) {
+      state.perkRoundState = serializePerkRoundState(perkManager);
     }
   }
   killDead(state, events);

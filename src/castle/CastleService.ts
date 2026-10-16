@@ -33,6 +33,11 @@ export interface CastleContinuation {
   maxHp: number;
   armor: number;
   stats?: CastleRunStats;
+  perks?: { id: string; stacks: number }[];
+  perkRerollsUsed?: number;
+  perkFreeRerollsUsed?: number;
+  perkRareStreak?: number;
+  progression?: { xp: number; level: number; modules: string[] };
 }
 export interface CastleSiegeStart extends CastleMeta {
   /** Returned only after the saved continuation has been consumed. */
@@ -95,6 +100,29 @@ function legacyRunStats(v: Record<string, unknown>): CastleRunStats {
     goldEarned: Math.max(0, Number(siege.coins ?? 0) - Number(v.inheritedCoins ?? 0)),
   };
 }
+function ownedPerks(v: unknown): v is { id: string; stacks: number }[] {
+  return (
+    Array.isArray(v) &&
+    v.every(
+      (p) =>
+        record(p) &&
+        typeof p.id === 'string' &&
+        p.id.length > 0 &&
+        integer(p.stacks) &&
+        p.stacks >= 1 &&
+        p.stacks <= 3
+    )
+  );
+}
+function savedProgression(v: unknown): v is { xp: number; level: number; modules: string[] } {
+  return (
+    record(v) &&
+    integer(v.xp) &&
+    integer(v.level) &&
+    Array.isArray(v.modules) &&
+    v.modules.every((m) => typeof m === 'string')
+  );
+}
 function continuation(v: unknown): v is CastleContinuation {
   return (
     record(v) &&
@@ -108,7 +136,12 @@ function continuation(v: unknown): v is CastleContinuation {
     finite(v.maxHp) &&
     v.hp > 0 &&
     v.hp <= v.maxHp &&
-    (v.stats === undefined || runStats(v.stats))
+    (v.stats === undefined || runStats(v.stats)) &&
+    (v.perks === undefined || ownedPerks(v.perks)) &&
+    (v.perkRerollsUsed === undefined || integer(v.perkRerollsUsed)) &&
+    (v.perkFreeRerollsUsed === undefined || integer(v.perkFreeRerollsUsed)) &&
+    (v.perkRareStreak === undefined || integer(v.perkRareStreak)) &&
+    (v.progression === undefined || savedProgression(v.progression))
   );
 }
 function upgrades(v: unknown): v is Upgrades {
@@ -151,7 +184,7 @@ function migrateProgressionAndReserve(v: Record<string, unknown>): void {
 function migrateRules(v: Record<string, unknown>): boolean {
   if (!record(v.run) || !record(v.run.battle)) return false;
   const battle = v.run.battle;
-  battle.allowRankWrap = false;
+  battle.allowRankWrap = true;
   if (v.runStats === undefined) v.runStats = legacyRunStats(v);
   let changed = v.undoRemaining === undefined || v.abilitiesUsed === undefined;
   const isJoker = (card: unknown): boolean =>
@@ -429,6 +462,15 @@ export class CastleService {
         stats: {
           ...(state.runStats ?? legacyRunStats(state as unknown as Record<string, unknown>)),
         },
+        perks: state.perks,
+        perkRerollsUsed: state.perkRerollsUsed,
+        perkFreeRerollsUsed: state.perkFreeRerollsUsed,
+        perkRareStreak: state.perkRareStreak,
+        progression: {
+          xp: state.progression.xp,
+          level: state.progression.level,
+          modules: [...state.progression.modules],
+        },
       };
       if (continuation(next)) meta.continuation = next;
     }
@@ -446,7 +488,7 @@ export class CastleService {
         ...snapshot,
         run: {
           ...snapshot.run,
-          battle: snapshot.run.battle ? { ...snapshot.run.battle, allowRankWrap: false } : null,
+          battle: snapshot.run.battle ? { ...snapshot.run.battle, allowRankWrap: true } : null,
         },
       });
       const history = undoHistory

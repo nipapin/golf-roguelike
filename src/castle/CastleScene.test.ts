@@ -68,9 +68,9 @@ describe('manual stock action and legal-move hint', () => {
   });
   it('highlights only an exposed dead end and clears the hint when WILD makes it playable', () => {
     const h = stockHarness(), battle = h.state.run.battle!;
-    Object.assign(battle, { activeCard: { id: 'king', rank: 13, suit: 'spades' },
-      tableau: [{ cards: [{ id: 'covered-queen', rank: 12, suit: 'clubs' },
-        { id: 'ace', rank: 1, suit: 'hearts' }] }] });
+    Object.assign(battle, { activeCard: { id: 'five', rank: 5, suit: 'spades' },
+      tableau: [{ cards: [{ id: 'covered-four', rank: 4, suit: 'clubs' },
+        { id: 'two', rank: 2, suit: 'hearts' }] }] });
     h.refresh(); h.refresh();
     expect(h.pile.getData('noLegalMoves')).toBe(true);
     expect(h.halo.alpha).toBe(1); expect(h.addTween).toHaveBeenCalledOnce();

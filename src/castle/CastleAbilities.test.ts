@@ -124,7 +124,7 @@ describe('one-use paid round abilities', () => {
       const coins = manager.state!.siege.coins;
       expect(manager.canUndo).toBe(true);
       manager.draw();
-      expect(manager.undo()).toBe(true);
+      expect(manager.undo().success).toBe(true);
       expect(manager.undoDepth).toBe(2);
       expect(manager.state!.siege.coins).toBe(coins);
       expect(manager.state!.abilitiesUsed).toContain(ability);
@@ -135,7 +135,7 @@ describe('one-use paid round abilities', () => {
       reopened.useAbility(ability);
       expect(reopened.state).toBe(before);
       expect(reopened.state!.siege.coins).toBe(coins);
-      expect(reopened.undo()).toBe(true);
+      expect(reopened.undo().success).toBe(true);
       expect(reopened.state!.siege.coins).toBe(300);
       expect(reopened.state!.abilitiesUsed).not.toContain(ability);
       reopened.start();
@@ -173,7 +173,7 @@ describe('one-use paid round abilities', () => {
     const { manager: training, ids } = createTraining();
     manager.state = training.state;
     manager.play(ids[0]);
-    expect(manager.undo()).toBe(true);
+    expect(manager.undo().success).toBe(true);
     expect(manager.undoDepth).toBe(0);
     manager.play(ids[0]);
     manager.state!.siege.coins = 30;
@@ -191,18 +191,18 @@ describe('one-use paid round abilities', () => {
     expect(reopened.resume()).toBe(true);
     expect(reopened.undoDepth).toBe(2);
     reopened.draw();
-    expect(reopened.undo()).toBe(true);
+    expect(reopened.undo().success).toBe(true);
     expect(reopened.undoDepth).toBe(2);
     reopened.draw();
-    expect(reopened.undo()).toBe(true);
+    expect(reopened.undo().success).toBe(true);
     reopened.save();
     const exhausted = new CastleManager(storage);
     expect(exhausted.resume()).toBe(true);
     expect(exhausted.undoDepth).toBe(2);
-    expect(exhausted.undo()).toBe(true);
+    expect(exhausted.undo().success).toBe(true);
     expect(exhausted.state!.abilitiesUsed).toEqual([]);
-    expect(exhausted.undo()).toBe(true);
-    expect(exhausted.undo()).toBe(false);
+    expect(exhausted.undo().success).toBe(true);
+    expect(exhausted.undo().success).toBe(false);
   });
   it('clears powers from recycled waste and consumed GUARD cannot activate again', () => {
     const { manager, ids } = createTraining();
@@ -278,8 +278,11 @@ describe('one-use paid round abilities', () => {
     reopened.play(ids[7]);
     expect(reopened.state!.usedPowers).toContain(ids[7]);
     expect(reopened.state!.run.battle!.wildActive).toBe(true);
-    expect(manager.undo()).toBe(true);
-    expect(manager.state).toEqual(before);
+    const hpBeforeUndo = manager.state!.run.player.hp;
+    expect(manager.undo().success).toBe(true);
+    expect(manager.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const expectedBefore = { ...before, run: { ...before.run, player: { ...before.run.player, hp: manager.state!.run.player.hp } } };
+    expect(manager.state).toEqual(expectedBefore);
   });
   it('strips the recycled GUARD while preserving unused GUARD and WILD on the field', () => {
     const { manager, ids } = createTraining();

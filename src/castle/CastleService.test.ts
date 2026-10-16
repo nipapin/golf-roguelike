@@ -356,6 +356,15 @@ describe('one-time round continuation', () => {
       maxHp: 40,
       armor: 9,
       stats: state.runStats,
+      perks: undefined,
+      perkRerollsUsed: undefined,
+      perkFreeRerollsUsed: undefined,
+      perkRareStreak: undefined,
+      progression: {
+        xp: state.progression.xp,
+        level: state.progression.level,
+        modules: [...state.progression.modules],
+      },
     });
     expect(service.readMeta().continuation).toBeUndefined();
     expect(service.beginSiege().carryover).toBeUndefined();
@@ -449,8 +458,8 @@ describe('one-time round continuation', () => {
 });
 
 describe('castle rank-policy migration', () => {
-  it.each([undefined, true])(
-    'loads legacy wrap=%s as linear ranks without replacing the board',
+  it.each([undefined, false])(
+    'loads legacy wrap=%s as wrap-around ranks without replacing the board',
     (allowRankWrap) => {
       const storage = memoryStorage(),
         service = new CastleService(storage),
@@ -459,7 +468,7 @@ describe('castle rank-policy migration', () => {
       state.run = { ...state.run, battle: { ...battle, allowRankWrap } };
       storage.setItem(KEY, JSON.stringify(state));
       const loaded = service.load()!;
-      expect(loaded.run.battle!.allowRankWrap).toBe(false);
+      expect(loaded.run.battle!.allowRankWrap).toBe(true);
       expect(loaded.run.battle!.tableau).toEqual(battle.tableau);
       expect(loaded.run.battle!.deck).toEqual(battle.deck);
       expect(loaded.run.battle!.activeCard).toEqual(battle.activeCard);
@@ -471,22 +480,22 @@ describe('castle rank-policy migration', () => {
     const storage = memoryStorage(),
       service = new CastleService(storage),
       state = initial();
-    state.run = { ...state.run, battle: { ...state.run.battle!, allowRankWrap: true } };
+    state.run = { ...state.run, battle: { ...state.run.battle!, allowRankWrap: false } };
     const before = structuredClone(state);
     service.save(state, { cost: 0, entries: [{ cost: 0, state }] });
     const saved = JSON.parse(storage.getItem(KEY)!);
-    expect(saved.run.battle.allowRankWrap).toBe(false);
-    expect(saved.undoHistory.entries[0].state.run.battle.allowRankWrap).toBe(false);
+    expect(saved.run.battle.allowRankWrap).toBe(true);
+    expect(saved.undoHistory.entries[0].state.run.battle.allowRankWrap).toBe(true);
     expect(state).toEqual(before);
     // Even a history written by the previous app is normalized during loading.
-    saved.run.battle.allowRankWrap = true;
-    saved.undoHistory.entries[0].state.run.battle.allowRankWrap = true;
+    saved.run.battle.allowRankWrap = false;
+    saved.undoHistory.entries[0].state.run.battle.allowRankWrap = false;
     storage.setItem(KEY, JSON.stringify(saved));
     const loaded = service.load()!;
-    expect(loaded.run.battle!.allowRankWrap).toBe(false);
+    expect(loaded.run.battle!.allowRankWrap).toBe(true);
     const history = service.loadUndoHistory(loaded);
     expect(history.entries).toHaveLength(1);
-    expect(history.entries[0].state.run.battle!.allowRankWrap).toBe(false);
+    expect(history.entries[0].state.run.battle!.allowRankWrap).toBe(true);
   });
 });
 

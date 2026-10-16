@@ -33,7 +33,7 @@ describe('scarce castle armor cards', () => {
     const armor = manager.state!.run.player.armor;
     const rng = manager.state!.run.rngState;
     expect([1, 5]).toContain(armor - initial);
-    expect(manager.undo()).toBe(true);
+    expect(manager.undo().success).toBe(true);
     expect(manager.state!.run.player.armor).toBe(initial);
     manager.play(ids[0]);
     expect(manager.state!.run.player.armor).toBe(armor);

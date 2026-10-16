@@ -104,34 +104,17 @@ function rankFixture(activeRank: number, targetRank: number, wild = false) {
   return { state, target };
 }
 
-describe('castle linear rank sequence', () => {
-  it.each([
-    [1, 13],
-    [13, 1],
-  ])('rejects %i to %i without modifying the battle', (active, target) => {
-    const fixture = rankFixture(active, target),
-      before = structuredClone(fixture.state);
-    expect(fixture.state.run.battle!.allowRankWrap).toBe(false);
-    expect(canConnectInBattle(fixture.target, fixture.state.run.battle!)).toBe(false);
-    expect(playCastleCard(fixture.state, fixture.target.id, config)).toEqual({
-      state: fixture.state,
-      events: [],
-    });
-    expect(fixture.state).toEqual(before);
-    // Direct callers cannot re-enable the old rule through a stale save flag.
-    fixture.state.run = {
-      ...fixture.state.run,
-      battle: { ...fixture.state.run.battle!, allowRankWrap: true },
-    };
-    expect(playCastleCard(fixture.state, fixture.target.id, config).state).toBe(fixture.state);
-  });
+describe('castle rank sequence with wrap-around', () => {
   it.each([
     [12, 13],
     [13, 12],
     [1, 2],
     [2, 1],
-  ])('accepts ordinary %i to %i', (active, target) => {
+    [1, 13],
+    [13, 1],
+  ])('accepts ordinary %i to %i including K<->A wrap', (active, target) => {
     const fixture = rankFixture(active, target);
+    expect(fixture.state.run.battle!.allowRankWrap).toBe(true);
     const result = playCastleCard(fixture.state, fixture.target.id, config);
     expect(result.state).not.toBe(fixture.state);
     expect(result.state.run.battle!.activeCard).toEqual(fixture.target);
@@ -147,7 +130,7 @@ describe('castle linear rank sequence', () => {
     const result = playCastleCard(fixture.state, fixture.target.id, config);
     expect(result.state.run.battle!.activeCard).toEqual(fixture.target);
     expect(result.state.run.battle!.wildActive).toBe(false);
-    expect(result.state.run.battle!.allowRankWrap).toBe(false);
+    expect(result.state.run.battle!.allowRankWrap).toBe(true);
   });
   it('continues an empty-stock chain until the player explicitly clicks reshuffle', () => {
     const state = start(),

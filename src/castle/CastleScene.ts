@@ -2,6 +2,7 @@ import { cardboardActor, type siegeActors } from './CardboardArt';
 import Phaser from 'phaser';
 import { viewport, configureViewport, getRenderDensity } from '../presentation/design/viewport';
 import { getCastleLayoutMetrics } from '../presentation/design/tokens';
+import { isDesktopViewport } from '../presentation/design/desktopLayout';
 import { coverImage } from '../presentation/design/coverImage';
 import { GameFeel, gildedPanel, siegeBackdrop } from '../presentation/design/GameFeel';
 import { CardVisual } from '../presentation/design/CardVisual';
@@ -264,8 +265,12 @@ export class CastleScene extends Phaser.Scene {
     const undoRoot = this.add.container(this.layout.undoX, this.layout.undoY).setDepth(90);
     this.undoButton = siegeButton(this, undoRoot, 0, 0, this.layout.undoWidth, this.layout.undoHeight, '', () => {
       if (this.paused || this.locked || this.ended || !this.allowTraining('undo')) return;
-      if (!manager.undo()) { AudioSystem.play('invalid_tap'); return; }
+      const result = manager.undo();
+      if (!result.success) { AudioSystem.play('invalid_tap'); return; }
       AudioSystem.play('card_draw'); this.accumulator = 0;
+      if (result.damage > 0) {
+        this.showUndoDamage(result.damage);
+      }
       this.renderCards(); this.syncActors(); this.refreshHUD(); this.advanceTraining();
     }, 'undo').setName('undo-button');
     this.settings = new SettingsModal(this, {
@@ -412,8 +417,11 @@ export class CastleScene extends Phaser.Scene {
     return Math.max(this.layout.arenaTop + 22, this.castle.getBounds().top - 14);
   }
   private enemyPosition(enemy: Invader) {
+    const vp = viewport(this);
+    const narrow = !isDesktopViewport(vp.width, vp.height);
+    const leftOffset = narrow ? -vp.width * 0.12 : 0;
     return {
-      x: enemy.progress * viewport(this).width * 0.78,
+      x: leftOffset + enemy.progress * vp.width * 0.78,
       y: enemyGroundPlacement(enemy.id, this.layout.arenaTop, this.layout.arenaHeight).y,
     };
   }
@@ -1265,6 +1273,13 @@ export class CastleScene extends Phaser.Scene {
           this.endPopup();
           break;
       }
+  }
+  private showUndoDamage(damage: number): void {
+    AudioSystem.play('player_hit', { volume: 0.6 });
+    impactFeedback();
+    this.number(this.castle.x, this.castle.y - 70, `−${damage}`, '#ff6b84');
+    this.tweens.add({ targets: this.castle, angle: -1.3, duration: 80, yoyo: true, ease: 'Sine.out' });
+    if (!isShakeReduced()) this.cameras.main.shake(60, 0.0008);
   }
   private shot(event: Extract<SiegeEvent, { type: 'shot' }>,
     splash: Extract<SiegeEvent, { type: 'shot' }>[] = []): void {

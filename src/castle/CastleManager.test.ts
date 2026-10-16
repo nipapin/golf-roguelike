@@ -44,22 +44,34 @@ describe('castle move undo', () => {
     const reopened = new CastleManager(storage);
     expect(reopened.resume()).toBe(true);
     expect(reopened.undoDepth).toBe(8);
+    let undoCount = 0;
     for (const snapshot of snapshots.reverse()) {
       expect(reopened.canUndo).toBe(true);
-      expect(reopened.undo()).toBe(true);
-      expect(reopened.state).toEqual(snapshot);
+      const hpBefore = reopened.state!.run.player.hp;
+      const result = reopened.undo();
+      expect(result.success).toBe(true);
+      expect(result.damage).toBe(1);
+      expect(reopened.state!.run.player.hp).toBe(hpBefore - 1);
+      const expected = { ...snapshot, run: { ...snapshot.run, player: { ...snapshot.run.player, hp: reopened.state!.run.player.hp } } };
+      expect(reopened.state).toEqual(expected);
+      undoCount++;
     }
     expect(reopened.canUndo).toBe(false);
-    expect(reopened.undo()).toBe(false);
+    expect(reopened.undo().success).toBe(false);
   });
-  it('restores the complete state before a play, including intervening siege time', () => {
+  it('restores the complete state before a play, including intervening siege time, but deducts undo HP cost', () => {
     const manager = prepare();
     const before = structuredClone(manager.state!);
     manager.play(chooseGreedyCard(manager.state!.run, config)!);
     manager.state = stepSiege(manager.state!).state;
+    const hpBefore = manager.state!.run.player.hp;
     expect(manager.canUndo).toBe(true);
-    expect(manager.undo()).toBe(true);
-    expect(manager.state).toEqual(before);
+    const result = manager.undo();
+    expect(result.success).toBe(true);
+    expect(result.damage).toBe(1);
+    expect(manager.state!.run.player.hp).toBe(hpBefore - 1);
+    const expected = { ...before, run: { ...before.run, player: { ...before.run.player, hp: manager.state!.run.player.hp } } };
+    expect(manager.state).toEqual(expected);
   });
   it('undoes draws and released deployments, then continues undoing earlier plays', () => {
     const { manager, ids } = createTraining();
@@ -70,25 +82,39 @@ describe('castle move undo', () => {
     const beforeDraw = structuredClone(manager.state!);
     const firstDraw = manager.draw()!;
     expect(manager.state!.siege.units).toHaveLength(3);
-    expect(manager.undo()).toBe(true);
-    expect(manager.state).toEqual(beforeDraw);
+    const hpBeforeUndo = manager.state!.run.player.hp;
+    expect(manager.undo().success).toBe(true);
+    expect(manager.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const expectedBeforeDraw = { ...beforeDraw, run: { ...beforeDraw.run, player: { ...beforeDraw.run.player, hp: manager.state!.run.player.hp } } };
+    expect(manager.state).toEqual(expectedBeforeDraw);
     // Replaying a draw neither duplicates soldiers nor reload rewards.
     expect(manager.draw()!.events).toEqual(firstDraw.events);
     expect(manager.state!.siege.units).toHaveLength(3);
-    expect(manager.undo()).toBe(true);
-    expect(manager.undo()).toBe(true);
+    expect(manager.undo().success).toBe(true);
+    expect(manager.undo().success).toBe(true);
     expect(manager.undoDepth).toBe(2);
     expect(manager.state!.run.battle!.chain).toHaveLength(2);
-    expect(manager.undo()).toBe(true);
-    expect(manager.undo()).toBe(true);
-    expect(manager.undo()).toBe(false);
+    expect(manager.undo().success).toBe(true);
+    expect(manager.undo().success).toBe(true);
+    expect(manager.undo().success).toBe(false);
   });
-  it('allows undo at one HP and never charges castle health', () => {
+  it('blocks undo at low HP to prevent castle death from undo cost', () => {
     const { manager } = createTraining();
     manager.state!.run = { ...manager.state!.run, player: { ...manager.state!.run.player, hp: 1 } };
     manager.draw();
+    expect(manager.canUndo).toBe(false);
+    expect(manager.undo().success).toBe(false);
+    expect(manager.state!.run.player.hp).toBe(1);
+    expect(manager.undoDepth).toBe(1);
+  });
+  it('allows undo at HP above the cost threshold', () => {
+    const { manager } = createTraining();
+    manager.state!.run = { ...manager.state!.run, player: { ...manager.state!.run.player, hp: 2 } };
+    manager.draw();
     expect(manager.canUndo).toBe(true);
-    expect(manager.undo()).toBe(true);
+    const result = manager.undo();
+    expect(result.success).toBe(true);
+    expect(result.damage).toBe(1);
     expect(manager.state!.run.player.hp).toBe(1);
     expect(manager.undoDepth).toBe(0);
   });
@@ -103,7 +129,7 @@ describe('castle move undo', () => {
     manager.play(card);
     const awarded = manager.state!.run.player.armor - armor;
     expect([1, 5]).toContain(awarded);
-    expect(manager.undo()).toBe(true);
+    expect(manager.undo().success).toBe(true);
     expect(manager.state!.run.player.armor).toBe(armor);
     manager.play(card);
     expect(manager.state!.run.player.armor).toBe(armor + awarded);
@@ -114,28 +140,36 @@ describe('castle move undo', () => {
     manager.play(ids[0]);
     const accepted = manager.state;
     expect(manager.play('missing')!.state).toBe(accepted);
-    expect(manager.undo()).toBe(true);
-    expect(manager.state).toEqual(before);
+    const hpBefore = manager.state!.run.player.hp;
+    expect(manager.undo().success).toBe(true);
+    expect(manager.state!.run.player.hp).toBe(hpBefore - 1);
+    const expected = { ...before, run: { ...before.run, player: { ...before.run.player, hp: manager.state!.run.player.hp } } };
+    expect(manager.state).toEqual(expected);
   });
-  it('restores the deck, discard and RNG before a reshuffle', () => {
+  it('restores the deck, discard and RNG before a reshuffle, minus undo HP cost', () => {
     const { manager } = createTraining();
     while (manager.state!.run.battle!.deck.length) manager.draw();
     const before = structuredClone(manager.state!);
     const drawn = manager.draw()!;
     expect(drawn.events).toContainEqual({ type: 'draw', recycled: true });
     expect(drawn.state.run.player.hp).toBe(before.run.player.hp - CASTLE_RECYCLE_HP_COST);
-    expect(manager.undo()).toBe(true);
-    expect(manager.state).toEqual(before);
+    const hpBeforeUndo = manager.state!.run.player.hp;
+    expect(manager.undo().success).toBe(true);
+    expect(manager.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const hpAfterUndo = manager.state!.run.player.hp;
+    const expectedBefore = { ...before, run: { ...before.run, player: { ...before.run.player, hp: hpAfterUndo } } };
+    expect(manager.state).toEqual(expectedBefore);
     const replayed = manager.draw()!;
     expect(replayed.state.run.battle).toEqual(drawn.state.run.battle);
     expect(replayed.state.run.rngState).toBe(drawn.state.run.rngState);
-    expect(replayed.state.run.player.hp).toBe(drawn.state.run.player.hp);
+    expect(replayed.state.run.player.hp).toBe(hpAfterUndo - CASTLE_RECYCLE_HP_COST);
   });
   it('keeps history after reopening a saved siege', () => {
     const storage = memoryStorage();
     const manager = new CastleManager(storage);
     const training = createTraining();
     manager.state = training.manager.state;
+    const initialHp = manager.state!.run.player.hp;
     const initial = structuredClone(manager.state!);
     manager.play(training.ids[0]);
     manager.play(training.ids[1]);
@@ -144,10 +178,12 @@ describe('castle move undo', () => {
     const reopened = new CastleManager(storage);
     expect(reopened.resume()).toBe(true);
     expect(reopened.canUndo).toBe(true);
-    expect(reopened.undo()).toBe(true);
-    expect(reopened.undo()).toBe(true);
-    expect(reopened.state).toEqual(initial);
-    expect(reopened.undo()).toBe(false);
+    expect(reopened.undo().success).toBe(true);
+    expect(reopened.undo().success).toBe(true);
+    const expectedHp = initialHp - 3;
+    const expectedInitial = { ...initial, run: { ...initial.run, player: { ...initial.run.player, hp: expectedHp } } };
+    expect(reopened.state).toEqual(expectedInitial);
+    expect(reopened.undo().success).toBe(false);
     const saved = JSON.parse(storage.getItem('golf-castle-run-v1')!);
     expect(saved.undoHistory.entries).toHaveLength(0);
   });
@@ -159,8 +195,11 @@ describe('castle move undo', () => {
     expect(manager.resume()).toBe(true);
     expect(manager.canUndo).toBe(false);
     manager.draw();
-    expect(manager.undo()).toBe(true);
-    expect(manager.state).toEqual(initial);
+    const hpBeforeUndo = manager.state!.run.player.hp;
+    expect(manager.undo().success).toBe(true);
+    expect(manager.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const expectedInitial = { ...initial, run: { ...initial.run, player: { ...initial.run.player, hp: manager.state!.run.player.hp } } };
+    expect(manager.state).toEqual(expectedInitial);
   });
   it('rejects damaged or cross-siege history without discarding the current board', () => {
     const storage = memoryStorage();
@@ -181,7 +220,7 @@ describe('castle move undo', () => {
     expect(manager.canUndo).toBe(true);
     manager.start();
     expect(manager.canUndo).toBe(false);
-    expect(manager.undo()).toBe(false);
+    expect(manager.undo().success).toBe(false);
   });
 });
 
@@ -207,10 +246,10 @@ describe('irreversible castle resources', () => {
     expect(manager.state!.siege.coins).toBe(4);
     expect(manager.canUndo).toBe(true);
     manager.draw();
-    expect(manager.undo()).toBe(true);
+    expect(manager.undo().success).toBe(true);
     expect(manager.state!.siege.coins).toBe(4);
     expect(manager.state!.progression.modules).toContain('fireArrows');
-    expect(manager.undo()).toBe(true);
+    expect(manager.undo().success).toBe(true);
     expect(manager.state!.siege.coins).toBe(10);
     expect(manager.state!.progression.modules).not.toContain('fireArrows');
   });
@@ -258,8 +297,11 @@ describe('irreversible castle resources', () => {
     expect(reopened.state!.siege.enemies.some((enemy) => enemy.id === 91)).toBe(false);
     expect(reopened.canUndo).toBe(true);
     const earned = structuredClone(reopened.state!);
-    expect(reopened.undo()).toBe(true);
-    expect(reopened.state).toEqual(before);
+    const hpBeforeUndo = reopened.state!.run.player.hp;
+    expect(reopened.undo().success).toBe(true);
+    expect(reopened.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const expectedBefore = { ...before, run: { ...before.run, player: { ...before.run.player, hp: reopened.state!.run.player.hp } } };
+    expect(reopened.state).toEqual(expectedBefore);
     reopened.draw();
     reopened.step();
     expect(reopened.state!.siege.coins).toBe(earned.siege.coins);
