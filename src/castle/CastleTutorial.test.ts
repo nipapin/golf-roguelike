@@ -14,8 +14,10 @@ describe('interactive training', () => {
     manager.play(ids[0]);
     manager.play(ids[1]);
     const hp = manager.state!.run.player.hp;
-    expect(manager.undo()).toBe(true);
-    expect(manager.state!.run.player.hp).toBe(hp);
+    const undoResult = manager.undo();
+    expect(undoResult.success).toBe(true);
+    expect(undoResult.damage).toBe(1);
+    expect(manager.state!.run.player.hp).toBe(hp - 1);
     expect(manager.undoDepth).toBe(1);
     expect(manager.state!.run.battle!.activeCard!.rank).toBe(6);
     manager.play(ids[1]);

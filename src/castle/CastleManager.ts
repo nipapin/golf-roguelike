@@ -15,8 +15,8 @@ import {
 } from './CastleDefense';
 import { CastleService, type CastleUndoHistory } from './CastleService';
 import type { ModuleKey } from './CastleProgression';
-// Legacy export for older integrations; current undo never costs castle HP.
-export const CASTLE_UNDO_HP_COST = 0;
+/** HP cost for each undo. Set to 0 to disable damage. */
+export const CASTLE_UNDO_HP_COST = 1;
 export class CastleManager {
   state: CastleRun | null = null;
   private history: CastleUndoHistory = { cost: 0, entries: [] };
@@ -102,17 +102,31 @@ export class CastleManager {
   }
   get canUndo(): boolean {
     const entry = this.history.entries.at(-1);
-    return !!entry && this.state?.run.phase === 'battle';
+    if (!entry || this.state?.run.phase !== 'battle') return false;
+    if (CASTLE_UNDO_HP_COST > 0 && this.state.run.player.hp <= CASTLE_UNDO_HP_COST) return false;
+    return true;
   }
   get undoDepth(): number {
     return this.history.entries.length;
   }
-  undo(): boolean {
-    if (!this.canUndo) return false;
+  /** Undo the last move. Returns { success, damage } where damage is HP lost. */
+  undo(): { success: boolean; damage: number } {
+    if (!this.canUndo) return { success: false, damage: 0 };
     const entry = this.history.entries.pop()!;
-    this.state = entry.state;
+    const damage = CASTLE_UNDO_HP_COST;
+    const currentHp = this.state!.run.player.hp;
+    this.state = {
+      ...entry.state,
+      run: {
+        ...entry.state.run,
+        player: {
+          ...entry.state.run.player,
+          hp: currentHp - damage,
+        },
+      },
+    };
     this.save();
-    return true;
+    return { success: true, damage };
   }
   draw(): SiegeResult | null {
     const before = this.state;

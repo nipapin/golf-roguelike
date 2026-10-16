@@ -169,9 +169,13 @@ describe('stock order after consecutive empty draws', () => {
     expect(reopened.state!.drawAssistRngState).toBe(before.drawAssistRngState);
     const result = reopened.draw()!.state;
     expect(result.run.battle!.activeCard!.rank).toBe(13);
-    expect(reopened.undo()).toBe(true);
-    expect(reopened.state).toEqual(before);
-    expect(reopened.draw()!.state).toEqual(result);
+    const hpBeforeUndo = reopened.state!.run.player.hp;
+    expect(reopened.undo().success).toBe(true);
+    expect(reopened.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const expectedBefore = { ...before, run: { ...before.run, player: { ...before.run.player, hp: reopened.state!.run.player.hp } } };
+    expect(reopened.state).toEqual(expectedBefore);
+    const redrawn = reopened.draw()!.state;
+    expect(redrawn.run.battle).toEqual(result.run.battle);
   });
   it('supports older saves without a draw streak', () => {
     const storage = memoryStorage(), service = new CastleService(storage);
@@ -195,8 +199,13 @@ describe('stock order after consecutive empty draws', () => {
     expect(reopened.resume()).toBe(true);
     expect(reopened.state!.drawAssistAt).toBe(first.drawAssistAt);
     expect(reopened.state!.drawAssistRngState).toBe(first.drawAssistRngState);
-    expect(reopened.undo()).toBe(true);
-    expect(reopened.state).toEqual(initial);
-    expect(reopened.draw()!.state).toEqual(first);
+    const hpBeforeUndo = reopened.state!.run.player.hp;
+    expect(reopened.undo().success).toBe(true);
+    expect(reopened.state!.run.player.hp).toBe(hpBeforeUndo - 1);
+    const expectedInitial = { ...initial, run: { ...initial.run, player: { ...initial.run.player, hp: reopened.state!.run.player.hp } } };
+    expect(reopened.state).toEqual(expectedInitial);
+    const redrawn = reopened.draw()!.state;
+    expect(redrawn.run.battle).toEqual(first.run.battle);
+    expect(redrawn.drawAssistAt).toBe(first.drawAssistAt);
   });
 });
