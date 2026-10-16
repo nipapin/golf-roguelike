@@ -40,6 +40,8 @@ import {
   upgradeValue,
   CHAIN_REWARD_ORDER,
   chainRewardCounts,
+  nextCastleCard,
+  getPerkManager,
   type Invader,
   type Defender,
   type SiegeEvent,
@@ -65,6 +67,7 @@ export class CastleScene extends Phaser.Scene {
   private active: CardVisual | null = null;
   private stockPile!: Phaser.GameObjects.Container;
   private stockPileBacks: Phaser.GameObjects.Container[] = [];
+  private stockPreviewCard: CardVisual | null = null;
   private stockHalo!: Phaser.GameObjects.Graphics;
   private stockPlaceholder!: Phaser.GameObjects.Graphics;
   private recyclePrice!: Phaser.GameObjects.Container;
@@ -143,6 +146,7 @@ export class CastleScene extends Phaser.Scene {
     this.ended = false;
     this.active = null;
     this.stockPileBacks = [];
+    this.stockPreviewCard = null;
     this.stockHintPulse = undefined;
     this.nextFootstep = 0;
     this.nextVoice = 0;
@@ -880,9 +884,17 @@ export class CastleScene extends Phaser.Scene {
     if (player.armor > 0) this.hp.fillStyle(0x4d9de9).fillRoundedRect(this.armorBar.x + 1, this.armorBar.y + 1,
       (this.armorBar.width - 2) * Math.min(1, player.armor / player.maxHp), this.armorBar.height - 2, 5);
     this.armorText.setText(String(player.armor));
+    const perkManager = getPerkManager(state);
+    const abilityCostMultiplier = perkManager.getAbilityCostMultiplier();
     for (const [ability, button] of this.abilityButtons) {
       const used = (state.abilitiesUsed ?? []).includes(ability);
-      button.setAlpha(used ? .28 : state.siege.coins < CASTLE_ABILITIES[ability].cost ? .5 : 1);
+      const discountedCost = Math.floor(CASTLE_ABILITIES[ability].cost * abilityCostMultiplier);
+      button.setAlpha(used ? .28 : state.siege.coins < discountedCost ? .5 : 1);
+      const priceText = button.getByName('ability-gold-price') as Phaser.GameObjects.Text | undefined;
+      if (priceText && abilityCostMultiplier < 1) {
+        priceText.setText(String(discountedCost));
+        priceText.setColor('#7dffb8');
+      }
     }
     const gold = state.siege.coins + player.gold;
     if (gold > this.lastGold) {
@@ -917,14 +929,41 @@ export class CastleScene extends Phaser.Scene {
     this.undoButton.setAlpha(this.manager.canUndo ? 1 : 0.5);
   }
   private refreshStock(): void {
-    const battle = this.manager.state!.run.battle!, count = battle.deck.length;
+    const state = this.manager.state!;
+    const battle = state.run.battle!, count = battle.deck.length;
     const noLegalMoves = !battle.tableau.some(column => {
       const card = column.cards.at(-1); return card && canConnectInBattle(card, battle);
     });
     const hint = !this.ended && noLegalMoves, empty = count === 0;
     this.stockPile.setData('cards', count).setData('noLegalMoves', noLegalMoves);
     this.stockPile.setData('action', empty ? 'shuffle' : 'draw');
-    this.stockPileBacks.forEach(back => back.setVisible(count > back.getData('layer')));
+    
+    const perkManager = getPerkManager(state);
+    const showPreview = !empty && perkManager.showNextCard();
+    
+    if (showPreview) {
+      const nextCard = nextCastleCard(state);
+      if (nextCard) {
+        const previewId = this.stockPreviewCard?.getCard().id;
+        if (previewId !== nextCard.id) {
+          this.stockPreviewCard?.destroy();
+          this.stockPreviewCard = new CardVisual(this, 0, 0, nextCard, null);
+          this.stockPreviewCard.setDepth(5);
+          this.stockPreviewCard.getContainer().setScale(this.layout.stockPileScale);
+          this.stockPreviewCard.setState('normal');
+          this.stockPile.add(this.stockPreviewCard.getContainer());
+        }
+        this.stockPreviewCard?.getContainer().setVisible(true);
+        this.stockPileBacks.forEach(back => back.setVisible(false));
+      }
+    } else {
+      if (this.stockPreviewCard) {
+        this.stockPreviewCard.destroy();
+        this.stockPreviewCard = null;
+      }
+      this.stockPileBacks.forEach(back => back.setVisible(count > back.getData('layer')));
+    }
+    
     this.stockPlaceholder.setVisible(empty);
     this.recyclePrice.setVisible(empty);
     const available = !empty || battle.discard.length > 0;
@@ -1275,6 +1314,39 @@ export class CastleScene extends Phaser.Scene {
         case 'laser':
           this.laserEffect(event.final);
           break;
+        case 'perk_heal': {
+          const p = this.activePosition();
+          playCombatVFX(this, 'heal', p.x + 25, p.y + 40, 60);
+          this.number(this.castle.x, this.castle.y - 70, `+${event.amount} HP`, '#83ffc4');
+          break;
+        }
+        case 'perk_coins': {
+          const p = this.activePosition();
+          playCombatVFX(this, 'reward', p.x + 25, p.y + 40, 50, 0xffd24a);
+          this.number(this.coins.x, this.coins.y - 20, `+${event.amount}`, '#ffe35a');
+          break;
+        }
+        case 'perk_armor': {
+          const p = this.activePosition();
+          playCombatVFX(this, 'shield', p.x + 25, p.y + 40, 60);
+          this.number(this.castle.x, this.castle.y - 70, `+${event.amount} ARMOR`, '#8ceaff');
+          break;
+        }
+        case 'perk_bomb': {
+          this.callout(`TRINITY BOMB · ${event.damage} DMG`, '#ffb196');
+          for (const view of [...this.invaders.values()].slice(0, 8))
+            playCombatVFX(this, 'magic', view.root.x, view.root.y - 22, 70, 0xff9964);
+          break;
+        }
+        case 'perk_laser': {
+          this.callout(`ACE LASER · ${event.damage} DMG`, '#c6fff3');
+          this.laserEffect(false);
+          break;
+        }
+        case 'perk_salvo': {
+          this.callout(`SPADE SALVO · ${event.damage} × ${event.targets}`, '#d8b0ff');
+          break;
+        }
         case 'ended':
           this.endPopup();
           break;

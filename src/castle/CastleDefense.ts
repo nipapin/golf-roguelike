@@ -604,13 +604,15 @@ export function nextCastleCard(current: CastleRun) {
   return deck[castleDrawIndex(current, deck)];
 }
 export function useCastleAbility(current: CastleRun, ability: CastleAbility, config: GameConfig): SiegeResult {
+  const perkManager = getPerkManager(current);
+  const abilityCost = Math.floor(CASTLE_ABILITIES[ability].cost * perkManager.getAbilityCostMultiplier());
   if (current.run.phase !== 'battle' || (current.abilitiesUsed ?? []).includes(ability) ||
-    current.siege.coins < CASTLE_ABILITIES[ability].cost ||
+    current.siege.coins < abilityCost ||
     (ability === 'HEAL' && current.run.player.hp >= current.run.player.maxHp) ||
     (ability === 'BOMB' && !current.siege.enemies.length) ||
     (ability === 'ECHO' && !current.run.battle!.chain.length)) return { state: current, events: [] };
   const state = clone(current);
-  state.siege.coins -= CASTLE_ABILITIES[ability].cost;
+  state.siege.coins -= abilityCost;
   state.abilitiesUsed = [...(current.abilitiesUsed ?? []), ability];
   const events: SiegeEvent[] = [{ type: 'ability', ability }];
   if (ability === 'HEAL') {

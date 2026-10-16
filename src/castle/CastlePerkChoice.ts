@@ -28,17 +28,43 @@ const CATEGORY_ICONS: Record<string, string> = {
   risk: '☠',
 };
 
+const PERK_ICONS: Record<string, string> = {
+  heart_mend: '♥',
+  spade_edge: '♠',
+  diamond_vein: '♦',
+  club_bulwark: '♣',
+  flush_run: '🎴',
+  royal_court: '👑',
+  ace_flare: '✦',
+  lucky_seven: '🎲',
+  momentum: '⚡',
+  ouroboros: '∞',
+  spare_stock: '📦',
+  card_counter: '👁',
+  jester: '🃏',
+  longbow: '🏹',
+  quick_draw: '💨',
+  extended_mag: '🔋',
+  heavy_shells: '💣',
+  cluster_shells: '💥',
+  focusing_lens: '🔮',
+  veteran_militia: '🛡',
+  stone_walls: '🧱',
+  masons: '🔨',
+  field_hospital: '🏥',
+  tar_moat: '🛢',
+  bounty_board: '📜',
+  guild_charter: '📋',
+  spade_salvo: '🎯',
+  heartfire: '🔥',
+  trinity: '△',
+  starfall: '★',
+  glass_cannon: '⚔',
+  blood_price: '🩸',
+};
+
 function getPerkIcon(perk: PerkDef): string {
-  if (perk.id === 'heart_mend') return '♥';
-  if (perk.id === 'spade_edge') return '♠';
-  if (perk.id === 'diamond_vein') return '♦';
-  if (perk.id === 'club_bulwark') return '♣';
-  if (perk.id === 'royal_court') return '👑';
-  if (perk.id === 'ace_flare') return '✦';
-  if (perk.id === 'starfall') return '★';
-  if (perk.id === 'glass_cannon') return '💥';
-  if (perk.id === 'blood_price') return '🩸';
-  return CATEGORY_ICONS[perk.category] || '✧';
+  return PERK_ICONS[perk.id] || CATEGORY_ICONS[perk.category] || '✧';
 }
 
 export function showPerkChoice(
